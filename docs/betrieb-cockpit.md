@@ -8,17 +8,82 @@ vollständig ersetzt und umgeschaltet wird.
 Der Betrieb der Werkbank ist in [`betrieb.md`](betrieb.md) beschrieben; das
 meiste gilt unverändert, weil das Cockpit aus ihr hervorgegangen ist.
 
-## Kennwerte für Coolify
+## Es läuft
+
+Angelegt und deployt am 07.09.2026:
 
 | | |
 | --- | --- |
-| Repository | `Lzm010409/wrapper-sachverstaendigenbuero` |
+| Coolify-Projekt | `Cockpit Sachverstaendigenbuero` (`k10x1nh74v7ky0bjl5d5amft`) |
+| Anwendung | `cockpit` (`d4yhrddgg34l4snwrfiqbvdq`) |
+| Datenbank | `cockpit-postgres` (`frxy65xrag8n872gab8zqsqi`) — **eigener Bestand**, Weg A |
+| Erreichbar | http://d4yhrddgg34l4snwrfiqbvdq.168.231.109.247.sslip.io |
+| Zustand | `running:healthy` |
+| Repository | `Lzm010409/wrapper-sachverstaendigenbuero`, öffentlich |
 | Branch | `claude/autoixpert-wrapper-integration-0in671` |
-| Build | Dockerfile (im Wurzelverzeichnis) |
-| Port | `3000` |
-| Healthcheck | `/api/gesundheit` — antwortet `{"zustand":"ok","datenbank":"erreichbar"}` |
+| Build | Dockerfile, Port 3000, Healthcheck `/api/gesundheit` |
 | Startbefehl | steckt im Abbild (`node starten.mjs`), nichts einzutragen |
-| Domain | frei wählbar, z. B. `cockpit.gollenstede.app` — DNS zeigt darauf |
+
+Belegt am laufenden System: Anmeldung, Argumentbibliothek mit 90 Einträgen,
+und ein **echter Fall aus autoiXpert** (`0926/2081TG`) über das Aktenzeichen
+geladen, mit gefülltem WBW-Reiter. Keine Browserfehler.
+
+### Eigene Domain
+
+Der DNS-Eintrag für z. B. `cockpit.gollenstede.app` muss wie der der Werkbank
+gesetzt werden — beide laufen über Cloudflare:
+
+- **A-Record auf `168.231.109.247`**, über Cloudflare geleitet.
+
+Sobald er aufgelöst wird, in Coolify unter *Domains* eintragen
+(`https://cockpit.gollenstede.app`) und danach **`APP_BASIS_URL` auf dieselbe
+Adresse setzen** — sie steht in den Umleitungen der Anmeldung. Vorher steht
+dort die sslip-Adresse, damit die Anwendung von Anfang an benutzbar ist.
+
+## Was beim Anlegen schiefging — und warum es hier steht
+
+Die ersten beiden Deployments schlugen fehl, **obwohl die Anwendung sauber
+hochkam**. Im Protokoll stand zehnmal:
+
+```
+/bin/sh: 1: curl: not found
+/bin/sh: 1: wget: not found
+New container is unhealthy. … rolling back to the old container.
+```
+
+Coolify führt seinen Healthcheck **im Container** aus und erwartet dort `curl`
+oder `wget`. Das schlanke `node:22-bookworm-slim` hat beides nicht. Die
+`HEALTHCHECK`-Zeile des Dockerfiles selbst benutzt Node und funktionierte —
+ausgewertet wird aber die von Coolify.
+
+Behoben durch `curl` im Laufzeit-Abbild. Der andere Weg wäre gewesen, den
+Healthcheck abzuschalten; dann merkt niemand mehr, wenn der Container steht,
+aber nicht antwortet — für eine Anwendung, die Gutachtendaten führt, der
+falsche Handel.
+
+Dazu die Zeitwerte auf die der laufenden Werkbank gezogen: Anlaufzeit 40 s
+statt 5, Abstand 30 s statt 5. Fünf Sekunden sind für einen Next-Server zu
+knapp, und alle fünf Sekunden zu fragen ist Lärm.
+
+## Noch einzutragen
+
+| Variable | Folge, solange sie fehlt |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Prüfberichte lassen sich nicht auswerten, Abschnitte nicht ausformulieren. Alles Übrige läuft. |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` | Kein Microsoft-Knopf in der Anmeldung; es gilt nur die Passwortanmeldung. |
+
+Coolify gibt Geheimnisse über seine API **nicht** heraus — die Werte der
+Werkbank liessen sich deshalb nicht übernehmen und müssen von Hand hinein.
+
+Bereits gesetzt sind `DATABASE_URL`, `APP_BASIS_URL`, `SITZUNG_GEHEIMNIS`,
+`AUTOIXPERT_API_TOKEN`, `AUTOIXPERT_BASIS_URL`, `PIPEDRIVE_API_TOKEN`,
+`PIPEDRIVE_BASE_URL` und die drei `ERSTER_ADMIN_*`.
+
+> **Nach der ersten Anmeldung `ERSTER_ADMIN_PASSWORT` wieder entfernen.**
+> Der Zugang bleibt bestehen; die Variable wird nur beim allerersten Start
+> gebraucht.
+
+## Kennwerte für Coolify
 
 Das Abbild bringt `poppler-utils` mit (`pdfinfo`, `pdftotext`, `pdftoppm`);
 ohne die lässt sich kein Prüfbericht einlesen.
@@ -187,7 +252,14 @@ grenzt das ein — jetzt 45 MB, praktisch nur noch `node_modules`.
 
 ## Berichtigungen zur Werkbank-Dokumentation
 
-Zwei Angaben in [`betrieb.md`](betrieb.md) stimmen nicht mehr:
+Drei Angaben in [`betrieb.md`](betrieb.md) stimmen nicht mehr:
+
+- **Die laufende Werkbank ist nicht die dort genannte Anwendung.** Live unter
+  https://werkbank.gollenstede.app ist `clone-of-werkbank-s11odxavd6ul8vqr9v1o1c1e`
+  mit der Datenbank `werkbank-postgres-clone-wo2zwmfgkjngcbjgmp9wiyvc`. Die
+  dokumentierten Ressourcen `werkbank` (`g7oinc0…`) und `werkbank-postgres`
+  (`thsbzqy…`) stehen auf `exited`. Wer nach der Dokumentation arbeitet, ändert
+  am toten Objekt.
 
 - **`app.autoixpert.de` ist aus der Claude-Code-Umgebung erreichbar.** Die dort
   vermerkte Sperre der Egress-Richtlinie besteht nicht mehr; die Schnittstelle
