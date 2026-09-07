@@ -1,17 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ladeFall } from '@/autoixpert/aktionen'
+import { formatiereDatum } from '@/autoixpert/felder'
 import {
-  formatiereDatum,
-  leseFalldaten,
-  platzhalterWerte,
-  schlageEmpfaengerVor,
-} from '@/autoixpert/felder'
-import { gutachtenSchema } from '@/autoixpert/typen'
-import { ladeStellungnahmenZumFall } from '@/stellungnahme/abfragen'
-import { werkzeugeVorhanden } from '@/pruefbericht/einlesen'
-import { kiVerfuegbar } from '@/ki/client'
-import { dealFelder, monetaerWert, phasenNamen, pipedrive } from '@/pipedrive/client'
+  ladeAuswertungsbereitschaft,
+  ladeFallAnsicht,
+  leseVorgangsangaben,
+  type Falldaten,
+  type FallAnsicht,
+  type Schreiben,
+} from '@/fall/ansicht'
+import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
@@ -30,14 +28,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /**
  * Die Fallseite — der Anker der Anwendung.
  *
- * Alles, was zu einem Vorgang gehört, liegt in ihren Reitern: Beteiligte,
- * Fahrzeug, Wiederbeschaffungswert, Stellungnahmen, Vorgang. Das folgt
+ * Alles, was zu einem Vorgang gehört, liegt in ihren Reitern. Das folgt
  * autoiXpert, wo ein Gutachten seine Reiter trägt und man den Fall nicht
  * verlässt, um an ihm zu arbeiten.
  *
- * Vorher war die Seite eine einzige lange Spalte mit Seitenleiste, und die
- * Stellungnahmen waren eine Karte darin. Die Reiter sind nicht nur Ordnung:
- * sie machen sichtbar, was es zu einem Fall überhaupt gibt.
+ * Diese Datei **stellt nur dar**. Woher die Angaben kommen — Datenbank,
+ * autoiXpert, Pipedrive — und was passiert, wenn eine Quelle ausfällt,
+ * entscheidet die Datenschicht unter `src/fall/`. Hier steht kein Drizzle,
+ * kein Zod, kein `fetch` und kein Feldpfad der Schnittstelle.
  */
 export default async function FallSeite({
   params,
@@ -51,18 +49,10 @@ export default async function FallSeite({
   // Datenbank und endete in einer Serverfehlerseite statt in „nicht gefunden".
   if (!UUID.test(id)) notFound()
 
-  const [f, { reiter: reiterWunsch }] = await Promise.all([ladeFall(id), searchParams])
-  if (!f) notFound()
+  const [fall, { reiter: reiterWunsch }] = await Promise.all([ladeFallAnsicht(id), searchParams])
+  if (!fall) notFound()
 
   const aktiv = leseReiter(reiterWunsch)
-  const schreiben = await ladeStellungnahmenZumFall(f.id)
-  const geprueft = gutachtenSchema.safeParse(f.daten)
-  const d = geprueft.success ? leseFalldaten(geprueft.data) : null
-
-  const aktenzeichen = d?.aktenzeichen ?? f.aktenzeichen ?? null
-  const titel = geprueft.success
-    ? (d?.anspruchsteller?.name ?? 'Fall ohne Anspruchsteller')
-    : 'Falldaten nicht lesbar'
 
   return (
     <>
@@ -74,29 +64,22 @@ export default async function FallSeite({
         <div className="fall-titel">
           {/* Aktenzeichen als Marke neben dem Namen — wie in autoiXpert, wo
               beides in einer Zeile über den Reitern steht. */}
-          <span className="fall-marke">{aktenzeichen ?? 'ohne Aktenzeichen'}</span>
+          <span className="fall-marke">{fall.aktenzeichen ?? 'ohne Aktenzeichen'}</span>
           <div>
-            <h1>{titel}</h1>
-            <p className="unterzeile">
-              {[d?.gutachtenTyp, d?.zustand].filter(Boolean).join(' · ')}
-              {f.abgerufenAm
-                ? `${d?.gutachtenTyp || d?.zustand ? ' · ' : ''}abgerufen ${new Date(
-                    f.abgerufenAm,
-                  ).toLocaleString('de-DE')}`
-                : ''}
-            </p>
+            <h1>{fall.titel}</h1>
+            <p className="unterzeile">{fall.untertitel}</p>
           </div>
         </div>
-        <Aktualisieren fallId={f.id} />
+        <Aktualisieren fallId={fall.id} />
       </div>
 
       <Reiterleiste
-        fallId={f.id}
+        fallId={fall.id}
         aktiv={aktiv}
-        zaehler={{ stellungnahmen: schreiben.length }}
+        zaehler={{ stellungnahmen: fall.schreiben.length }}
       />
 
-      {!geprueft.success ? (
+      {!fall.lesbar ? (
         <div className="hinweis fehler">
           Die gespeicherten Falldaten haben nicht die Form, die autoiXpert liefert — sie
           lassen sich deshalb nicht anzeigen. Mit „Aus autoiXpert neu laden" oben rechts
@@ -111,23 +94,21 @@ export default async function FallSeite({
         autoiXpert. Wer hier landet, weil ein Import schiefging, kommt trotzdem
         an sein Schreiben.
       */}
-      {aktiv === 'stellungnahmen' ? (
-        <StellungnahmenReiter fall={f} bezeichnung={aktenzeichen ?? titel} schreiben={schreiben} />
-      ) : null}
+      {aktiv === 'stellungnahmen' ? <StellungnahmenReiter fall={fall} /> : null}
 
-      {geprueft.success && d ? (
+      {fall.daten && fall.gutachten ? (
         <>
-          {aktiv === 'beteiligte' ? <BeteiligteReiter d={d} /> : null}
-          {aktiv === 'fahrzeug' ? <FahrzeugReiter d={d} /> : null}
-          {aktiv === 'wbw' ? <WbwReiter gutachten={geprueft.data} /> : null}
-          {aktiv === 'vorgang' ? <VorgangReiter d={d} aktenzeichen={aktenzeichen} /> : null}
+          {aktiv === 'beteiligte' ? <BeteiligteReiter d={fall.daten} /> : null}
+          {aktiv === 'fahrzeug' ? <FahrzeugReiter d={fall.daten} /> : null}
+          {aktiv === 'wbw' ? <WbwReiter gutachten={fall.gutachten} /> : null}
+          {aktiv === 'vorgang' ? (
+            <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
+          ) : null}
         </>
       ) : null}
     </>
   )
 }
-
-type Falldaten = NonNullable<ReturnType<typeof leseFalldaten>>
 
 /* ---------------- Reiter: Unfall & Beteiligte ---------------- */
 
@@ -282,7 +263,7 @@ function FahrzeugReiter({ d }: { d: Falldaten }) {
 
       <aside className="seitenleiste">
         <div className="hinweis warn">
-          Kalkulationsbeträge liefert die autoiXpert-Schnittstelle noch nicht. Die
+          Kalkulationsbeträge stehen noch nicht im Gutachten-Objekt der Schnittstelle. Die
           Kürzungspositionen kommen deshalb aus dem Prüfbericht.
         </div>
       </aside>
@@ -292,36 +273,21 @@ function FahrzeugReiter({ d }: { d: Falldaten }) {
 
 /* ---------------- Reiter: Stellungnahmen ---------------- */
 
-async function StellungnahmenReiter({
-  fall,
-  bezeichnung,
-  schreiben,
-}: {
-  fall: { id: string }
-  bezeichnung: string
-  schreiben: {
-    id: string
-    betreff: string | null
-    erstelltAm: Date | null
-    versendetAm: Date | null
-    positionen: number
-  }[]
-}) {
-  const [werkzeuge, ki] = await Promise.all([werkzeugeVorhanden(), kiVerfuegbar()])
-  const bereit = werkzeuge.ok && ki
+async function StellungnahmenReiter({ fall }: { fall: FallAnsicht }) {
+  const bereitschaft = await ladeAuswertungsbereitschaft()
 
   return (
     <>
-      {!ki ? (
+      {bereitschaft.kiFehlt ? (
         <div className="hinweis warn" style={{ marginBottom: 12 }}>
           Die Auswertung der Prüfberichte braucht einen Zugang zum Sprachmodell. Hinterlege{' '}
           <code>ANTHROPIC_API_KEY</code> in den Umgebungsvariablen.
         </div>
       ) : null}
-      {!werkzeuge.ok ? (
+      {bereitschaft.fehlendeWerkzeuge.length > 0 ? (
         <div className="hinweis warn" style={{ marginBottom: 12 }}>
-          Zum Einlesen fehlen auf diesem Server: {werkzeuge.fehlend.join(', ')}. Sie stecken
-          im Paket <code>poppler-utils</code>.
+          Zum Einlesen fehlen auf diesem Server: {bereitschaft.fehlendeWerkzeuge.join(', ')}. Sie
+          stecken im Paket <code>poppler-utils</code>.
         </div>
       ) : null}
 
@@ -332,18 +298,21 @@ async function StellungnahmenReiter({
         </p>
         <BerichtFormular
           faelle={[]}
-          aktiv={bereit}
-          festerFall={{ id: fall.id, bezeichnung }}
+          aktiv={bereitschaft.bereit}
+          festerFall={{
+            id: fall.id,
+            bezeichnung: fall.aktenzeichen ?? fall.titel,
+          }}
         />
       </div>
 
-      {schreiben.length === 0 ? (
+      {fall.schreiben.length === 0 ? (
         <div className="leer">
           <p style={{ margin: 0 }}>Zu diesem Fall ist noch kein Schreiben angelegt.</p>
         </div>
       ) : (
         <div className="liste">
-          {schreiben.map((s) => (
+          {fall.schreiben.map((s: Schreiben) => (
             <SchreibenZeile key={s.id} s={s} />
           ))}
         </div>
@@ -361,11 +330,8 @@ async function VorgangReiter({
   d: Falldaten
   aktenzeichen: string | null
 }) {
-  const werte = platzhalterWerte(d)
-  const vorschlag = schlageEmpfaengerVor(d)
-
-  // Pipedrive ist Beiwerk: fällt es aus, bleibt der Reiter benutzbar.
-  const deal = await pipedrive.findeDeal(aktenzeichen ?? '').catch(() => undefined)
+  const { vorschlag, platzhalter } = leseVorgangsangaben(d)
+  const vorgang = await ladeVorgang(aktenzeichen)
 
   return (
     <div className="detail">
@@ -373,35 +339,7 @@ async function VorgangReiter({
         <div className="block">
           <div className="block-label">Pipedrive</div>
           <div className="karte">
-            {deal ? (
-              <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
-                <dt>Phase</dt>
-                <dd style={{ textAlign: 'left' }}>
-                  <span className="marke-pille m-akzent">
-                    {phasenNamen[deal.stage_id ?? -1] ?? 'unbekannt'}
-                  </span>
-                </dd>
-                <Zeile label="Deal" wert={deal.title} />
-                <Zeile
-                  label="Schadenhöhe brutto"
-                  wert={euro(monetaerWert(deal.custom_fields?.[dealFelder.schadenhoeheBrutto]))}
-                />
-                <Zeile
-                  label="Ausgebuchter Betrag"
-                  wert={euro(monetaerWert(deal.custom_fields?.[dealFelder.ausgebuchterBetrag]))}
-                />
-                <Zeile
-                  label="Rechnung (sevDesk)"
-                  wert={textWert(deal.custom_fields?.[dealFelder.sevdeskRechnungId])}
-                />
-              </dl>
-            ) : (
-              <p className="unterzeile" style={{ margin: 0 }}>
-                {process.env.PIPEDRIVE_API_TOKEN
-                  ? 'Zu diesem Aktenzeichen wurde kein Deal gefunden.'
-                  : 'Pipedrive ist auf diesem Server nicht eingerichtet — PIPEDRIVE_API_TOKEN fehlt.'}
-              </p>
-            )}
+            <PipedriveInhalt vorgang={vorgang} />
           </div>
         </div>
 
@@ -465,13 +403,13 @@ async function VorgangReiter({
           <p className="unterzeile" style={{ marginTop: 0 }}>
             Werden beim Einfügen eines Bibliothekstexts automatisch gesetzt.
           </p>
-          {Object.keys(werte).length === 0 ? (
+          {Object.keys(platzhalter).length === 0 ? (
             <p className="unterzeile" style={{ margin: 0 }}>
               Keine — die Falldaten sind zu dünn.
             </p>
           ) : (
             <dl className="kv">
-              {Object.entries(werte).map(([schluessel, wert]) => (
+              {Object.entries(platzhalter).map(([schluessel, wert]) => (
                 <span key={schluessel} style={{ display: 'contents' }}>
                   <dt>
                     <code style={{ fontSize: 11 }}>[{schluessel}]</code>
@@ -487,11 +425,53 @@ async function VorgangReiter({
   )
 }
 
+/**
+ * Die vier Ausgänge des Pipedrive-Abrufs, jeder mit eigener Aussage.
+ * „Kein Deal gefunden" für alle vier wäre die gefährlichste davon: wer das
+ * liest, legt den Vorgang womöglich ein zweites Mal in Pipedrive an.
+ */
+function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
+  if (vorgang.stand === 'nicht_eingerichtet') {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        Pipedrive ist auf diesem Server nicht eingerichtet — <code>PIPEDRIVE_API_TOKEN</code>{' '}
+        fehlt.
+      </p>
+    )
+  }
+
+  if (vorgang.stand === 'fehler') {
+    return (
+      <div className="hinweis fehler" style={{ margin: 0 }}>
+        Pipedrive war nicht erreichbar: {vorgang.meldung}
+      </div>
+    )
+  }
+
+  if (vorgang.stand === 'ohne_treffer' || !vorgang.deal) {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        Pipedrive kennt zu diesem Aktenzeichen keinen Deal.
+      </p>
+    )
+  }
+
+  const d = vorgang.deal
+  return (
+    <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
+      <dt>Phase</dt>
+      <dd style={{ textAlign: 'left' }}>
+        <span className="marke-pille m-akzent">{d.phase}</span>
+      </dd>
+      <Zeile label="Deal" wert={d.titel} />
+      <Zeile label="Schadenhöhe brutto" wert={euro(d.schadenhoeheBrutto)} />
+      <Zeile label="Ausgebuchter Betrag" wert={euro(d.ausgebuchterBetrag)} />
+      <Zeile label="Rechnung (sevDesk)" wert={d.sevdeskRechnungId} />
+    </dl>
+  )
+}
+
 function euro(wert: number | undefined): string | null {
   if (wert === undefined) return null
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(wert)
-}
-
-function textWert(wert: unknown): string | null {
-  return typeof wert === 'string' && wert.trim() ? wert : null
 }

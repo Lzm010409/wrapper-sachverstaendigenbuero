@@ -21,3 +21,6 @@ yarn-error.log*
 .pnpm-debug.log*
 .vercel
 coverage
+
+# Startbefuellung entsteht beim Bauen des Abbilds
+seed/
