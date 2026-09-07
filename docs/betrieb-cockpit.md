@@ -219,6 +219,40 @@ ist damit gefahrlos.
    Ohne `--passwort` entsteht ein Zugang, der sich ausschliesslich über
    Microsoft Entra nutzen lässt — der vorgesehene Normalfall.
 
+## Anmeldepflicht — und warum sie in der Seite steht
+
+Am 07.09.2026 gefunden: Ein Abruf **ohne jedes Cookie** lieferte HTTP 307, im
+Rumpf der Antwort stand aber die vollständig gerenderte Seite — Aktenzeichen,
+Name des Anspruchstellers, Kennzeichen, Gutachtentyp im Klartext. Der Browser
+folgt der Umleitung und zeigt davon nichts; jeder andere HTTP-Client sieht alles.
+
+Ursache: Die Prüfung stand nur im Layout. Im App Router rendert die Seite
+**gleichzeitig** mit dem Layout, lädt dabei ihre Daten und gibt sie als
+RSC-Nutzlast aus, bevor die Umleitung greift.
+
+Seitdem zwei Riegel:
+
+1. `verlangeAnmeldung()` als **erste Anweisung jeder Seite**, vor dem ersten
+   Ladevorgang (`src/auth/wache.ts`). `redirect()` bricht sofort ab.
+2. `src/middleware.ts` leitet ohne Sitzungscookie um, bevor gerendert wird.
+   Bewusst nur eine Vorprüfung — Middleware hat keinen Datenbankzugriff.
+
+Ein struktureller Test hält es fest: jede `page.tsx` unter `src/app/(app)` muss
+`verlangeAnmeldung()` aufrufen, und zwar vor jedem anderen `await`.
+
+Nachgemessen nach der Behebung, gegen die laufende Anwendung:
+
+| Abruf | vorher | nachher |
+| --- | --- | --- |
+| ohne Cookie | 8 530 B mit Falldaten | 9 B, keine Daten |
+| mit gefälschtem Cookie | — | 7 113 B, nur Next-Gerüst |
+
+> **Die laufende Kürzungsabwehr-Werkbank hat dieselbe Lücke** (Stand
+> 07.09.2026: `/faelle` 13 223 B, `/stellungnahmen` 13 913 B mit Falldaten im
+> Rumpf). Sie liegt in einem anderen Repository. Derselbe Eingriff behebt sie:
+> `src/auth/wache.ts` und `src/middleware.ts` übernehmen, `verlangeAnmeldung()`
+> in jede Seite unter `src/app/(app)`.
+
 ## Trennung von Daten und Oberfläche
 
 Die Oberfläche greift nicht selbst auf Datenbank oder fremde Schnittstellen
