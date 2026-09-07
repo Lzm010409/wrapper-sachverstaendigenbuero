@@ -5,7 +5,7 @@ import {
   pruefeGutachten,
   pruefeSchreibzugriff,
   type Abrufregel,
-} from "@/lib/autoixpert/abrufregel";
+} from "@/autoixpert/abrufregel";
 
 const enge: Abrufregel = {
   nurOffene: true,

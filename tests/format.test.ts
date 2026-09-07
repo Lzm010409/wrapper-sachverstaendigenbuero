@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactName, formatEuro, formatKilometers, werktageSeit } from "@/lib/format";
+import { contactName, formatEuro, formatKilometers, werktageSeit } from "@/format";
 
 describe("werktageSeit", () => {
   it("zaehlt nur Werktage", () => {

@@ -1,0 +1,16 @@
+{
+  "name": "kuerzung-stellungnahme",
+  "version": "0.6.0",
+  "description": "Erstellt Stellungnahmen gegen Kürzungsschreiben und Prüfberichte von Kfz-Versicherern (Kalkulation, Wertminderung, WBW/Restwert) und pflegt die zugehörige Argumentbibliothek. Für das Kfz-Sachverständigenbüro Gollenstede.",
+  "author": {
+    "name": "Gollenstede Sachverstand"
+  },
+  "keywords": [
+    "kfz",
+    "sachverstaendiger",
+    "kuerzungsschreiben",
+    "pruefbericht",
+    "stellungnahme",
+    "versicherung"
+  ]
+}

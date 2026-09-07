@@ -1,11 +1,2446 @@
-@import "tailwindcss";
+/*
+ * Tailwind bewusst OHNE Preflight: die vorhandene Werkbank-Optik steht in
+ * klassischem CSS und wuerde von einem globalen Reset ueberfahren. Waehrend
+ * der Umstellung auf den autoiXpert-Look laufen beide Welten nebeneinander;
+ * ist die Umstellung durch, kann Preflight dazugenommen werden.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/**
+ * Farben, Masse und Formen folgen der Vorlage „Judia" (Bootstrap 5.3):
+ * Blau als einzige Signalfarbe, kühle Blaugrautöne für Text, helle
+ * Flächen mit dünnen Rändern statt Schatten. Die Namen der Variablen
+ * bleiben, wie sie waren — umgestellt wird das Aussehen, nicht das Gerüst.
+ *
+ * Eine Ausnahme bleibt bewusst bestehen: der Brief selbst wird in einer
+ * Serifenschrift gesetzt. Er soll wie ein Schreiben aussehen und nicht wie
+ * eine Bildschirmmaske — das ist der Unterschied zwischen der Anwendung und
+ * ihrem Erzeugnis.
+ */
+
+:root {
+  --ground: #f8f9fa;
+  --surface: #ffffff;
+  --surface-alt: #f7f7f9;
+  --line: #e9ecef;
+  --line-soft: #f1f3f5;
+  --ink: #424e66;
+  --ink-mid: #4a566c;
+  --ink-soft: #8291af;
+  --accent: #007fff;
+  --accent-stark: #0066cc;
+  --accent-soft: #e7f1ff;
+  --accent-rand: #99ccff;
+  --accent-ink: #ffffff;
+  --quelle-marke: #ddebff;
+  --warn: #997404;
+  --warn-soft: #fff3cd;
+  --crit: #c1441c;
+  --crit-soft: #fae1d8;
+  --good: #0a6a49;
+  --good-soft: #cfefe4;
+
+  /*
+   * Die Farben der Handlungen.
+   *
+   * Drei Bedeutungen, sonst nichts: blau trägt die Arbeit voran, grün gibt
+   * frei, rot löscht endgültig. Alles Übrige bleibt grau. Ausgemalt wird
+   * nur der Umriss — gefüllt wird erst unter dem Zeiger, im Augenblick vor
+   * dem Klick. So bleibt je Fläche genau ein lauter Knopf: der, der
+   * weiterführt.
+   */
+  --gefahr: #b23c17;
+  --gefahr-fest: #c1441c;
+  --gefahr-ink: #ffffff;
+  --freigabe: #0a6a49;
+  --freigabe-fest: #0a6a49;
+  --freigabe-ink: #ffffff;
+
+  --schiene: #1e2f50;
+  --schiene-ink: #869bc3;
+  --menue: #f7f7f9;
+  --menue-ink: #595970;
+  --menue-titel: #727287;
+
+  --schatten: 0 2px 4px rgba(20, 18, 30, 0.06);
+  --schatten-menue: 0 2px 4px rgba(20, 18, 30, 0.14);
+
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial,
+    sans-serif;
+  --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, 'Times New Roman', serif;
+  --mono: SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  --radius: 0.375rem;
+  --radius-klein: 0.25rem;
+
+  --schiene-breite: 30px;
+  --menue-breite: 250px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ground: #1a1d20;
+    --surface: #212529;
+    --surface-alt: #2b3035;
+    --line: #495057;
+    --line-soft: #343a40;
+    --ink: #f8f9fa;
+    --ink-mid: #dee2e6;
+    --ink-soft: #a7acb1;
+    --accent: #66b2ff;
+    --accent-stark: #85c1ff;
+    --accent-soft: #001933;
+    --accent-rand: #004c99;
+    --accent-ink: #06182e;
+    --quelle-marke: rgba(102, 178, 255, 0.16);
+    --warn: #ffda6a;
+    --warn-soft: #332701;
+    --crit: #f0a589;
+    --crit-soft: #2e150c;
+    --good: #70d0af;
+    --good-soft: #032318;
+
+    --gefahr: #f0a589;
+    --gefahr-fest: #b23c17;
+    --gefahr-ink: #ffffff;
+    --freigabe: #70d0af;
+    --freigabe-fest: #0d7a55;
+    --freigabe-ink: #ffffff;
+
+    --schiene: #16203a;
+    --schiene-ink: #6d80a6;
+    --menue: #212529;
+    --menue-ink: #ced4da;
+    --menue-titel: #8291af;
+
+    --schatten: 0 2px 4px rgba(0, 0, 0, 0.35);
+    --schatten-menue: 0 2px 4px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  --ground: #1a1d20;
+  --surface: #212529;
+  --surface-alt: #2b3035;
+  --line: #495057;
+  --line-soft: #343a40;
+  --ink: #f8f9fa;
+  --ink-mid: #dee2e6;
+  --ink-soft: #a7acb1;
+  --accent: #66b2ff;
+  --accent-stark: #85c1ff;
+  --accent-soft: #001933;
+  --accent-rand: #004c99;
+  --accent-ink: #06182e;
+  --quelle-marke: rgba(102, 178, 255, 0.16);
+  --warn: #ffda6a;
+  --warn-soft: #332701;
+  --crit: #f0a589;
+  --crit-soft: #2e150c;
+  --good: #70d0af;
+  --good-soft: #032318;
+
+  --gefahr: #f0a589;
+  --gefahr-fest: #b23c17;
+  --gefahr-ink: #ffffff;
+  --freigabe: #70d0af;
+  --freigabe-fest: #0d7a55;
+  --freigabe-ink: #ffffff;
+
+  --schiene: #16203a;
+  --schiene-ink: #6d80a6;
+  --menue: #212529;
+  --menue-ink: #ced4da;
+  --menue-titel: #8291af;
+
+  --schatten: 0 2px 4px rgba(0, 0, 0, 0.35);
+  --schatten-menue: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink-mid);
+  font-family: var(--sans);
+  font-size: 0.925rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--accent-stark);
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-klein);
+}
+
+/* ---------- Die Schiene, das Menü, die Kopfleiste ---------- */
+
+/**
+ * Der Aufbau der Vorlage: eine schmale dunkle Schiene ganz links, daneben
+ * das Menü, darüber eine Kopfleiste. Der Inhalt rückt um beides ein.
+ */
+.schiene {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--schiene-breite);
+  background: var(--schiene);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.schiene span {
+  writing-mode: vertical-rl;
+  color: var(--schiene-ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.menue {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--schiene-breite);
+  width: var(--menue-breite);
+  background: var(--menue);
+  box-shadow: var(--schatten-menue);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease;
+}
+
+.marke {
+  display: block;
+  padding: 22px 24px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.marke:hover {
+  text-decoration: none;
+}
+
+.menue-titel {
+  font-size: 13px;
+  color: var(--menue-titel);
+  margin: 5px 24px 6px;
+}
+
+.menue-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.menue-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 24px;
+  color: var(--menue-ink);
+  font-size: 0.925rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.menue-nav a svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  opacity: 0.75;
+}
+
+.menue-nav a:hover,
+.menue-nav a[aria-current='page'] {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.menue-nav a[aria-current='page'] {
+  font-weight: 600;
+}
+
+.menue-nav a[aria-current='page'] svg {
+  opacity: 1;
+}
+
+.menue-fuss {
+  padding: 16px 24px 22px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menue-benutzer {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  height: 70px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 26px;
+  z-index: 900;
+}
+
+.topbar-titel {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menue-schalter {
+  padding: 6px 10px;
+  line-height: 1;
+}
+
+.huelle {
+  margin-left: calc(var(--schiene-breite) + var(--menue-breite));
+  min-height: 100vh;
+  transition: margin-left 0.25s ease;
+}
+
+body.menue-zu .menue {
+  transform: translateX(-100%);
+}
+
+body.menue-zu .huelle {
+  margin-left: var(--schiene-breite);
+}
+
+@media (max-width: 900px) {
+  .menue {
+    transform: translateX(-100%);
+  }
+
+  .huelle {
+    margin-left: var(--schiene-breite);
+  }
+
+  body.menue-auf .menue {
+    transform: none;
+  }
+}
+
+/* ---------- Grundgerüst ---------- */
+
+main {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 26px 26px 80px;
+}
+
+.seiten-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 22px;
+}
+
+h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.unterzeile {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+/* ---------- Formularelemente ---------- */
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-mid);
+}
+
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='file'],
+select,
+textarea {
+  font-family: inherit;
+  font-size: 0.925rem;
+  color: var(--ink-mid);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.525rem 0.9rem;
+  width: 100%;
+}
+
+textarea {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 120px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-rand);
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(0, 127, 255, 0.2);
+}
+
+button,
+.knopf {
+  font-family: inherit;
+  font-size: 0.925rem;
+  font-weight: 400;
+  padding: 0.525rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-mid);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+button:hover,
+.knopf:hover {
+  background: var(--surface-alt);
+  border-color: var(--ink-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+button.haupt,
+.knopf.haupt {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+button.haupt:hover,
+.knopf.haupt:hover {
+  background: var(--accent-stark);
+  border-color: var(--accent-stark);
+  color: var(--accent-ink);
+}
 
 /*
- * Designtokens, abgeleitet aus der autoiXpert-Oberflaeche (Screenshots vom 07.09.2026:
- * Gutachtenliste, Unfall & Beteiligte, Fahrzeugauswahl, Fotos, Kalkulation).
- * Alle Farben, Radien und Abstaende der Anwendung kommen aus dieser Datei - wer die
- * Optik nachziehen will, aendert hier und nirgends sonst.
+ * Zerstörend: rot im Umriss, gefüllt erst unter dem Zeiger.
+ *
+ * Die Farbe ist nie das einzige Zeichen — jeder dieser Knöpfe sagt in
+ * Worten, was er tut, und fragt vor dem Vollzug nach. Rot steht
+ * ausschliesslich dort, wo etwas endgültig verschwindet; was sich
+ * zurücknehmen lässt (nicht bestreiten, aus der Bibliothek nehmen,
+ * zurückziehen), bleibt grau.
  */
+button.gefahr,
+.knopf.gefahr {
+  border-color: var(--gefahr);
+  color: var(--gefahr);
+}
+
+button.gefahr:hover:not(:disabled),
+button.gefahr:focus-visible,
+.knopf.gefahr:hover {
+  background: var(--gefahr-fest);
+  border-color: var(--gefahr-fest);
+  color: var(--gefahr-ink);
+}
+
+/* Freigeben und bestätigen: dasselbe in Grün. */
+button.freigabe,
+.knopf.freigabe {
+  border-color: var(--freigabe);
+  color: var(--freigabe);
+}
+
+button.freigabe:hover:not(:disabled),
+button.freigabe:focus-visible,
+.knopf.freigabe:hover {
+  background: var(--freigabe-fest);
+  border-color: var(--freigabe-fest);
+  color: var(--freigabe-ink);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/*
+ * Wo die Freigabe selbst die Handlung der Fläche ist — auf der Karte
+ * „Freigabe" —, ist sie gefüllt wie ein Hauptknopf, nur in Grün.
+ */
+button.haupt.freigabe,
+.knopf.haupt.freigabe {
+  background: var(--freigabe-fest);
+  border-color: var(--freigabe-fest);
+  color: var(--freigabe-ink);
+}
+
+button.haupt.freigabe:hover:not(:disabled) {
+  filter: brightness(1.12);
+  color: var(--freigabe-ink);
+}
+
+/* Ein gesperrter Knopf droht nicht. Die Farbe weicht dem Grau. */
+button.gefahr:not(.haupt):disabled,
+button.freigabe:not(.haupt):disabled {
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink-mid);
+}
+
+button.haupt:disabled:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- Karten und Listen ---------- */
+
+.karte {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 1rem;
+}
+
+.werkzeugleiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.werkzeugleiste input[type='search'] {
+  flex: 1;
+  min-width: 220px;
+}
+
+.werkzeugleiste select {
+  width: auto;
+  min-width: 150px;
+}
+
+.treffer-zahl {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* Auf einem Telefon ist die Zeile „12 Fälle · zuletzt abgerufen …" breiter
+   als der Schirm; mit `nowrap` schob sie die ganze Seite quer (gemessen:
+   433px bei 380px Fenster). Dort darf sie umbrechen. */
+@media (max-width: 520px) {
+  .treffer-zahl {
+    white-space: normal;
+  }
+}
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  overflow: hidden;
+}
+
+/* Die Hülle trägt den Löschknopf, damit er nicht im Verweis steht. Blass,
+   solange die Zeile nicht angesteuert wird — aber nie ganz unsichtbar: ein
+   Knopf, den erst der Mauszeiger hervorholt, fehlt auf dem Tablet ganz. */
+.zeile-huelle {
+  position: relative;
+}
+
+.zeile-huelle .loeschknopf {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
+}
+
+.zeile-huelle:hover .loeschknopf,
+.zeile-huelle .loeschknopf:focus-visible {
+  opacity: 1;
+}
+
+.loeschknopf {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+.zeile {
+  background: var(--surface);
+  padding: 13px 16px;
+  display: grid;
+  /* Die erste Spalte trägt mal eine Gliederungsnummer („2.11"), mal ein
+     Aktenzeichen („PA-0726/2011TG"). Bei festen 58px lief das Aktenzeichen
+     aus seiner Zelle heraus und legte sich quer über den Titel daneben —
+     Rasterzellen schneiden nichts ab, sie lassen überlaufen. Deshalb wächst
+     die Spalte jetzt mit ihrem Inhalt und schrumpft im Notfall wieder auf
+     58px, wo dann der Umbruch greift. */
+  grid-template-columns: minmax(58px, auto) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  text-decoration: none;
+  color: inherit;
+}
+
+.zeile:hover {
+  background: var(--surface-alt);
+}
+
+/*
+  Auf dem Telefon kehrt sich der Vorteil um: eine mitwachsende erste Spalte
+  nahm dem Aktenzeichen zuliebe 101 von 296 nutzbaren Pixeln, und für den
+  Titel blieb kaum etwas. Dort ist die Spalte wieder schmal — das
+  Aktenzeichen bricht dann um (`overflow-wrap: anywhere`), was auf einem
+  schmalen Schirm die richtige Wahl ist.
+*/
+@media (max-width: 640px) {
+  .zeile {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /* Statuspille und Knöpfe stehen darunter statt daneben. Nebeneinander
+     nahmen sie dem Titel über hundert der knapp dreihundert nutzbaren
+     Pixel; auf einem Telefon liest man lieber untereinander als in einer
+     Spalte von neunzig Pixeln. */
+  .zeile-rechts {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+}
+
+.zeile-nummer {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  padding-top: 2px;
+  min-width: 0;
+  /* Ein Aktenzeichen hat keine Leerzeichen, an denen umbrochen werden
+     könnte. Ohne diese Zeile bliebe es auch in einer engen Spalte in einer
+     Zeile stehen und ragte hinaus. */
+  overflow-wrap: anywhere;
+}
+
+.zeile-titel {
+  /* Als `inline` wirkten weder der untere Abstand noch `text-wrap`, und der
+     Titel ragte auf schmalen Schirmen über den rechten Rand hinaus. */
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.008em;
+  margin-bottom: 3px;
+  text-wrap: balance;
+}
+
+.zeile-meta {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.zeile-auszug {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  margin-top: 5px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.zeile-rechts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+/* ---------- Marker ---------- */
+
+.marke-pille {
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.35em 0.65em;
+  border-radius: var(--radius-klein);
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.m-entwurf {
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+}
+.m-pruefung {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.m-freigegeben {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.m-zurueckgezogen {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+.m-akzent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.m-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* ---------- Detailansicht ---------- */
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.block {
+  margin-bottom: 20px;
+}
+
+.block-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fliesstext {
+  font-family: var(--serif);
+  font-size: 15.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.zitat {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 13px 16px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.intern {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  padding: 13px 16px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 14px;
+}
+
+.seitenleiste .karte + .karte {
+  margin-top: 14px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  font-size: 13px;
+}
+
+.kv dt {
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.kv dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.marker-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.hinweis {
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.hinweis.warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.hinweis.fehler {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.leer {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--surface-alt);
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  padding: 0.08em 0.34em;
+}
+
+/* ---------- Anmeldung ---------- */
+
+.anmelde-huelle {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.anmelde-karte {
+  width: 100%;
+  max-width: 390px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 2rem;
+}
+
+.anmelde-karte form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Trefferliste und Prüfliste ---------- */
+
+.vorschlag {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: var(--ground);
+}
+
+.vorschlag-titel { font-weight: 600; font-size: 13.5px; overflow-wrap: break-word; }
+.vorschlag-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+.b-direkt { background: var(--good-soft); color: var(--good); }
+.b-teilweise { background: var(--warn-soft); color: var(--warn); }
+
+.sonderfall {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+}
+.sonderfall.wichtig { border-left-color: var(--crit); background: var(--crit-soft); }
+.sonderfall.hinweis { border-left-color: var(--accent); background: var(--accent-soft); }
+
+.sonderfall-titel {
+  font-weight: 640;
+  font-size: 13.5px;
+  margin-bottom: 3px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.sonderfall-text { font-size: 13px; line-height: 1.5; }
+.sonderfall-handlung { font-size: 13px; color: var(--ink-mid); margin-top: 5px; }
+
+
+/* ---------- Kopfzeile über dem Brief ---------- */
+
+/**
+ * Eine Zeile für alles, was nicht der Brief ist. Vorher standen Rückweg,
+ * Überschrift, Kennzahlen, Prüfliste und Empfänger untereinander und
+ * schoben den Brief aus dem Bild — bei zwölf Positionen sah man von der
+ * eigentlichen Arbeit noch drei Absätze.
+ */
+.brief-kopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.brief-kopfzeile .zurueck {
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+
+.brief-kopfzeile .zurueck:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.brief-aktenzeichen {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-klein);
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.brief-kopfzeile h1 {
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 44ch;
+}
+
+.brief-kennzahlen {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.brief-kennzahlen strong {
+  font-family: var(--mono);
+  color: var(--crit);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Die aufklappbaren Kästen rücken gemeinsam nach rechts und öffnen über
+   dem Brief, statt ihn nach unten zu schieben. */
+.brief-kopf-klappen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.brief-kopfzeile .klappe.schmal {
+  margin: 0;
+  position: relative;
+  padding: 0 12px;
+}
+
+.klappe.schmal > summary {
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.klappe.schmal[open] > summary {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.klappe.schmal .klappe-inhalt {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  width: min(560px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(20, 18, 30, 0.16);
+  padding: 14px 16px;
+}
+
+/* ---------- Klappe ---------- */
+
+.klappe {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 16px;
+  margin-bottom: 14px;
+}
+
+.klappe > summary {
+  cursor: pointer;
+  padding: 11px 0;
+  font-weight: 620;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+}
+
+.klappe > summary::-webkit-details-marker {
+  display: none;
+}
+
+.klappe > summary::before {
+  content: '▸';
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.klappe[open] > summary::before {
+  content: '▾';
+}
+
+.klappe[open] > summary {
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 14px;
+}
+
+.klappe > *:last-child {
+  margin-bottom: 16px;
+}
+
+/* ---------- Schreibtisch: links der Brief, rechts die Anmerkungen ---------- */
+
+.werkbank-leiste {
+  position: sticky;
+  top: 70px;
+  z-index: 10;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.werkzeuge {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.werkzeuge button {
+  padding: 4px 10px;
+  font-size: 13px;
+  min-width: 32px;
+}
+
+.werkzeuge button.an {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+/* ---------- Schnellauswahl über der Markierung ---------- */
+
+.schnellauswahl {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+  z-index: 40;
+}
+
+.schnellauswahl button {
+  padding: 3px 9px;
+  font-size: 13px;
+  min-width: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.schnellauswahl button:hover:not(:disabled) {
+  background: var(--surface-alt);
+  border-color: var(--line);
+}
+
+.schnellauswahl button.an {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.schnellauswahl-strich {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--line);
+}
+
+.speicherstand {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.speicherstand.speichert { color: var(--accent); }
+.speicherstand.geaendert { color: var(--warn); }
+.speicherstand.konflikt,
+.speicherstand.fehler { color: var(--crit); font-weight: 600; }
+
+.pruefstand {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.ausgabe-leiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.werkbank-raster {
+  display: grid;
+  /* Der Brief bekommt so viel Breite, wie der Satzspiegel braucht, und der
+     Rest geht an die Anmerkungen — nicht umgekehrt. */
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+/**
+ * Fokus: nur der Brief. Die Anmerkungen bleiben im Baum stehen und werden
+ * ausgeblendet — beim Zurückschalten steht alles wieder da, wo es war.
+ */
+.werkbank-raster.fokus {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.werkbank-raster.fokus .rand {
+  display: none;
+}
+
+/* ---------- Positionsleiste ---------- */
+
+/* Kopfleiste und Werkzeugleiste kleben oben fest. Wer zu einem Abschnitt
+   oder einer Anmerkung springt, soll sie nicht darunter suchen müssen —
+   deshalb hält alles Anspringbare diesen Abstand zum oberen Rand frei. */
+.brief-flaeche .d-abschnitt,
+.blase,
+.d-bild {
+  scroll-margin-top: 150px;
+}
+
+/* Die Leiste bricht um, statt zu rollen. Vorher lief sie bei achtzehn
+   Positionen waagerecht davon: die ersten Marken standen ausserhalb des
+   Bildes, und wer nach Position 1 suchte, fand sie nicht mehr. */
+.positionsleiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding: 2px 4px;
+}
+
+.positionsmarke {
+  padding: 3px 8px;
+  min-width: 30px;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  gap: 5px;
+  border-radius: var(--radius-klein);
+}
+
+.positionsmarke.fertig {
+  border-color: var(--good);
+  color: var(--good);
+  background: var(--good-soft);
+}
+
+.positionsmarke.leer {
+  border-style: dashed;
+}
+
+/* Nicht bestritten: die Marke bleibt — die Position gehört zum Fall —, sagt
+   aber unübersehbar, dass sie nicht im Schreiben steht. */
+.positionsmarke.draussen {
+  opacity: 0.55;
+  border-style: dotted;
+}
+
+.positionsmarke.draussen span {
+  text-decoration: line-through;
+}
+
+.positionsmarke.aktiv {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.positionsmarke em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+/* ---------- Der Brief ---------- */
+
+.brief {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 34px 40px 44px;
+  min-height: 60vh;
+}
+
+.brief-flaeche {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.62;
+  outline: none;
+  counter-reset: abschnitt;
+  /* Rund 70 Zeichen je Zeile — die Breite, bei der sich am ruhigsten liest.
+     Zentriert, damit der Brief in einer breiten Spalte nicht links klebt. */
+  max-width: 34em;
+  margin: 0 auto;
+}
+
+.brief-flaeche p {
+  margin: 0 0 1em;
+}
+
+.brief-flaeche .d-betreff {
+  font-weight: 700;
+  font-family: var(--sans);
+  font-size: 15px;
+  margin-bottom: 1.6em;
+}
+
+.brief-flaeche .d-anrede {
+  margin-bottom: 1.2em;
+}
+
+.brief-flaeche .d-abschnitt {
+  counter-increment: abschnitt;
+  margin: 0 0 1.4em;
+  position: relative;
+}
+
+/**
+ * Die Marke im Papierrand.
+ *
+ * Sie steht neben dem Abschnitt, nicht in ihm: dieselbe Zahl wie in der
+ * Leiste oben und an der Anmerkung am Rand. Ein Klick öffnet die Anmerkung
+ * genau dort, wo gerade gelesen wird — bei achtzehn Positionen der
+ * Unterschied zwischen Suchen und Finden.
+ */
+.abschnittsmarke {
+  position: absolute;
+  left: -2.6em;
+  top: 0.05em;
+  width: 1.9em;
+  min-width: 0;
+  padding: 1px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+  user-select: none;
+}
+
+.abschnittsmarke:hover {
+  border-color: var(--accent);
+}
+
+.abschnittsmarke.leer {
+  color: var(--ink-soft);
+  background: var(--surface-alt);
+}
+
+.abschnittsmarke.draussen {
+  color: var(--ink-soft);
+  background: transparent;
+  border-style: dotted;
+  border-color: var(--line);
+  text-decoration: line-through;
+}
+
+/* Auf schmalen Schirmen ist kein Rand übrig — dann sitzt die Marke am
+   Abschnittsanfang, wo sie zwar auffällt, aber nichts verdeckt. */
+@media (max-width: 1100px) {
+  .abschnittsmarke {
+    position: static;
+    display: inline-block;
+    margin: 0 0 4px;
+  }
+}
+
+.brief-flaeche .d-ueberschrift {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 660;
+  margin: 0 0 0.7em;
+  letter-spacing: -0.01em;
+}
+
+.brief-flaeche .d-ueberschrift::before {
+  content: counter(abschnitt) '. ';
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Ein Abschnitt ohne Text erscheint auch im fertigen Schreiben nicht — er
+ * bekommt deshalb keine Nummer. Sonst zeigte der Editor eine andere
+ * Zählung als das versandte Dokument.
+ */
+:root {
+  --leer-hoehe: 1.9em;
+}
+
+/**
+ * Ein Abschnitt ohne Text schrumpft auf eine Zeile.
+ *
+ * Vorher nahm jede noch unbearbeitete Position so viel Platz ein wie eine
+ * geschriebene — bei zwölf Positionen las sich der Brief als Liste von
+ * Stümpfen. Jetzt steht der Rumpf schmal da und macht dem Platz, was
+ * geschrieben ist.
+ */
+.brief-flaeche .d-abschnitt.abschnitt-leer {
+  counter-increment: none;
+  margin: 0 0 0.35em;
+  border-left: 2px dashed var(--line);
+  padding-left: 10px;
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer .d-ueberschrift {
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-size: 13.5px;
+  margin: 0;
+  line-height: var(--leer-hoehe);
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer .d-ueberschrift::before {
+  content: '';
+}
+
+/* Eine Überschrift, die gelöscht wurde, zeigt den Namen ihrer Position als
+   Schatten. Ein Abschnitt verschwindet damit nie ganz aus dem Bild. */
+.brief-flaeche .d-ueberschrift.ueberschrift-leer::before {
+  content: none;
+}
+
+.brief-flaeche .d-ueberschrift.ueberschrift-leer::after {
+  content: attr(data-titel);
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Der leere Absatz darunter bleibt anklickbar, nimmt aber kaum Raum. */
+.brief-flaeche .d-abschnitt.abschnitt-leer p {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 13.5px;
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer p.is-empty::before {
+  font-size: 12px;
+}
+
+/* Der Abschnitt zur offenen Anmerkung. */
+.brief-flaeche .d-abschnitt.aktiv {
+  box-shadow: -14px 0 0 -12px var(--accent);
+}
+
+.brief-flaeche .d-ergebnis {
+  margin: 1.8em 0 1.4em;
+}
+
+.brief-flaeche .d-signatur {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 14px;
+  margin-top: 26px;
+  color: var(--ink-soft);
+  user-select: none;
+}
+
+.brief-flaeche .d-signatur p {
+  margin: 0;
+  min-height: 1.4em;
+}
+
+/**
+ * Eingefügter Bibliothekstext bleibt erkennbar — dezent, damit der Brief
+ * nicht wie ein Formular aussieht, aber sichtbar genug, um beim
+ * Überarbeiten zu wissen, was von wem stammt.
+ */
+.brief-flaeche .d-quelle {
+  box-shadow: inset 0 -0.55em 0 var(--quelle-marke);
+}
+
+.brief-flaeche .d-quelle[data-herkunft='eigener_text'] {
+  box-shadow: none;
+}
+
+.brief-flaeche ul,
+.brief-flaeche ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+
+.brief-flaeche p.is-empty::before,
+.brief-flaeche h3.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-soft);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-family: var(--sans);
+  font-size: 13.5px;
+}
+
+.brief-flaeche ::selection {
+  background: var(--accent-soft);
+}
+
+/* ---------- Die Anmerkungen am Rand ---------- */
+
+.rand {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* Bezugspunkt für die Höhenberechnung der Blasen. */
+  position: relative;
+}
+
+.blase {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--schatten);
+  width: 100%;
+  text-align: left;
+  transition: margin-top 0.12s ease-out;
+}
+
+.blase.zu {
+  display: grid;
+  white-space: normal;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.blase.zu:hover {
+  border-color: var(--accent);
+}
+
+.blase.auf {
+  border-color: var(--accent);
+  border-left-width: 3px;
+  padding: 12px 14px 14px;
+  position: relative;
+}
+
+/* Eine kurze Linie zum Brief hin — sie macht sichtbar, was zusammengehört. */
+.blase.auf::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 18px;
+  width: 16px;
+  border-top: 1px solid var(--accent);
+}
+
+.blase.draussen {
+  opacity: 0.62;
+}
+
+.blase-kopf,
+.blase.zu {
+  font-size: 13.5px;
+}
+
+.blase-kopf {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.blase-nummer {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 2px 6px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.blase-titel {
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.blase-marken {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.blase-betrag {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--crit);
+  white-space: nowrap;
+}
+
+.blase-zitat {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.blase-abschnitt {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.blase-abschnitt:first-of-type {
+  border-top: 0;
+  margin-top: 0;
+}
+
+.blase-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.blase-vorschlag {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: var(--ground);
+  overflow: hidden;
+}
+
+.blase-vorschlag-kopf {
+  display: grid;
+  white-space: normal;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.blase-vorschlag-kopf:hover {
+  background: var(--surface-alt);
+}
+
+.blase-entwurf {
+  border-top: 1px solid var(--line-soft);
+  padding: 10px;
+  background: var(--surface);
+}
+
+.blase-entwurf textarea {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.blase-variante {
+  padding: 3px 9px;
+  font-size: 12px;
+  margin: 0 5px 5px 0;
+}
+
+.blase-knoepfe {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+
+.blase-knoepfe button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.blase-fuss {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+  margin-top: 12px;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.blase-fuss button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.blase-befunde {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.befund {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  text-align: left;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border: 0;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--warn-soft);
+  color: var(--ink);
+  cursor: pointer;
+  width: 100%;
+}
+
+.befund.sperrt {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+}
+
+@media (max-width: 1100px) {
+  .werkbank-raster {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brief {
+    padding: 26px 24px 32px;
+  }
+
+  /* Ohne zweite Spalte tragen die Blasen keine Anker mehr. */
+  .rand {
+    gap: 8px;
+  }
+
+  .blase {
+    margin-top: 0 !important;
+  }
+}
+
+/**
+ * Ein nicht bestrittener Abschnitt bleibt sichtbar, gehört aber nicht in
+ * das Schreiben: keine Nummer, zurückgenommene Farbe. Sein Text bleibt
+ * erhalten — wer die Position doch bestreitet, findet ihn wieder.
+ */
+.brief-flaeche .d-abschnitt[data-ausgelassen] {
+  counter-increment: none;
+  opacity: 0.5;
+}
+
+.brief-flaeche .d-abschnitt[data-ausgelassen] .d-ueberschrift::before {
+  content: 'nicht bestritten — ';
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ---------- Warten: Kreisel und Balken ---------- */
+
+.nur-vorlesen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.kreisel-zeile {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.kreisel {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  animation: kreisel-dreht 0.75s linear infinite;
+}
+
+.kreisel.gross {
+  width: 20px;
+  height: 20px;
+  border-width: 2.5px;
+}
+
+@keyframes kreisel-dreht {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/**
+ * Wer Bewegung abgestellt hat, bekommt statt der Drehung ein ruhiges
+ * Pulsieren — ganz ohne Anzeige bliebe sonst offen, ob überhaupt etwas
+ * läuft.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .kreisel {
+    animation: kreisel-pulst 1.6s ease-in-out infinite !important;
+    border-right-color: currentColor;
+  }
+  @keyframes kreisel-pulst {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.9; }
+  }
+}
+
+.fortschritt {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 15px;
+}
+
+.fortschritt.fehler {
+  border-left-color: var(--crit);
+}
+
+.fortschritt-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.fortschritt-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.fortschritt-zahl {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fortschritt-schiene {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.fortschritt-fuellung {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.35s ease-out;
+}
+
+.fortschritt.fehler .fortschritt-fuellung {
+  background: var(--crit);
+}
+
+.fortschritt-verlauf {
+  list-style: none;
+  margin: 9px 0 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+
+.fortschritt-verlauf li::before {
+  content: '✓ ';
+  color: var(--good);
+}
+
+.fortschritt-verlauf li:last-child {
+  color: var(--ink-mid);
+}
+
+/* ---------- Erscheinungsbild ---------- */
+
+.erscheinung {
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 1;
+  min-width: 32px;
+  justify-content: center;
+}
+
+/* ---------- Bausteine ziehen ---------- */
+
+.blase-vorschlag-kopf.ziehbar {
+  cursor: grab;
+}
+
+.blase-vorschlag-kopf.ziehbar:active {
+  cursor: grabbing;
+}
+
+.ziehgriff {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 3px 9px;
+  cursor: grab;
+  user-select: none;
+  align-self: center;
+}
+
+.ziehgriff:active {
+  cursor: grabbing;
+}
+
+/**
+ * Solange ein Baustein am Zeiger hängt, zeigt der Brief seine Abschnitte —
+ * damit sichtbar ist, wohin er überhaupt fallen darf.
+ */
+body.zieht-baustein .brief-flaeche .d-abschnitt {
+  outline: 1px dashed var(--accent);
+  outline-offset: 6px;
+  border-radius: 2px;
+}
+
+body.zieht-baustein .brief-flaeche .d-abschnitt[data-ausgelassen] {
+  outline-color: var(--line);
+}
+
+/* ---------- Bilder im Brief ---------- */
+
+.brief-flaeche .d-bild {
+  margin: 1.4em 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brief-flaeche .d-bild-rahmen {
+  position: relative;
+  max-width: 100%;
+  line-height: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+}
+
+.brief-flaeche .d-bild-rahmen img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-klein);
+}
+
+.brief-flaeche .d-bild.gewaehlt .d-bild-rahmen,
+.brief-flaeche .d-bild.zieht .d-bild-rahmen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem rgba(0, 127, 255, 0.2);
+}
+
+/**
+ * Der Griff sitzt in der unteren rechten Ecke des Bildes und zieht
+ * stufenlos. Er erscheint erst beim Überfahren — im Lesefluss soll das
+ * Bild ein Bild sein und kein Bedienelement.
+ */
+.brief-flaeche .d-bild-griff {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  touch-action: none;
+}
+
+.brief-flaeche .d-bild:hover .d-bild-griff,
+.brief-flaeche .d-bild.gewaehlt .d-bild-griff,
+.brief-flaeche .d-bild.zieht .d-bild-griff,
+.brief-flaeche .d-bild-griff:focus-visible {
+  opacity: 1;
+}
+
+.brief-flaeche .d-bild-mass {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-klein);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.brief-flaeche .d-bild.zieht .d-bild-mass {
+  opacity: 1;
+}
+
+.brief-flaeche .d-bild-unterschrift {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 7px 0 0;
+  line-height: 1.45;
+  min-height: 1.4em;
+  /* Volle Breite, damit die leere Beschriftung anklickbar bleibt — sonst
+     schrumpft sie im Flusslayout auf null. */
+  width: 100%;
+}
+
+.brief-flaeche .d-bild-unterschrift.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-soft);
+  opacity: 0.7;
+  float: none;
+  height: auto;
+  pointer-events: none;
+  font-size: 12px;
+}
+
+/* Beim Ziehen einer Datei zeigt der Brief, dass er sie annimmt. */
+.brief.nimmt-datei {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+/* ---------- Bildbibliothek ---------- */
+
+.bildgitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.bildkarte {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bildkarte.offen-uebernahme {
+  border-style: dashed;
+}
+
+.bildkarte-bild {
+  padding: 0;
+  border: 0;
+  background: var(--surface-alt);
+  border-radius: var(--radius-klein);
+  overflow: hidden;
+  cursor: zoom-in;
+  display: block;
+  width: 100%;
+}
+
+.bildkarte-bild img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  background: var(--surface-alt);
+}
+
+.bildkarte-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.bildkarte-titel {
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.35;
+  /* Zwei Zeilen: der Titel ist der Griff, an dem ein Bild wiedergefunden
+     wird — ihn nach zwei Wörtern abzuschneiden hilft niemandem. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bildkarte-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bildkarte-themen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bildkarte-fuss,
+.bildkarte-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.bildkarte-fuss {
+  justify-content: space-between;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
+}
+
+.bildkarte-fuss button,
+.bildkarte-knoepfe button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.bildkarte-formular {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* ---------- Bilder in der Randspalte ---------- */
+
+.blase-bilder {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.blase-bild {
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-klein);
+  background: var(--ground);
+  overflow: hidden;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  white-space: normal;
+}
+
+.blase-bild:active {
+  cursor: grabbing;
+}
+
+.blase-bild img {
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+  display: block;
+}
+
+.blase-bild span {
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 4px 6px;
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- Platzhalter im Brief ---------- */
+
+/*
+  Ein Platzhalter war bis eben gewöhnlicher Text in eckigen Klammern. Er
+  sieht jetzt aus wie das, was er ist: eine offene Stelle, die noch etwas
+  verlangt — und keine Textstelle, in die man versehentlich hineinschreibt.
+
+  Zwei Farben für zwei Dinge, die vorher gleich aussahen: ein einzusetzender
+  Wert trägt die Akzentfarbe, ein Arbeitsauftrag die Warnfarbe. Rot ist
+  bewusst nicht dabei — hier verschwindet nichts, hier fehlt etwas.
+
+  Alle Farben kommen aus vorhandenen Merkmalen; die Kachel folgt damit dem
+  Erscheinungsbild, ohne dass ein neues Merkmal in allen drei Blöcken
+  nachgeführt werden müsste.
+*/
+
+.platzhalter-huelle {
+  position: relative;
+  display: inline;
+  white-space: normal;
+}
+
+.platzhalter {
+  display: inline;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin: 0 1px;
+  font-size: 0.94em;
+  font-weight: 600;
+  line-height: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  /* Ein Platzhalter ist ein Ding, kein Wort: er darf nicht umbrechen. */
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.platzhalter.wert {
+  background: var(--accent-soft);
+  border-color: var(--accent-rand);
+  color: var(--accent-stark);
+}
+
+.platzhalter.anweisung {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.platzhalter:hover,
+.platzhalter.auf {
+  border-style: solid;
+  filter: brightness(0.97);
+}
+
+.platzhalter.auf {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Der Punkt sagt: zu dieser Angabe hat der Fall etwas anzubieten. */
+.platzhalter-punkt {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.platzhalter-kasten {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max(240px, 20vw);
+  max-width: min(340px, 90vw);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  font-weight: 400;
+  font-style: normal;
+  white-space: normal;
+  cursor: auto;
+  text-align: left;
+}
+
+.platzhalter-titel {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.platzhalter-text {
+  display: block;
+  line-height: 1.5;
+}
+
+.platzhalter-vorschlag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.platzhalter-knoepfe {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.platzhalter-knoepfe input {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+  In der Ausgabe und beim Ausschneiden trägt der Knoten seine Klammern
+  wieder — dort darf nichts von der Kachel übrig bleiben.
+*/
+.d-platzhalter {
+  font: inherit;
+}
+
+
+/* ---- autoiXpert-Look: Designtokens des Cockpits ---- */
 @theme {
   /* Flaechen */
   --color-ax-bg: #e8ebef;

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { Report } from "@/lib/autoixpert/types";
+import type { Gutachten } from "@/autoixpert/typen";
 import {
   fehlendeAngaben,
   parseAusstattung,
   reportToWbwParams,
   toEzMonat,
-} from "@/lib/wbw/params";
+} from "@/wbw/params";
 
-const report: Report = {
+const report: Gutachten = {
   id: "r1",
   type: "liability",
   state: "recorded",

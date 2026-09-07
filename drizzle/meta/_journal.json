@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786538449181,
+      "tag": "0000_silent_bloodaxe",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786540768056,
+      "tag": "0001_funny_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786551375550,
+      "tag": "0002_faithful_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786559105307,
+      "tag": "0003_first_stellaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786559823819,
+      "tag": "0004_complete_ogun",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786875243275,
+      "tag": "0005_aromatic_silverclaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786961643275,
+      "tag": "0006_bibliothek_fingerabdruck",
+      "breakpoints": true
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import {
   abrufreihenfolge,
   leseAktenzeichen,
   vergleichsform,
-} from "@/lib/autoixpert/aktenzeichen";
+} from "@/autoixpert/aktenzeichen";
 
 describe("leseAktenzeichen", () => {
   it("liest die Anzeigeform mit Schraegstrich", () => {
@@ -50,7 +50,7 @@ describe("vergleichsform", () => {
 
 describe("fallKennungen", () => {
   it("zeigt das Aktenzeichen, verlinkt aber ueber die externe ID", async () => {
-    const { fallKennungen } = await import("@/lib/autoixpert/aktenzeichen");
+    const { fallKennungen } = await import("@/autoixpert/aktenzeichen");
     expect(
       fallKennungen({ id: "yNVk", token: "0926/2081TG", external_id: "0926_2081TG" }),
     ).toEqual({ anzeige: "0926/2081TG", pfad: "0926_2081TG" });
@@ -58,7 +58,7 @@ describe("fallKennungen", () => {
 
   it("leitet den Pfad aus dem Aktenzeichen ab, wenn die externe ID fehlt", () => {
     // Genau der Fall 0826/2069TG: nachgezogen wurde die externe ID erst spaeter.
-    return import("@/lib/autoixpert/aktenzeichen").then(({ fallKennungen }) => {
+    return import("@/autoixpert/aktenzeichen").then(({ fallKennungen }) => {
       expect(fallKennungen({ id: "abc", token: "0826/2069TG" })).toEqual({
         anzeige: "0826/2069TG",
         pfad: "0826_2069TG",
@@ -67,7 +67,7 @@ describe("fallKennungen", () => {
   });
 
   it("faellt auf die technische ID zurueck, wenn beides fehlt", async () => {
-    const { fallKennungen } = await import("@/lib/autoixpert/aktenzeichen");
+    const { fallKennungen } = await import("@/autoixpert/aktenzeichen");
     expect(fallKennungen({ id: "abc" })).toEqual({ anzeige: "abc", pfad: "abc" });
   });
 });
