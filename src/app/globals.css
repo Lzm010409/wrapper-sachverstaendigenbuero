@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/*
+ * Designtokens, abgeleitet aus der autoiXpert-Oberflaeche (Screenshots vom 07.09.2026:
+ * Gutachtenliste, Unfall & Beteiligte, Fahrzeugauswahl, Fotos, Kalkulation).
+ * Alle Farben, Radien und Abstaende der Anwendung kommen aus dieser Datei - wer die
+ * Optik nachziehen will, aendert hier und nirgends sonst.
+ */
+@theme {
+  /* Flaechen */
+  --color-ax-bg: #e8ebef;
+  --color-ax-surface: #ffffff;
+  --color-ax-surface-muted: #f5f6f8;
+  --color-ax-rail: #f7f8fa;
+  --color-ax-border: #e2e6ea;
+  --color-ax-divider: #eceff1;
+
+  /* Schrift */
+  --color-ax-text: #37474f;
+  --color-ax-text-soft: #607d8b;
+  --color-ax-label: #9aa4ad;
+
+  /* Akzente */
+  --color-ax-primary: #1f8fd4;
+  --color-ax-primary-strong: #1878b4;
+  --color-ax-primary-soft: #e6f3fb;
+  --color-ax-value: #43a047;
+  --color-ax-warn: #f5a623;
+  --color-ax-danger: #e05252;
+
+  /* Status-Chips der Gutachtenliste */
+  --color-ax-chip-green: #4caf50;
+  --color-ax-chip-red: #ef5350;
+  --color-ax-chip-orange: #ffa726;
+  --color-ax-chip-purple: #ab47bc;
+  --color-ax-chip-blue: #42a5f5;
+
+  /* autoiXpert setzt Roboto; ohne Netzabhaengigkeit nehmen wir es nur, wenn es lokal da ist. */
+  --font-sans: Roboto, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+
+  --radius-ax: 4px;
+  --radius-ax-lg: 6px;
+
+  --shadow-ax-card: 0 1px 3px rgb(38 50 56 / 0.12), 0 1px 2px rgb(38 50 56 / 0.06);
+  --shadow-ax-raised: 0 4px 14px rgb(38 50 56 / 0.14);
+}
+
+html,
+body {
+  background: var(--color-ax-bg);
+  font-family: var(--font-sans);
+  color: var(--color-ax-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* autoiXpert setzt Formularfelder ohne Rahmen, nur mit Unterstrich. */
+.ax-field-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--color-ax-border);
+  background: transparent;
+  padding: 2px 0 5px;
+  font-size: 14px;
+  color: var(--color-ax-text);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.ax-field-input:focus {
+  border-bottom-color: var(--color-ax-primary);
+  box-shadow: 0 1px 0 0 var(--color-ax-primary);
+}
+.ax-field-input::placeholder {
+  color: color-mix(in srgb, var(--color-ax-label) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
