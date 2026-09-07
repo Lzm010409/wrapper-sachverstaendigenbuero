@@ -44,7 +44,13 @@ export async function ladeFall(aktenzeichen: string): Promise<FallAkte | undefin
     return report ? { report, demo: true } : undefined;
   }
 
-  const report = await autoixpert.getReport(aktenzeichen);
+  // Erst der direkte Weg (ein Lesezugriff), dann die Suche ueber das
+  // Aktenzeichen - noetig fuer aeltere Faelle ohne nachgezogene externe ID.
+  const report = await autoixpert.getReport(aktenzeichen).catch(async (fehler: unknown) => {
+    const gefunden = await autoixpert.sucheUeberAktenzeichen(aktenzeichen);
+    if (gefunden) return gefunden;
+    throw fehler;
+  });
 
   // Der Deal ist Beiwerk: faellt Pipedrive aus, bleibt die Akte trotzdem nutzbar.
   let deal: Deal | undefined;

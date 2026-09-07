@@ -6,6 +6,7 @@ import { Card, DemoHinweis, Field, LicensePlate, StatusChip } from "@/components
 import { reportTypeLabels } from "@/lib/autoixpert/types";
 import { AutoixpertError } from "@/lib/autoixpert/client";
 import { ladeFall } from "@/lib/faelle/service";
+import { fallKennungen } from "@/lib/autoixpert/aktenzeichen";
 import { dealFields, monetaryValue, stageNames } from "@/lib/pipedrive/client";
 import { contactName, formatDate, formatEuro, formatKilometers, formatShortDate } from "@/lib/format";
 import { WbwFormular } from "@/components/WbwFormular";
@@ -30,12 +31,12 @@ export default async function FallSeite({
   if (!akte) notFound();
 
   const { report, deal, demo } = akte;
-  const az = report.external_id ?? report.token ?? report.id;
+  const { anzeige, pfad } = fallKennungen(report);
 
   return (
-    <AppShell title={contactName(report.claimant)} badge={az}>
+    <AppShell title={contactName(report.claimant)} badge={anzeige}>
       {demo ? <DemoHinweis /> : null}
-      <FallReiter aktenzeichen={az} aktiv={aktiv} />
+      <FallReiter aktenzeichen={pfad} aktiv={aktiv} />
 
       {aktiv === "beteiligte" ? (
         <div className="grid gap-5 lg:grid-cols-3">

@@ -1,4 +1,11 @@
 import { env } from "@/lib/env";
+import {
+  AbrufregelVerletzt,
+  pflichtfilter,
+  pruefeGutachten,
+  pruefeSchreibzugriff,
+} from "./abrufregel";
+import { abrufreihenfolge } from "./aktenzeichen";
 import type { Page, Report, ReportListFilter } from "./types";
 
 /**
@@ -91,24 +98,63 @@ export function extractPage<T>(body: Record<string, unknown>): Page<T> {
 }
 
 export const autoixpert = {
-  /** Eine Seite Gutachten. Fuer Folgeseiten `starting_after` aus `next_page` setzen. */
+  /**
+   * Eine Seite Gutachten. Die Pflichtfilter der Abrufregel werden immer
+   * gesetzt und lassen sich vom Aufrufer nicht ueberschreiben - sie stehen
+   * bewusst hinter dem uebergebenen Filter.
+   */
   async listReports(filter: ReportListFilter = {}): Promise<Page<Report>> {
     const body = await request<Record<string, unknown>>("/reports", {
-      query: { ...filter },
+      query: { ...filter, ...pflichtfilter() },
     });
     return extractPage<Report>(body);
   },
 
   /**
-   * Ein Gutachten. `idOrExternalId` darf laut Doku auch die externe ID sein -
-   * bei uns also das Aktenzeichen, sofern es nachgezogen wurde.
+   * Ein Gutachten ueber Aktenzeichen, externe ID oder technische ID.
+   *
+   * Die externe ID (`0926_2081TG`) wird zuerst versucht, weil sie in der URL
+   * erlaubt ist; die Anzeigeform mit Schraegstrich (`0926/2081TG`) steht nur
+   * im Feld `token` und ist ueber den Pfad nicht erreichbar. Aeltere Faelle
+   * haben gar keine externe ID - dafuer gibt es `sucheUeberAktenzeichen`.
+   *
+   * Jeder Treffer wird gegen die Abrufregel geprueft: der Einzelabruf kennt
+   * keine Filterparameter, die Pruefung im Nachgang ist die einzige Sperre.
    */
-  async getReport(idOrExternalId: string): Promise<Report> {
-    return request<Report>(`/reports/${encodeURIComponent(idOrExternalId)}`);
+  async getReport(eingabe: string): Promise<Report> {
+    let letzterFehler: unknown;
+
+    for (const weg of abrufreihenfolge(eingabe)) {
+      try {
+        const report = await request<Report>(`/reports/${encodeURIComponent(weg)}`);
+        pruefeGutachten(report);
+        return report;
+      } catch (fehler) {
+        // Eine Regelverletzung ist ein Ergebnis, kein Fehlschlag des Weges -
+        // weitersuchen wuerde dieselbe Sperre nur erneut ausloesen.
+        if (fehler instanceof AbrufregelVerletzt) throw fehler;
+        letzterFehler = fehler;
+      }
+    }
+
+    throw letzterFehler;
+  },
+
+  /**
+   * Sucht ein Gutachten ueber das Aktenzeichen (`token`). Die Schnittstelle
+   * bietet dafuer keinen Filter, deshalb wird die - durch die Abrufregel
+   * bereits eingeengte - Liste durchgesehen. Nur fuer Faelle ohne externe ID.
+   */
+  async sucheUeberAktenzeichen(aktenzeichen: string): Promise<Report | undefined> {
+    const { vergleichsform } = await import("./aktenzeichen");
+    const gesucht = vergleichsform(aktenzeichen);
+    const seite = await this.listReports({ limit: 50, sort: "created_at", sort_direction: "desc" });
+    return seite.items.find((report) => vergleichsform(report.token ?? "") === gesucht);
   },
 
   /** Einzelne Felder aendern. PUT waere ein Ersetzen und ist laut Doku zu vermeiden. */
   async patchReport(idOrExternalId: string, patch: Partial<Report>): Promise<Report> {
+    pruefeSchreibzugriff(`PATCH /reports/${idOrExternalId}`);
     return request<Report>(`/reports/${encodeURIComponent(idOrExternalId)}`, {
       method: "PATCH",
       body: JSON.stringify(patch),

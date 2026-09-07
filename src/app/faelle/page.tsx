@@ -3,6 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { DemoHinweis, EmptyState, LicensePlate, StatusChip } from "@/components/ui";
 import { IconSuche } from "@/components/icons";
 import { reportTypeLabels } from "@/lib/autoixpert/types";
+import { fallKennungen } from "@/lib/autoixpert/aktenzeichen";
 import { contactName, formatShortDate, werktageLabel } from "@/lib/format";
 import { ladeFaelle } from "@/lib/faelle/service";
 
@@ -37,11 +38,11 @@ export default async function FaelleSeite() {
         ) : (
           <ul>
             {reports.map((report) => {
-              const aktenzeichen = report.external_id ?? report.token ?? report.id;
+              const { anzeige, pfad } = fallKennungen(report);
               return (
                 <li key={report.id} className="border-b border-ax-divider last:border-0">
                   <Link
-                    href={`/faelle/${encodeURIComponent(aktenzeichen)}`}
+                    href={`/faelle/${encodeURIComponent(pfad)}`}
                     className="grid grid-cols-1 items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-ax-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ax-primary md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_auto_auto_minmax(0,0.9fr)]"
                   >
                     <span className="truncate text-sm text-ax-text">
@@ -59,7 +60,7 @@ export default async function FaelleSeite() {
                     </span>
 
                     <span className="font-mono text-xs text-ax-text-soft">
-                      {aktenzeichen}
+                      {anzeige}
                     </span>
 
                     <LicensePlate value={report.car?.license_plate} />

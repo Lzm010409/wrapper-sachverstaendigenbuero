@@ -49,6 +49,34 @@ Aus der abgelegten Dokumentation (`Autoixpert API/`), nachgelesen statt vermutet
    Generalschlüssel über autoiXpert, Pipedrive (`Autoixpert ID`) und die Ablage.
    Für Altfälle ohne nachgezogene `external_id` bleibt das Feld `token` als Rückfall.
 
+## Abrufregel (Stand: enge Fassung)
+
+Solange der Ausbau läuft, gilt eine bewusst enge Sperre gegen die
+autoiXpert-Schnittstelle. Sie steht in `src/lib/autoixpert/abrufregel.ts` und
+wirkt im Client, nicht im Aufrufer — eine Regel, an die man sich erinnern muss,
+ist keine.
+
+| Regel | Voreinstellung | Lösen über |
+| --- | --- | --- |
+| nur offene Gutachten | an | `AUTOIXPERT_NUR_OFFENE=false` |
+| frühestens angelegt am | `2026-05-01` | `AUTOIXPERT_FRUEHESTENS` |
+| schreibende Zugriffe | gesperrt | `AUTOIXPERT_SCHREIBEN=erlaubt` |
+
+Die Listenabfrage setzt die Filter **hinter** den übergebenen Filter, sie sind
+also nicht überschreibbar. Der Einzelabruf `/reports/{id}` kennt keine
+Filterparameter — dort prüft der Client die Antwort im Nachgang.
+
+## Aktenzeichen: zwei Schreibweisen, zwei Aufgaben
+
+| Feld | Schreibweise | Aufgabe |
+| --- | --- | --- |
+| `token` | `0926/2081TG` | Anzeige — so steht es im Gutachten |
+| `external_id` | `0926_2081TG` | Pfad — der Schrägstrich wäre ein Trennzeichen |
+
+Ältere Fälle haben **keine** `external_id` (belegt an `0826/2069TG`). Für sie
+leitet `fallKennungen` den Pfad aus dem `token` ab; findet der direkte Abruf
+nichts, sucht `sucheUeberAktenzeichen` in der ohnehin eingeengten Liste.
+
 ## Technische Wahl
 
 - **Next.js (App Router) + Tailwind v4.** Serverseitiges Rendern hält die API-Schlüssel
