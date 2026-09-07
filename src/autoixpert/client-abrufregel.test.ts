@@ -87,3 +87,34 @@ describe('Abrufregel im Client', () => {
     expect(decodeURIComponent(aufrufe[0]!.pathname)).toContain('0926_2081TG')
   })
 })
+
+describe('holeVxs', () => {
+  it('holt die Kalkulation als XML', async () => {
+    const { hole, aufrufe } = stelleFetch(() => ({ koerper: {} }))
+    const holeXml = vi.fn(async () => new Response('<vxs:Dossiers/>', { status: 200 }))
+    const client = new AutoixpertClient({
+      token: 't',
+      basisUrl: BASIS,
+      hole: holeXml as unknown as typeof fetch,
+      regel: ENG,
+    })
+    expect(await client.holeVxs('0926_2081TG')).toBe('<vxs:Dossiers/>')
+    expect(hole).not.toHaveBeenCalled()
+    expect(aufrufe).toHaveLength(0)
+  })
+
+  it('meldet ein Gutachten ohne Kalkulation als leer, nicht als Fehler', async () => {
+    // Viele Gutachten haben schlicht keine DAT-Kalkulation. Das ist ein
+    // Ergebnis - eine Ausnahme daraus zu machen, waere eine Falschmeldung.
+    for (const status of [400, 404]) {
+      const holeXml = vi.fn(async () => new Response('', { status }))
+      const client = new AutoixpertClient({
+        token: 't',
+        basisUrl: BASIS,
+        hole: holeXml as unknown as typeof fetch,
+        regel: ENG,
+      })
+      expect(await client.holeVxs('x'), String(status)).toBeNull()
+    }
+  })
+})

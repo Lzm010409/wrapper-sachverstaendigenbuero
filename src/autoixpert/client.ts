@@ -147,6 +147,41 @@ export class AutoixpertClient {
     return geprueft.data.report
   }
 
+  /**
+   * Holt die DAT-Kalkulation als VXS-XML.
+   *
+   * Sie trägt zwei Dinge, die das Gutachten-Objekt nicht hat: die genaue
+   * Fahrzeugbezeichnung (`SubModelName`, z. B. „E 53 AMG 4Matic+") und die
+   * Kalkulationssummen. Siehe `vxs.ts`.
+   *
+   * Die Schnittstelle antwortet mit einem Fehler, wenn das Fahrzeug nicht mit
+   * DAT identifiziert wurde, keine Kalkulation vorliegt oder dem Gutachten
+   * kein DAT-Zugang zugeordnet ist. Das ist kein Störfall — viele Gutachten
+   * haben schlicht keine Kalkulation.
+   */
+  async holeVxs(reportId: string): Promise<string | null> {
+    const url = `${this.basisUrl}/reports/${encodeURIComponent(reportId)}/vxs`
+    let antwort: Response
+    try {
+      antwort = await this.hole(url, {
+        headers: { authorization: `Bearer ${this.token}`, accept: 'application/xml' },
+      })
+    } catch (fehler) {
+      throw new AutoixpertFehler(
+        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
+      )
+    }
+    // Keine Kalkulation ist ein Ergebnis, kein Fehler.
+    if (antwort.status === 404 || antwort.status === 400) return null
+    if (!antwort.ok) {
+      throw new AutoixpertFehler(
+        `Die DAT-Kalkulation liess sich nicht laden (HTTP ${antwort.status}).`,
+        antwort.status,
+      )
+    }
+    return antwort.text()
+  }
+
   /** Eine Seite der Gutachtenliste. */
   async listeGutachten(optionen: {
     limit?: number
