@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react'
 import type { Gutachten } from '@/autoixpert/typen'
 import { fehlendeAngaben, reportToWbwParams, type WbwEingaben } from '@/wbw/params'
 import type { KalkulationStand } from '@/fall/kalkulation'
+import { fehlendeLaufangaben, type LaufEingaben } from '@/wbw/lauf-eingaben'
+import type { Laufstand } from '@/wbw/auftrag'
+import type { Portal } from '@/wbw/lauf'
+import { WbwLauf } from './wbw-lauf'
 import type { WbwVorschlag } from '@/wbw/vorschlag'
 import type { Merkmal } from '@/wbw/ausstattung'
 
@@ -29,15 +33,40 @@ import type { Merkmal } from '@/wbw/ausstattung'
  * steht die Abweichung da, statt sich stillschweigend für eine zu
  * entscheiden.
  */
+/** Voreinstellung: die beiden kostenlosen Portale. */
+const PORTALE: { schluessel: Portal; name: string; hinweis: string; kostenpflichtig?: boolean }[] = [
+  {
+    schluessel: 'autoscout24',
+    name: 'AutoScout24',
+    hinweis: 'kennt Motorvarianten als eigenes Modell — der belastbarste Korb',
+  },
+  {
+    schluessel: 'kleinanzeigen',
+    name: 'Kleinanzeigen',
+    hinweis: 'nur Baureihen, dafür viele private Angebote',
+  },
+  {
+    schluessel: 'mobile.de',
+    name: 'mobile.de',
+    hinweis: 'nur über einen kostenpflichtigen Dienst erreichbar (Apify)',
+    kostenpflichtig: true,
+  },
+]
+
 export function WbwReiter({
   gutachten,
   vorschlag,
   kalkulationsstand,
+  fallId,
+  letzterLauf,
 }: {
   gutachten: Gutachten
   vorschlag: WbwVorschlag | null
   kalkulationsstand: KalkulationStand
+  fallId: string
+  letzterLauf: Laufstand | null
 }) {
+  const [portale, setzePortale] = useState<Portal[]>(['autoscout24', 'kleinanzeigen'])
   // Der Vorschlag ist die Voreinstellung, nicht der Wert: jedes Feld bleibt
   // ein gewöhnliches Eingabefeld, das der Sachverständige überschreibt.
   const [eingaben, setzeEingaben] = useState<WbwEingaben>(() => ausVorschlag(vorschlag))
@@ -46,6 +75,33 @@ export function WbwReiter({
   const params = useMemo(() => reportToWbwParams(gutachten, eingaben), [gutachten, eingaben])
   const fehlt = fehlendeAngaben(params)
   const text = JSON.stringify(params, null, 2)
+
+  // Die Angaben für den Lauf entstehen aus denselben Feldern wie die
+  // Eingabedatei — es gibt keine zweite Wahrheit über die Suche.
+  const laufEingaben: LaufEingaben = useMemo(
+    () => ({
+      modell: params.subject.modell,
+      baureihe: vorschlag?.baureihe ?? null,
+      marke: params.subject.marke,
+      variante: params.subject.variante,
+      ez: params.subject.ez,
+      laufleistung: params.subject.mileage,
+      leistungKw: params.subject.power,
+      bauart: vorschlag?.bauart ?? null,
+      plz: params.plz,
+      sollAusstattung: params.sollAusstattung,
+      ...(params.getriebe ? { getriebe: params.getriebe } : {}),
+      ...(params.tueren ? { tueren: params.tueren } : {}),
+      radiusKm: params.radiusKm,
+      kmToleranz: params.kmToleranz,
+      ezToleranzJahre: params.ezToleranzJahre,
+      leistungToleranzKw: params.leistungToleranzKw,
+      maxItemsProPortal: params.maxItemsProPortal,
+      portale,
+      kostenpflichtigErlaubt: portale.includes('mobile.de'),
+    }),
+    [params, portale, vorschlag],
+  )
 
   function setze<K extends keyof WbwEingaben>(schluessel: K, wert: WbwEingaben[K]) {
     setzeEingaben((alt) => ({ ...alt, [schluessel]: wert }))
@@ -56,6 +112,7 @@ export function WbwReiter({
     <div className="detail">
       <div>
         {vorschlag ? <Abweichungen vorschlag={vorschlag} /> : null}
+
 
         <div className="block">
           <div className="block-label">
@@ -195,6 +252,43 @@ export function WbwReiter({
               ) : null}
             </div>
 
+            <fieldset
+              style={{ border: 0, padding: 0, margin: '0 0 14px' }}
+            >
+              <legend className="unterzeile" style={{ padding: 0, marginBottom: 6 }}>
+                Portale
+              </legend>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {PORTALE.map((p) => (
+                  <label
+                    key={p.schluessel}
+                    style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13.5 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={portale.includes(p.schluessel)}
+                      onChange={(e) =>
+                        setzePortale((alt) =>
+                          e.target.checked
+                            ? [...alt, p.schluessel]
+                            : alt.filter((x) => x !== p.schluessel),
+                        )
+                      }
+                    />
+                    <span>
+                      {p.name}
+                      {p.kostenpflichtig ? (
+                        <span className="marke-pille m-warn">kostenpflichtig</span>
+                      ) : null}
+                      <span className="unterzeile" style={{ display: 'block' }}>
+                        {p.hinweis}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div className="feldgruppe">
               <div className="feld" style={{ flex: 1, minWidth: 110 }}>
                 <label htmlFor="wbw-radius">Radius (km)</label>
@@ -227,6 +321,18 @@ export function WbwReiter({
             </div>
           </div>
         </div>
+
+        {/*
+          Der Knopf steht **unter** den Suchparametern, nicht darüber: erst
+          prüft man, womit gesucht wird, dann sucht man. Der Fortschritt und
+          das Ergebnis erscheinen dann dort, wo man gerade hingesehen hat.
+        */}
+        <WbwLauf
+          fallId={fallId}
+          eingaben={laufEingaben}
+          fehlt={fehlendeLaufangaben(laufEingaben)}
+          vorheriger={letzterLauf}
+        />
       </div>
 
       <aside className="seitenleiste">
@@ -271,9 +377,8 @@ export function WbwReiter({
         <Kalkulationshinweis stand={kalkulationsstand} vorschlag={vorschlag} />
 
         <div className="hinweis">
-          Der Recherchelauf über mobile.de, AutoScout24 und Kleinanzeigen ist noch nicht
-          angeschlossen — dafür fehlt der Job-Dienst. Diese Datei nimmt das Plugin
-          unverändert entgegen.
+          Die Datei nimmt das Plugin unverändert entgegen — für einen Lauf von Hand oder
+          zum Nachvollziehen dessen, womit gesucht wurde.
         </div>
       </aside>
     </div>

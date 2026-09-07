@@ -38,6 +38,9 @@ export const eintragStatusEnum = pgEnum('eintrag_status', [
   'zurueckgezogen',
 ])
 
+/** Der Stand eines WBW-Recherchelaufs. */
+export const wbwZustandEnum = pgEnum('wbw_zustand', ['laeuft', 'fertig', 'fehler'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -345,6 +348,44 @@ export const fall = pgTable(
   ],
 )
 
+/**
+ * Ein WBW-Recherchelauf.
+ *
+ * Der Lauf dauert Minuten — die Portale werden nacheinander abgefragt, und
+ * zwischen den Abrufen wird bewusst pausiert. Eine HTTP-Antwort kann darauf
+ * nicht warten, deshalb steht der Stand hier: die Oberfläche fragt ihn ab,
+ * und ein Neuladen der Seite verliert nichts.
+ *
+ * `protokoll` wächst während des Laufs Schritt für Schritt — daran hängt die
+ * Fortschrittsanzeige. `ergebnis` ist das `result.json` des Plugins,
+ * unverändert.
+ */
+export const wbwLauf = pgTable(
+  'wbw_lauf',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    fallId: uuid()
+      .notNull()
+      .references(() => fall.id, { onDelete: 'cascade' }),
+    zustand: wbwZustandEnum().notNull().default('laeuft'),
+    /** Die Eingaben, mit denen gesucht wurde — für die Nachvollziehbarkeit. */
+    eingabe: jsonb().notNull(),
+    /** Die Schritte, wie sie durchlaufen wurden. */
+    protokoll: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /** `result.json` des Plugins. */
+    ergebnis: jsonb(),
+    /** Was der Markenfilter je Portal entfernt hat. */
+    markenfremd: jsonb(),
+    /** Nur bei `fehler`: die Meldung, unverändert. */
+    fehler: text(),
+    /** Wo die erzeugten Dateien liegen. Überlebt keinen Neustart des Containers. */
+    ordner: text(),
+    begonnenAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    beendetAm: timestamp({ withTimezone: true }),
+  },
+  (t) => [index('wbw_lauf_fall_idx').on(t.fallId), index('wbw_lauf_zustand_idx').on(t.zustand)],
+)
+
 export const stellungnahme = pgTable(
   'stellungnahme',
   {
@@ -609,3 +650,4 @@ export type Platzhalter = typeof eintragPlatzhalter.$inferSelect
 export type Vorbedingung = typeof eintragVorbedingung.$inferSelect
 export type Beleg = typeof beleg.$inferSelect
 export type Benutzer = typeof benutzer.$inferSelect
+export type WbwLauf = typeof wbwLauf.$inferSelect

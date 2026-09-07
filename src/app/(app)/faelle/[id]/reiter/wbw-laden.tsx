@@ -1,6 +1,7 @@
 import type { Gutachten } from '@/autoixpert/typen'
 import { ladeKalkulation } from '@/fall/kalkulation'
 import { vorschlagAusVxs, type WbwVorschlag } from '@/wbw/vorschlag'
+import { letzterLauf } from '@/wbw/auftrag'
 import { WbwReiter } from './wbw'
 
 /**
@@ -12,8 +13,19 @@ import { WbwReiter } from './wbw'
  * fertig hinübergereicht; die Trennung zwischen Daten und Oberfläche bleibt,
  * wo sie hingehört.
  */
-export async function WbwReiterMitVorschlag({ gutachten }: { gutachten: Gutachten }) {
-  const kalkulation = await ladeKalkulation(gutachten)
+export async function WbwReiterMitVorschlag({
+  gutachten,
+  fallId,
+}: {
+  gutachten: Gutachten
+  fallId: string
+}) {
+  // Beides zugleich: die Kalkulation kommt über das Netz, der letzte Lauf aus
+  // der Datenbank — nacheinander wären es zwei Wartezeiten hintereinander.
+  const [kalkulation, vorheriger] = await Promise.all([
+    ladeKalkulation(gutachten),
+    letzterLauf(fallId),
+  ])
 
   let vorschlag: WbwVorschlag | null = null
   if (kalkulation.stand === 'gefunden' && kalkulation.daten) {
@@ -21,6 +33,12 @@ export async function WbwReiterMitVorschlag({ gutachten }: { gutachten: Gutachte
   }
 
   return (
-    <WbwReiter gutachten={gutachten} vorschlag={vorschlag} kalkulationsstand={kalkulation.stand} />
+    <WbwReiter
+      gutachten={gutachten}
+      vorschlag={vorschlag}
+      kalkulationsstand={kalkulation.stand}
+      fallId={fallId}
+      letzterLauf={vorheriger}
+    />
   )
 }

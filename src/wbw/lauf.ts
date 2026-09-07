@@ -71,6 +71,15 @@ export interface WbwEingabe {
   portale: Portal[]
   /** Markenfremde Inserate aussortieren. Voreinstellung: ja. */
   markenfilter?: boolean
+  /**
+   * Zusätzliche Umgebungsvariablen für die Skripte dieses einen Laufs.
+   *
+   * Damit wird `WBW_ALLOW_PAID` **pro Lauf** gesetzt statt dauerhaft im
+   * Container: die kostenpflichtige Stufe (Apify) ist dann eine bewusste
+   * Entscheidung für diese eine Suche und nicht ein Schalter, den irgendwann
+   * niemand mehr sieht.
+   */
+  umgebung?: Record<string, string>
 }
 
 export interface Schritt {
@@ -89,6 +98,24 @@ export interface WbwErgebnis {
   dateien: { html?: string; pdf?: string; linkliste?: string }
 }
 
+/**
+ * Die Umgebung, in der die Plugin-Skripte laufen.
+ *
+ * Ergänzt wird nur, was fehlt. `KA_API_BASE` sagt dem Kleinanzeigen-Adapter,
+ * wo die Schnittstelle steht — seit sie im Cockpit selbst liegt, ist das die
+ * eigene Adresse. Im Betrieb setzt `starten.mjs` sie samt Zugangswort, bevor
+ * der Server hochfährt; in der Entwicklung (`next dev`) läuft dieses Skript
+ * nicht, und ohne diesen Rückfall bekäme das Plugin dort „KA_API_BASE fehlt"
+ * und liefe stumm auf null Treffer — genau so gemessen am 07.09.2026.
+ */
+function laufUmgebung(zusatz?: Record<string, string>): NodeJS.ProcessEnv {
+  const umgebung: NodeJS.ProcessEnv = { ...process.env, ...zusatz }
+  if (!umgebung.KA_API_BASE) {
+    umgebung.KA_API_BASE = `http://127.0.0.1:${process.env.PORT ?? '3000'}/api/kleinanzeigen`
+  }
+  return umgebung
+}
+
 /** Wo die Skripte des Plugins liegen. Im Abbild `/app/wbw-plugin`. */
 function pluginPfad(): string {
   return process.env.WBW_PLUGIN_PFAD ?? join(process.cwd(), 'wbw-plugin')
@@ -101,27 +128,78 @@ function pluginPfad(): string {
 async function rufeSkript(
   skript: string,
   argumente: string[],
-  optionen: { cwd?: string; timeoutMs?: number } = {},
+  optionen: { cwd?: string; timeoutMs?: number; umgebung?: Record<string, string> } = {},
 ): Promise<string> {
-  const { stdout } = await fuehreAus('node', [join(pluginPfad(), skript), ...argumente], {
-    cwd: optionen.cwd,
-    // Die Beschaffung eines Portals kann Minuten dauern — Kleinanzeigen holt
-    // je Inserat eine Detailseite und pausiert dazwischen bewusst.
-    timeout: optionen.timeoutMs ?? 15 * 60 * 1000,
-    maxBuffer: 64 * 1024 * 1024,
-    env: process.env,
-  })
-  return stdout
+  try {
+    const { stdout } = await fuehreAus('node', [join(pluginPfad(), skript), ...argumente], {
+      cwd: optionen.cwd,
+      // Die Beschaffung eines Portals kann Minuten dauern — Kleinanzeigen holt
+      // je Inserat eine Detailseite und pausiert dazwischen bewusst.
+      timeout: optionen.timeoutMs ?? 15 * 60 * 1000,
+      maxBuffer: 64 * 1024 * 1024,
+      env: laufUmgebung(optionen.umgebung),
+    })
+    return stdout
+  } catch (fehler) {
+    // `execFile` wirft bei einem Rückgabewert ungleich null mit der nackten
+    // Meldung „Command failed: node …". Der Grund steht im Ausgabestrom des
+    // Skripts — die Plugin-Skripte schreiben ihn als `{"fehler": "…"}`. Ohne
+    // ihn stand in der Oberfläche der Befehl statt der Ursache.
+    throw new Error(`${skript}: ${grundAus(fehler)}`)
+  }
 }
 
-/** Löst die Postleitzahl in Koordinaten auf. */
-export async function ermittleZentrum(plz: string): Promise<{ lat: number; lon: number }> {
-  const roh = await rufeSkript('zentrum.js', [plz], { timeoutMs: 60_000 })
-  const daten = JSON.parse(roh) as { lat?: number; lon?: number; fehler?: string }
-  if (daten.fehler || daten.lat == null || daten.lon == null) {
-    throw new Error(daten.fehler ?? `Für die PLZ ${plz} liess sich kein Ort bestimmen.`)
+/** Holt den Grund aus der Ausgabe eines gescheiterten Skripts. */
+function grundAus(fehler: unknown): string {
+  const f = fehler as { stdout?: string; stderr?: string; message?: string }
+  for (const strom of [f.stdout, f.stderr]) {
+    const text = strom?.trim()
+    if (!text) continue
+    try {
+      const gelesen = JSON.parse(text) as { fehler?: string }
+      if (gelesen.fehler) return gelesen.fehler
+    } catch {
+      // Kein JSON — dann die letzte Zeile, sie trägt meist die Meldung.
+      const zeilen = text.split('\n').filter(Boolean)
+      const letzte = zeilen[zeilen.length - 1]
+      if (letzte) return letzte.slice(0, 300)
+    }
   }
-  return { lat: daten.lat, lon: daten.lon }
+  return f.message?.slice(0, 300) ?? 'unbekannter Fehler'
+}
+
+/**
+ * Löst die Postleitzahl in Koordinaten auf.
+ *
+ * Mit Wiederholung: der Geokodierdienst bremst wiederholte Anfragen aus und
+ * antwortet dann mit nichts. Zweimal hintereinander gemessen —
+ * `{"plz":"50997","lat":50.8651,…}` und unmittelbar danach
+ * `{"fehler":"Für die PLZ 50997 liess sich kein Ort bestimmen."}`. Ohne
+ * Wiederholung stirbt daran der ganze Lauf im ersten Schritt.
+ */
+export async function ermittleZentrum(
+  plz: string,
+  optionen: { versuche?: number; warte?: (ms: number) => Promise<void> } = {},
+): Promise<{ lat: number; lon: number }> {
+  const hoechstens = Math.max(1, optionen.versuche ?? 3)
+  const warte = optionen.warte ?? ((ms: number) => new Promise((w) => setTimeout(w, ms)))
+  let letzterGrund = ''
+
+  for (let versuch = 1; versuch <= hoechstens; versuch++) {
+    if (versuch > 1) await warte(versuch * 2000)
+    try {
+      const roh = await rufeSkript('zentrum.js', [plz], { timeoutMs: 60_000 })
+      const daten = JSON.parse(roh) as { lat?: number; lon?: number; fehler?: string }
+      if (daten.lat != null && daten.lon != null) return { lat: daten.lat, lon: daten.lon }
+      letzterGrund = daten.fehler ?? `Für die PLZ ${plz} liess sich kein Ort bestimmen.`
+    } catch (fehler) {
+      letzterGrund = fehler instanceof Error ? fehler.message : String(fehler)
+    }
+  }
+
+  throw new Error(
+    `Für die PLZ ${plz} liess sich auch nach ${hoechstens} Versuchen kein Ort bestimmen: ${letzterGrund}`,
+  )
 }
 
 export interface Modellliste {
@@ -270,7 +348,10 @@ export async function fuehreLaufAus(
     const datei = ROHDATEI[portal]
     halteFest({ name: `${portal} durchsuchen`, stand: 'laeuft' })
     try {
-      await rufeSkript('fetch-portal.js', [portal, 'search-inputs.json', datei], { cwd: ordner })
+      await rufeSkript('fetch-portal.js', [portal, 'search-inputs.json', datei], {
+        cwd: ordner,
+        umgebung: eingabe.umgebung,
+      })
     } catch (fehler) {
       halteFest({
         name: `${portal} durchsuchen`,

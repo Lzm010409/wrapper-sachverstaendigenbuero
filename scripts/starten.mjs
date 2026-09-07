@@ -245,6 +245,25 @@ async function legeErstenZugangAn(sql) {
  * **Nichts wird überschrieben.** Wer `KA_API_BASE` in Coolify setzt, spricht
  * weiter gegen den alten Dienst; der Wechsel bleibt eine Variable.
  */
+async function raeumeWbwLaeufeAuf(sql) {
+  // Ein Recherchelauf laeuft im Prozess der Anwendung. Startet der Container
+  // neu, ist er fort - die Zeile stuende sonst fuer immer auf "laeuft" und die
+  // Oberflaeche wartete auf einen Fortschritt, der nie kommt.
+  const betroffen = await sql`
+    update wbw_lauf
+       set zustand = 'fehler',
+           fehler = 'Der Server wurde neu gestartet, waehrend die Recherche lief. Der Lauf muss neu angestossen werden.',
+           beendet_am = now()
+     where zustand = 'laeuft'
+    returning id
+  `
+  if (betroffen.length > 0) {
+    melde(
+      `${betroffen.length} unterbrochene${betroffen.length === 1 ? 'r' : ''} WBW-Lauf als abgebrochen vermerkt.`,
+    )
+  }
+}
+
 function richteKleinanzeigenEin() {
   if (process.env.KA_API_BASE) {
     melde(`Kleinanzeigen-Beschaffung über ${process.env.KA_API_BASE}.`)
@@ -273,6 +292,7 @@ async function main() {
     await wendeMigrationenAn(sql)
     await befuelleBibliothek(sql)
     await legeErstenZugangAn(sql)
+    await raeumeWbwLaeufeAuf(sql)
   } catch (fehler) {
     console.error('[start] Einrichtung fehlgeschlagen:', fehler)
     process.exit(1)

@@ -50,6 +50,13 @@
       "when": 1786961643275,
       "tag": "0006_bibliothek_fingerabdruck",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788813226589,
+      "tag": "0007_bitter_talos",
+      "breakpoints": true
     }
   ]
 }

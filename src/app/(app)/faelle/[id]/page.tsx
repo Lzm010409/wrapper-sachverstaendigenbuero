@@ -110,7 +110,7 @@ export default async function FallSeite({
           {aktiv === 'beteiligte' ? <BeteiligteReiter d={fall.daten} /> : null}
           {aktiv === 'fahrzeug' ? <FahrzeugReiter d={fall.daten} /> : null}
           {aktiv === 'kalkulation' ? <KalkulationReiter gutachten={fall.gutachten} /> : null}
-          {aktiv === 'wbw' ? <WbwReiterMitVorschlag gutachten={fall.gutachten} /> : null}
+          {aktiv === 'wbw' ? <WbwReiterMitVorschlag gutachten={fall.gutachten} fallId={fall.id} /> : null}
           {aktiv === 'vorgang' ? (
             <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
           ) : null}

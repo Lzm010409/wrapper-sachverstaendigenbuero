@@ -375,3 +375,36 @@ Wenn der neue Weg sich bewährt hat:
 Der Quelltext der alten Anwendung liegt weiter in
 `Lzm010409/WBW-Sachverstaendigenbuero` unter `ops/ka-api/`; sie lässt sich
 jederzeit wieder anlegen.
+
+## Der WBW-Recherchelauf
+
+Der Knopf „Vergleichsfahrzeuge suchen" im Reiter „Wiederbeschaffungswert"
+stösst einen Lauf an, der **Minuten** dauert: AutoScout24 und Kleinanzeigen
+werden nacheinander abgefragt, zwischen den Abrufen wird bewusst pausiert,
+und zu jedem Kleinanzeigen-Inserat kommt eine Detailseite. Gemessen am
+07.09.2026: 102 Sekunden für 6 + 14 Treffer.
+
+**Der Lauf steht in der Datenbank** (`wbw_lauf`), nicht im Arbeitsspeicher.
+Wer ihn angestossen hat, kann die Seite neu laden oder den Rechner zuklappen;
+der Stand ist beim nächsten Öffnen des Reiters wieder da, samt Ergebnis. Die
+Oberfläche fragt alle zwei Sekunden nach.
+
+**Was ein Neustart des Containers bedeutet:** Der Lauf arbeitet im Prozess
+der Anwendung. Startet der Container neu, ist er fort — `starten.mjs`
+vermerkt hängengebliebene Läufe deshalb beim Hochfahren als abgebrochen,
+statt sie für immer auf „läuft" stehen zu lassen. Ein Deployment während
+eines Laufs kostet den Lauf; er muss neu angestossen werden.
+
+**Kein zweiter Lauf für denselben Fall.** Zwei gleichzeitig würden sich
+gegenseitig in die Frequenzbremse der Portale treiben. Der zweite Versuch
+wird mit einer Meldung abgewiesen.
+
+**Kostenpflichtige Stufen** (mobile.de über Apify) sind je Lauf zu wählen und
+nicht dauerhaft geschaltet: das Häkchen setzt `WBW_ALLOW_PAID=1` für **diesen
+einen** Kindprozess. Ein dauerhafter Schalter im Container wäre genau die
+Art Einstellung, die irgendwann niemand mehr sieht.
+
+**Ordner der erzeugten Dateien:** Das Plugin schreibt HTML, PDF und
+Linkliste in ein Verzeichnis unter `/tmp`. Der Pfad steht in der Zeile; die
+Dateien überleben aber keinen Neustart des Containers. Die Zahlen selbst
+(`result.json`) liegen in der Datenbank und bleiben.
