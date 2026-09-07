@@ -14,7 +14,7 @@ import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
 import { KalkulationReiter } from './reiter/kalkulation'
-import { WbwReiter } from './reiter/wbw'
+import { WbwReiterMitVorschlag } from './reiter/wbw-laden'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
 import { Reichtext } from './reiter/reichtext'
 import { verlangeAnmeldung } from '@/auth/wache'
@@ -110,7 +110,7 @@ export default async function FallSeite({
           {aktiv === 'beteiligte' ? <BeteiligteReiter d={fall.daten} /> : null}
           {aktiv === 'fahrzeug' ? <FahrzeugReiter d={fall.daten} /> : null}
           {aktiv === 'kalkulation' ? <KalkulationReiter gutachten={fall.gutachten} /> : null}
-          {aktiv === 'wbw' ? <WbwReiter gutachten={fall.gutachten} /> : null}
+          {aktiv === 'wbw' ? <WbwReiterMitVorschlag gutachten={fall.gutachten} /> : null}
           {aktiv === 'vorgang' ? (
             <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
           ) : null}

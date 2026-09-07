@@ -210,6 +210,51 @@ umgestellt und trägt Klassennamen wie `text-title3 font-strong text-secondary`
 Ortsname) und nicht an CSS-Klassen. Die Selektoren des ausgelagerten Dienstes
 greifen dort bereits ins Leere.
 
+## Die DAT-Kalkulation trägt die halbe Vergleichsfahrzeugsuche
+
+Das Gutachten-Objekt der Schnittstelle ist für eine Vergleichsfahrzeugsuche
+zu dünn. Am echten Fall 0926/2081TG nebeneinandergelegt:
+
+| Angabe | Gutachten-Objekt | DAT-Kalkulation |
+| --- | --- | --- |
+| Modell | `E Limousine (BM 213)` | **`E 53 AMG 4Matic+`** |
+| Leistung | 320 kW | 320 kW |
+| Laufleistung | 147.441 km | 147.441 km |
+| Erstzulassung | 2018-10-12 | 2018-10-12 |
+| Getriebe | — | **Automatik, 9 Stufen** |
+| Türen | — | **4** |
+| Ausstattungslinie | — | **AMG-Line** |
+| Ausstattung | **kein Feld** | **66 Sonder-, 50 Serienpositionen** |
+| Farbe | — | SELENITGRAU |
+
+Die fett gesetzten Zeilen sind der Grund, warum die VXS nicht nur die
+Kalkulationszahlen liefert. Das Modell entscheidet über die Brauchbarkeit der
+Suche — eine Suche nach der Baureihe mischt 143-kW-Diesel mit einem
+320-kW-AMG. Die Ausstattung filtert den Korb hart und musste bis hierher von
+Hand eingetippt werden; DAT leitet sie aus der Fahrgestellnummer ab.
+
+**Übersetzt, nicht durchgereicht.** DAT schreibt `Audio-Navigationssystem:
+COMAND Online`, das Plugin kennt `navigationssystem`; DAT schreibt `Multibeam
+LED`, das Plugin `led_scheinwerfer`. `src/wbw/ausstattung.ts` bildet das auf
+den Wortschatz des Plugins ab (`ausstattung-matcher.js`, Objekt `ALIASE`).
+Aus 66 Sonderpositionen werden zwölf Merkmale — die übrigen tragen zum
+Vergleich nichts bei („Einstiegsleisten beleuchtet", „Kältemittel R 1234 YF")
+und fallen weg. Was sich nicht sicher zuordnen lässt, wird nicht behauptet:
+`Armaturentafel Oberteil Leder Nappa` ist keine Lederausstattung, eine
+`Vorrüstung Entertainment-System` keine Ausstattung.
+
+**Vorrang und Abweichung.** Wo beide Quellen etwas sagen, gilt das Gutachten
+— dort steht, was der Sachverständige aufgenommen hat, und die Kalkulation
+kann älter sein als die Besichtigung. Sind die Werte verschieden, steht das
+als Abweichung in der Oberfläche, statt sich stillschweigend für einen zu
+entscheiden.
+
+**Sonder- gegen Serienausstattung.** Vorbelegt wird die Sonderausstattung:
+was in der Baureihe Serie ist, hat jedes Vergleichsfahrzeug ohnehin. Die
+Serienmerkmale stehen daneben und lassen sich zuschalten — bei Kleinanzeigen,
+wo über die ganze Baureihe gesucht wird, unterscheidet Allrad einen E 53 AMG
+sehr wohl von einem E 220 d.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,

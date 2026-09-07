@@ -6,6 +6,12 @@ import { baureiheAusVxs, leseVxs, modellVorschlagAusVxs } from './vxs'
  * Die Werte sind die echten - Kennzeichen und VIN sind es nicht, denn eine
  * Fahrgestellnummer eines Unfallgeschaedigten gehoert nicht in ein
  * Repository.
+ *
+ * Die Ausstattungsbloecke sind gekuerzt: von den 66 Sonder- und 50
+ * Serienpositionen stehen hier die, an denen sich etwas entscheidet - jede
+ * Erkennungsregel und die Faelle, die NICHT ausloesen duerfen ("Armaturentafel
+ * Oberteil Leder Nappa" ist keine Lederausstattung, "Kaeltemittel R 1234 YF"
+ * ist kein Merkmal).
  */
 const VXS = `<?xml version="1.0" encoding="utf-8"?>
 <vxs:Dossiers xmlns:vxs="http://www.dat.de/vxs" source="SD3" type="VehicleRepairOnline">
@@ -20,6 +26,40 @@ const VXS = `<?xml version="1.0" encoding="utf-8"?>
     <vxs:ShortName>Model: Limousine AMG E 53 4MATIC+</vxs:ShortName>
     <vxs:DatECode>015700900610001</vxs:DatECode>
     <vxs:VehicleIdentNumber>WDD0000000A000000</vxs:VehicleIdentNumber>
+    <vxs:PowerKw>320.0</vxs:PowerKw>
+    <vxs:Capacity>2999</vxs:Capacity>
+    <vxs:MileageOdometer>147441</vxs:MileageOdometer>
+    <vxs:InitialRegistration>2018-10-12+02:00</vxs:InitialRegistration>
+    <vxs:GearBoxType>automatic</vxs:GearBoxType>
+    <vxs:NrOfGears>9</vxs:NrOfGears>
+    <vxs:VehicleDoors>4</vxs:VehicleDoors>
+    <vxs:Color>SELENITGRAU - METALLICLACK</vxs:Color>
+    <vxs:SpecialEquipment>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4706</vxs:DatEquipmentId><vxs:Description>Ablage-Paket</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>14204</vxs:DatEquipmentId><vxs:Description>Anhängerkupplung (Kugelkopf schwenkbar)</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26088</vxs:DatEquipmentId><vxs:Description>Armaturentafel Oberteil Leder Nappa</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26011</vxs:DatEquipmentId><vxs:Description>Audio-Navigationssystem: COMAND Online</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4110</vxs:DatEquipmentId><vxs:Description>Head-up-Display (Frontsichtanzeige)</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4111</vxs:DatEquipmentId><vxs:Description>Multibeam LED</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4112</vxs:DatEquipmentId><vxs:Description>Panorama-Schiebedach elektrisch (vollverglaste Dachfläche)</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4113</vxs:DatEquipmentId><vxs:Description>Sitzheizung vorn</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4114</vxs:DatEquipmentId><vxs:Description>Sitzbezug / Polsterung: Leder</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4115</vxs:DatEquipmentId><vxs:Description>Tempomat mit Abstandsregelung / Distronic Plus mit Stop&amp;Go-Funktion</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4116</vxs:DatEquipmentId><vxs:Description>Kältemittel R 1234 YF</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>4117</vxs:DatEquipmentId><vxs:Description>Lenkrad (AMG Performance, Dinamica)</vxs:Description></vxs:EquipmentPosition>
+    </vxs:SpecialEquipment>
+    <vxs:SeriesEquipment>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26910</vxs:DatEquipmentId><vxs:Description>Airbag Beifahrerseite abschaltbar</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26803</vxs:DatEquipmentId><vxs:Description>Klimaautomatik (Thermatic 2-Zonen)</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26804</vxs:DatEquipmentId><vxs:Description>Fahrzeuge mit 4-Matic / Allradantrieb</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26805</vxs:DatEquipmentId><vxs:Description>LM-Felgen</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26806</vxs:DatEquipmentId><vxs:Description>Fensterheber elektrisch vorn + hinten</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26807</vxs:DatEquipmentId><vxs:Description>Sitzheizung vorn</vxs:Description></vxs:EquipmentPosition>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26808</vxs:DatEquipmentId><vxs:Description>Getriebe Automatik - (9-Stufen)</vxs:Description></vxs:EquipmentPosition>
+    </vxs:SeriesEquipment>
+    <vxs:DeselectedSeriesEquipment>
+      <vxs:EquipmentPosition><vxs:DatEquipmentId>26809</vxs:DatEquipmentId><vxs:Description>Sitz-Komfort-Paket</vxs:Description></vxs:EquipmentPosition>
+    </vxs:DeselectedSeriesEquipment>
   </vxs:Vehicle>
   <vxs:Calculation>
     <vxs:TotalNetCosts>8490.71</vxs:TotalNetCosts>
@@ -100,5 +140,49 @@ describe('baureiheAusVxs', () => {
     // "G (BM 465)" traegt keine Bauform - daraus wird keine Klasse erfunden.
     const t = baureiheAusVxs(leseVxs('<vxs:BaseModelName>G (BM 465)</vxs:BaseModelName>'))
     expect(t).toBe('G')
+  })
+})
+
+describe('Fahrzeugdaten, die das Gutachten-Objekt nicht fuehrt', () => {
+  const f = leseVxs(VXS).fahrzeug
+
+  it('liest Leistung, Laufleistung und Erstzulassung', () => {
+    expect(f.leistungKw).toBe(320)
+    expect(f.laufleistung).toBe(147441)
+    // DAT haengt den Zeitzonenversatz an: `2018-10-12+02:00`.
+    expect(f.erstzulassung).toBe('2018-10-12')
+  })
+
+  it('liest Getriebe, Gaenge und Tueren - im Gutachten steht dazu nichts', () => {
+    expect(f.getriebe).toBe('automatic')
+    expect(f.gaenge).toBe(9)
+    expect(f.tueren).toBe(4)
+  })
+
+  it('liest Farbe und Hubraum', () => {
+    expect(f.farbe).toBe('SELENITGRAU - METALLICLACK')
+    expect(f.hubraum).toBe(2999)
+  })
+})
+
+describe('Ausstattung', () => {
+  const a = leseVxs(VXS).ausstattung
+
+  it('trennt Sonder-, Serien- und abgewaehlte Ausstattung', () => {
+    expect(a.sonderausstattung).toContain('Anhängerkupplung (Kugelkopf schwenkbar)')
+    expect(a.serienausstattung).toContain('Klimaautomatik (Thermatic 2-Zonen)')
+    expect(a.abgewaehlt).toEqual(['Sitz-Komfort-Paket'])
+  })
+
+  it('loest Entitaeten auf', () => {
+    expect(a.sonderausstattung).toContain(
+      'Tempomat mit Abstandsregelung / Distronic Plus mit Stop&Go-Funktion',
+    )
+  })
+
+  it('bleibt leer, wo keine Ausstattung steht', () => {
+    const leer = leseVxs('<vxs:Dossiers/>').ausstattung
+    expect(leer.sonderausstattung).toEqual([])
+    expect(leer.serienausstattung).toEqual([])
   })
 })

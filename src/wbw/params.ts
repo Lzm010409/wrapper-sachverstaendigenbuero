@@ -29,6 +29,12 @@ export interface WbwParams {
 }
 
 export interface WbwEingaben {
+  /**
+   * Der Suchbegriff fuer das Modell. Ueberschreibt `car.model` aus dem
+   * Gutachten - dort steht die Baureihe (`E Limousine (BM 213)`), und die ist
+   * als Suchbegriff zu grob. Der Untertyp kommt aus der DAT-Kalkulation.
+   */
+  modell?: string;
   variante?: string;
   plz?: string;
   getriebe?: "Automatik" | "Manuell" | "egal";
@@ -72,7 +78,7 @@ export function reportToWbwParams(report: Gutachten, eingaben: WbwEingaben = {})
   const params: WbwParams = {
     subject: {
       marke: car.make ?? "",
-      modell: car.model ?? "",
+      modell: eingaben.modell ?? car.model ?? "",
       variante: eingaben.variante ?? "",
       ez: toEzMonat(car.first_registration_date ?? undefined),
       mileage,

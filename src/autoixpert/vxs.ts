@@ -48,6 +48,42 @@ export interface VxsFahrzeug {
   kurzname: string | null
   datECode: string | null
   vin: string | null
+  /** Leistung in kW, z. B. `320`. */
+  leistungKw: number | null
+  /** Abgelesener Kilometerstand, z. B. `147441`. */
+  laufleistung: number | null
+  /** Erstzulassung als ISO-Datum, z. B. `2018-10-12`. */
+  erstzulassung: string | null
+  /** Getriebeart, wie DAT sie führt: `automatic` oder `manual`. */
+  getriebe: string | null
+  /** Zahl der Gänge, z. B. `9`. */
+  gaenge: number | null
+  /** Zahl der Türen, z. B. `4`. */
+  tueren: number | null
+  /** Farbe im Klartext, z. B. `SELENITGRAU - METALLICLACK`. */
+  farbe: string | null
+  /** Hubraum in Kubikzentimetern, z. B. `2999`. */
+  hubraum: number | null
+}
+
+/**
+ * Die Ausstattung, wie DAT sie führt — im Gutachten-Objekt der Schnittstelle
+ * gibt es dafür **kein einziges Feld**.
+ *
+ * Am echten Fall 0926/2081TG: 81 Sonder-, 52 Serienpositionen, dazu elf
+ * abgewählte Serienpositionen. Die Beschreibungen stehen im Klartext
+ * („Anhängerkupplung (Kugelkopf schwenkbar)", „Audio-Navigationssystem:
+ * COMAND Online").
+ *
+ * Für den Vergleichskorb zählt vor allem die **Sonderausstattung**: was in
+ * dieser Baureihe Serie ist, hat jedes Vergleichsfahrzeug ohnehin und
+ * unterscheidet nichts.
+ */
+export interface VxsAusstattung {
+  sonderausstattung: string[]
+  serienausstattung: string[]
+  /** Serienausstattung, die dieses Fahrzeug ausdrücklich **nicht** hat. */
+  abgewaehlt: string[]
 }
 
 export interface VxsKalkulation {
@@ -62,6 +98,7 @@ export interface VxsKalkulation {
 export interface VxsDaten {
   fahrzeug: VxsFahrzeug
   kalkulation: VxsKalkulation
+  ausstattung: VxsAusstattung
   /** Aktenzeichen, wie DAT es im Dossiernamen führt. */
   bezeichnung: string | null
 }
@@ -100,6 +137,49 @@ function liesBetrag(xml: string, feld: string): number | null {
   return Number.isFinite(zahl) ? zahl : null
 }
 
+/** Wie `liesBetrag`, aber auf eine ganze Zahl gerundet. */
+function liesGanzzahl(xml: string, feld: string): number | null {
+  const zahl = liesBetrag(xml, feld)
+  return zahl === null ? null : Math.round(zahl)
+}
+
+/**
+ * Ein Datum. DAT hängt den Zeitzonenversatz an: `2018-10-12+02:00`. Der Rest
+ * der Anwendung rechnet mit reinen ISO-Tagen, deshalb fällt er hier weg —
+ * eine Erstzulassung hat keine Uhrzeit.
+ */
+function liesDatum(xml: string, feld: string): string | null {
+  const roh = lies(xml, feld)
+  if (!roh) return null
+  const treffer = /^(\d{4}-\d{2}-\d{2})/.exec(roh)
+  return treffer?.[1] ?? null
+}
+
+/**
+ * Die Beschreibungen eines Ausstattungsblocks.
+ *
+ * Genommen wird der **erste** Block gleichen Namens: DAT schreibt den
+ * Fahrzeugteil zweimal in die Datei, Zeichen für Zeichen gleich (am echten
+ * Fall geprüft: zweimal 27.037 Byte Sonderausstattung).
+ */
+function liesAusstattungsblock(xml: string, name: string): string[] {
+  const anfang = xml.indexOf(`<vxs:${name}>`)
+  if (anfang === -1) return []
+  const ende = xml.indexOf(`</vxs:${name}>`, anfang)
+  if (ende === -1) return []
+  const block = xml.slice(anfang, ende)
+
+  const gefunden: string[] = []
+  const gesehen = new Set<string>()
+  for (const treffer of block.matchAll(/<vxs:Description>([^<]*)<\/vxs:Description>/g)) {
+    const text = entschluessele((treffer[1] ?? '').trim())
+    if (!text || gesehen.has(text)) continue
+    gesehen.add(text)
+    gefunden.push(text)
+  }
+  return gefunden
+}
+
 export function leseVxs(xml: string): VxsDaten {
   return {
     bezeichnung: lies(xml, 'Name'),
@@ -110,6 +190,20 @@ export function leseVxs(xml: string): VxsDaten {
       kurzname: lies(xml, 'ShortName'),
       datECode: lies(xml, 'DatECode'),
       vin: lies(xml, 'VehicleIdentNumber'),
+      leistungKw: liesGanzzahl(xml, 'PowerKw'),
+      laufleistung: liesGanzzahl(xml, 'MileageOdometer'),
+      erstzulassung: liesDatum(xml, 'InitialRegistration'),
+      // DAT schreibt das Feld in zwei Schreibweisen in dieselbe Datei.
+      getriebe: lies(xml, 'GearBoxType') ?? lies(xml, 'GearboxType'),
+      gaenge: liesGanzzahl(xml, 'NrOfGears'),
+      tueren: liesGanzzahl(xml, 'VehicleDoors'),
+      farbe: lies(xml, 'Color'),
+      hubraum: liesGanzzahl(xml, 'Capacity'),
+    },
+    ausstattung: {
+      sonderausstattung: liesAusstattungsblock(xml, 'SpecialEquipment'),
+      serienausstattung: liesAusstattungsblock(xml, 'SeriesEquipment'),
+      abgewaehlt: liesAusstattungsblock(xml, 'DeselectedSeriesEquipment'),
     },
     kalkulation: {
       // `TotalNetCosts` und `SumNet` tragen denselben Wert; `Corrected` ist
