@@ -21,9 +21,17 @@ import { Kreisel } from '@/app/teile/anzeigen'
 export function BerichtFormular({
   faelle,
   aktiv,
+  festerFall,
 }: {
   faelle: { id: string; bezeichnung: string }[]
   aktiv: boolean
+  /**
+   * Wird die Maske aus einem Fall heraus benutzt, steht der Fall schon fest.
+   * Dann gibt es nichts auszuwählen — und vor allem nichts falsch
+   * auszuwählen: das Auswahlfeld stand auf „Ohne Fallzuordnung", und wer es
+   * übersah, legte ein Schreiben ohne Fall an.
+   */
+  festerFall?: { id: string; bezeichnung: string }
 }) {
   const router = useRouter()
   const [laeuft, setzeLaeuft] = useState(false)
@@ -101,14 +109,21 @@ export function BerichtFormular({
           aria-label="Prüfbericht als PDF"
           style={{ flex: 1, minWidth: 240, fontSize: 13.5 }}
         />
-        <select name="fallId" disabled={!aktiv || laeuft} aria-label="Fall zuordnen">
-          <option value="">Ohne Fallzuordnung</option>
-          {faelle.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.bezeichnung}
-            </option>
-          ))}
-        </select>
+        {festerFall ? (
+          <>
+            <input type="hidden" name="fallId" value={festerFall.id} />
+            <span className="treffer-zahl">zu {festerFall.bezeichnung}</span>
+          </>
+        ) : (
+          <select name="fallId" disabled={!aktiv || laeuft} aria-label="Fall zuordnen">
+            <option value="">Ohne Fallzuordnung</option>
+            {faelle.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.bezeichnung}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="submit" className="haupt" disabled={!aktiv || laeuft}>
           {laeuft ? <Kreisel text="Wird übertragen" /> : 'Prüfbericht auswerten'}
         </button>

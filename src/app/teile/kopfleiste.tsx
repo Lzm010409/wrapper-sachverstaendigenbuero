@@ -14,8 +14,8 @@ import { Erscheinungsschalter } from './erscheinung'
  */
 
 const BEREICHE: { pfad: string; name: string }[] = [
-  { pfad: '/stellungnahmen', name: 'Stellungnahmen' },
   { pfad: '/faelle', name: 'Fälle' },
+  { pfad: '/stellungnahmen', name: 'Stellungnahmen' },
   { pfad: '/bibliothek', name: 'Argumentbibliothek' },
   { pfad: '/bilder', name: 'Bildbibliothek' },
 ]

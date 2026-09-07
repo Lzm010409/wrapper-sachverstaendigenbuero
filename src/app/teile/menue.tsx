@@ -15,16 +15,19 @@ import { usePathname } from 'next/navigation'
  * allein wäre für die Tastatur- und Sprachbedienung eine Verschlechterung.
  */
 
+// Der Fall steht oben: er ist der Anker, alles Weitere liegt in seinen
+// Reitern. Bibliothek und Bilder sind fallübergreifende Nachschlagewerke
+// und stehen deshalb darunter.
 const PUNKTE = [
-  {
-    pfad: '/stellungnahmen',
-    name: 'Stellungnahmen',
-    pfadDaten: 'M5 3h7l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm7 0v4h4M7 11h6M7 14h6',
-  },
   {
     pfad: '/faelle',
     name: 'Fälle',
     pfadDaten: 'M3 6a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6z',
+  },
+  {
+    pfad: '/stellungnahmen',
+    name: 'Stellungnahmen',
+    pfadDaten: 'M5 3h7l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm7 0v4h4M7 11h6M7 14h6',
   },
   {
     pfad: '/bibliothek',

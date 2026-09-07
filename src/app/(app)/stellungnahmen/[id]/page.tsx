@@ -59,7 +59,15 @@ export default async function StellungnahmeSeite({
     return (
       <>
         <p style={{ margin: '0 0 14px', fontSize: 13 }}>
-          <Link href="/stellungnahmen">← Stellungnahmen</Link>
+          {/* Der Fall ist der Anker: gibt es einen, führt der Rückweg dorthin
+              und nicht in die Liste aller Schreiben. */}
+          {s.fall ? (
+            <Link href={`/faelle/${s.fall.id}?reiter=stellungnahmen`}>
+              ← {s.fall.aktenzeichen ?? 'Fall'}
+            </Link>
+          ) : (
+            <Link href="/stellungnahmen">← Stellungnahmen</Link>
+          )}
         </p>
 
         <div className="seiten-kopf">
@@ -100,12 +108,27 @@ export default async function StellungnahmeSeite({
         untereinander — jede Zeile darüber ist eine Zeile weniger Brief.
       */}
       <div className="brief-kopfzeile">
-        <Link href="/stellungnahmen" className="zurueck" aria-label="Zurück zur Übersicht">
+        {/*
+          Der Rückweg führt in den Fall, nicht in die Liste: der Fall ist der
+          Anker, und das Schreiben ist einer seiner Reiter. Nur ein Schreiben
+          ohne Fallzuordnung kehrt in die Übersicht zurück.
+        */}
+        <Link
+          href={s.fall ? `/faelle/${s.fall.id}?reiter=stellungnahmen` : '/stellungnahmen'}
+          className="zurueck"
+          aria-label={s.fall ? 'Zurück zum Fall' : 'Zurück zur Übersicht'}
+        >
           ←
         </Link>
-        <span className="brief-aktenzeichen">
-          {s.fall?.aktenzeichen ?? extraktion?.aktenzeichen ?? 'ohne Aktenzeichen'}
-        </span>
+        {s.fall ? (
+          <Link href={`/faelle/${s.fall.id}`} className="brief-aktenzeichen">
+            {s.fall.aktenzeichen ?? extraktion?.aktenzeichen ?? 'ohne Aktenzeichen'}
+          </Link>
+        ) : (
+          <span className="brief-aktenzeichen">
+            {extraktion?.aktenzeichen ?? 'ohne Aktenzeichen'}
+          </span>
+        )}
         <h1 title={s.betreff ?? undefined}>{s.betreff ?? 'Stellungnahme'}</h1>
         <span className="brief-kennzahlen">
           {[

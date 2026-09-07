@@ -18,6 +18,42 @@ Rechnungsworkflow, Postfachwächter, Deal-Index, Kalk-Lernkreislauf) bleiben die
 Automatisierung; der Wrapper ist die Oberfläche darüber. Alles andere hieße zwei
 Wahrheiten über denselben Fall.
 
+## Der Fall ist der Anker
+
+Alles, was zu einem Vorgang gehört, liegt in den **Reitern des Falls** — so wie in
+autoiXpert, wo ein Gutachten seine Reiter trägt und man den Fall nicht verlässt, um
+an ihm zu arbeiten.
+
+| Reiter | Inhalt |
+| --- | --- |
+| Unfall & Beteiligte | Unfalldaten, Schadenhergang, alle Beteiligten |
+| Fahrzeug | Basisdaten, Vorschäden |
+| Wiederbeschaffungswert | Suchparameter und `params.json` des WBW-Plugins |
+| Stellungnahmen | Prüfbericht auswerten, die Schreiben zu diesem Fall |
+| Vorgang | Pipedrive-Phase, sevDesk-Verweis, Herkunft, Platzhalter |
+
+Vorher standen Fälle und Stellungnahmen als zwei **gleichrangige Listen** nebeneinander,
+und die Verbindung war eine Karte in der Seitenleiste. Wer einen Vorgang bearbeitete,
+sprang zwischen zwei Bereichen und legte im Zweifel ein zweites Schreiben zum selben
+Fall an.
+
+Was daraus folgt:
+
+- Die **Startseite nach dem Anmelden** ist `/faelle`, nicht mehr `/stellungnahmen`.
+- Im Menü steht **Fälle oben**; Argumentbibliothek und Bildbibliothek sind
+  fallübergreifende Nachschlagewerke und stehen darunter.
+- Der **Rückweg aus einem Schreiben** führt in seinen Fall, nicht in die Liste. Nur ein
+  Schreiben ohne Fallzuordnung kehrt in die Übersicht zurück.
+- Wird ein Prüfbericht **aus einem Fall heraus** hochgeladen, steht der Fall fest. Das
+  Auswahlfeld „Ohne Fallzuordnung" gibt es dort nicht mehr — wer es übersah, legte ein
+  Schreiben ohne Fall an.
+- `/stellungnahmen` **bleibt** als Übersicht über alle Schreiben: Schreiben ohne Fall
+  gibt es weiterhin, und „welche Briefe sind offen" ist eine fallübergreifende Frage.
+
+Der aktive Reiter steht in der Adresse (`?reiter=…`), nicht im Browser: er ist damit
+verlinkbar, und der Zurück-Knopf tut, was er soll. Eine unbekannte Angabe fällt auf den
+ersten Reiter zurück, statt eine leere Seite zu zeigen.
+
 ## Was die autoiXpert-API nicht kann
 
 Aus der abgelegten Dokumentation (`Autoixpert API/`), nachgelesen statt vermutet:

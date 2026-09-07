@@ -678,6 +678,20 @@ button.haupt:disabled:hover {
   color: var(--accent-ink);
 }
 
+/*
+ * Mehrere Felder nebeneinander INNERHALB einer Karte.
+ *
+ * Dafür wurde zuerst `.werkzeugleiste` genommen — die ist aber selbst eine
+ * Karte mit Rand und Schatten und zeichnete so einen Kasten in den Kasten.
+ * Hier braucht es nur die Aufteilung, keine Fläche.
+ */
+.feldgruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: flex-end;
+}
+
 /* ---------- Karten und Listen ---------- */
 
 /*
@@ -930,6 +944,92 @@ button.haupt:disabled:hover {
  * gleich, die Bedeutung trägt der Punkt (siehe `.marke-pille::before`).
  * Damit lesen sich auch vier Kennzeichen nebeneinander noch als Text.
  */
+
+/* ---------- Der Fall: Kopfzeile und Reiter ---------- */
+
+/*
+ * Der Fall ist der Anker. Seine Kopfzeile trägt das Aktenzeichen als Marke
+ * neben dem Namen — wie in autoiXpert, wo beides in einer Zeile über den
+ * Reitern steht.
+ */
+.fall-titel {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fall-marke {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border-radius: var(--radius-klein);
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+/*
+ * Die Reiterleiste des Falls. Wie in autoiXpert: eine helle Leiste, der
+ * aktive Reiter blau umrandet statt unterstrichen — ein Rahmen hält die
+ * Zeile ruhig, wenn sieben Reiter nebeneinander stehen.
+ */
+.fall-reiter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 6px;
+  margin-bottom: 20px;
+}
+
+.fall-reiter a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.fall-reiter a:hover {
+  background: var(--surface-alt);
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+
+.fall-reiter a[aria-current='page'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+/* Die Zahl hinter einem Reiter, z. B. wie viele Schreiben es gibt. */
+.fall-reiter-zahl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.fall-reiter a[aria-current='page'] .fall-reiter-zahl {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 
 /* ---------- Detailansicht ---------- */
 
