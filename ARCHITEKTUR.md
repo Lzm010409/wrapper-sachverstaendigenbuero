@@ -12,6 +12,7 @@ Stand: 07.09.2026.
 | sevDesk | Buchhaltung, nachgelagert | noch nicht angebunden |
 | n8n | Automatisierungsschicht, bleibt Backend | Aufruf vorhandener Webhooks |
 | OneDrive | Ablage der Gutachtenordner | über n8n |
+| Kleinanzeigen | Vergleichsfahrzeuge für den Wiederbeschaffungswert | lesend, direkt aus dem Cockpit |
 
 **n8n wird nicht ersetzt.** Die 76 vorhandenen Workflows (Sync, Kürzungssync,
 Rechnungsworkflow, Postfachwächter, Deal-Index, Kalk-Lernkreislauf) bleiben die
@@ -174,10 +175,47 @@ es auch nichts nachzuahmen.
 Die React-Befunde sind bewusst nicht beiläufig repariert: sie sitzen in verwickeltem,
 laufendem Code. Sie gehören in einen eigenen Schritt.
 
+## Kleinanzeigen: ein Dienst weniger
+
+Die Beschaffung der Vergleichsfahrzeuge lief über eine zweite Anwendung auf
+Coolify — der Upstream `DanielWTE/ebay-kleinanzeigen-api` hinter einem
+Basic-Auth-Vorschalter, mit eigener Domain und eigenem Passwort. Sie ist
+aufgelöst; das Cockpit beantwortet dieselben Aufrufe unter
+`/api/kleinanzeigen` selbst.
+
+**Die Entscheidung hing an einer Messung, nicht an einer Vorliebe.** Der
+ausgelagerte Dienst fährt für jede Seite ein Chromium hoch. Die Begründung
+dafür stand in `providers.json`: der direkte Zugriff werde IP-gesperrt. Am
+07.09.2026 nachgemessen stimmt das so nicht — ein gewöhnlicher HTTP-Aufruf
+ohne Browser, ohne JavaScript und ohne Cookies bekommt dieselben Treffer und
+dieselben Merkmalzeilen. Was es wirklich gibt, ist eine Frequenzbremse: HTTP
+403 „IP-Bereich vorübergehend gesperrt", die nach einer Pause wieder
+durchlässt. Sechs Aufrufe ohne Pause ergaben `403 200 200 403 403 200`,
+dieselbe Adresse mit vier Sekunden Abstand dreimal `200`.
+
+Dagegen hilft kein Browser, sondern Zurückhaltung: ein Abruf zur Zeit, ein
+Mindestabstand, Wiederholung mit wachsender Wartezeit. Das ist zugleich der
+rücksichtsvollere Umgang mit einem fremden Server als der bisherige.
+
+**Die Schnittform bleibt.** Das Plugin spricht weiter gegen `KA_API_BASE`;
+diese Adresse zeigt nur woandershin. Wer den ausgelagerten Dienst zurück
+will, setzt eine Variable — nachprüfbar, weil der unveränderte Adapter des
+Plugins gegen beide Seiten läuft.
+
+**Was hier gelesen wird und was nicht.** Die Detailseite steht noch im alten
+Aufbau (`#viewad-details`), die Trefferliste ist auf ein neues Frontend
+umgestellt und trägt Klassennamen wie `text-title3 font-strong text-secondary`
+— Namen, die sich wieder ändern. Deshalb liest die Auswertung der Liste an der
+**Form der Werte** (`210.000 km`, `EZ 03/2009`, `10.999 €`, fünf Ziffern plus
+Ortsname) und nicht an CSS-Klassen. Die Selektoren des ausgelagerten Dienstes
+greifen dort bereits ins Leere.
+
 ## Offene Punkte
 
-- Recherchelauf des WBW-Plugins anschließen (Job-Dienst, Portal-Zugangsdaten,
+- Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,
   Rückschreiben des Reports als Gutachten-Dokument)
+- Alte Kleinanzeigen-Anwendung abschalten, sobald ein vollständiger Lauf über
+  den neuen Weg im Alltag durchgelaufen ist
 - Kürzungscockpit aus dem vorhandenen Projekt integrieren
 - Extraktion der Kalkulationszahlen aus dem gerenderten Gutachten-Dokument
 - Anmeldung, Datenbank, Änderungsprotokoll

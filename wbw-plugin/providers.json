@@ -69,7 +69,7 @@
           "adapter": "kleinanzeigen",
           "enabled": true,
           "endpointEnv": "KA_API_BASE",
-          "beleg": "Eigener Dienst auf Coolify (DanielWTE/ebay-kleinanzeigen-api, Commit da2fb02, unveraendert). POST /inserate-by-url liefert success:true; GET /inserat/{adid}?batch_id=... liefert Kilometerstand, Erstzulassung, Leistung, Getriebe, Kraftstoffart, Fahrzeugtyp, Anzahl Tueren. Direktzugriff auf kleinanzeigen.de aus fremden Netzen wird IP-gesperrt - deshalb der eigene Dienst."
+          "beleg": "Wird vom Cockpit selbst beantwortet: POST {KA_API_BASE}/inserate-by-url liefert success:true, GET {KA_API_BASE}/inserat/{adid} liefert Kilometerstand, Erstzulassung, Leistung, Getriebe, Kraftstoffart, Fahrzeugtyp, Anzahl Tueren - dieselben Felder und dieselbe Antwortform wie der frueher ausgelagerte Dienst (DanielWTE/ebay-kleinanzeigen-api). Kleinanzeigen liefert Trefferliste und Detailseite fertig gerendert; am 07.09.2026 ohne Browser nachgemessen. Zeitweise HTTP 403 ('IP-Bereich voruebergehend gesperrt') ist eine Frequenzbremse und kein Ausschluss: sechs Aufrufe ohne Pause ergaben 403 200 200 403 403 200, mit vier Sekunden Abstand dreimal 200. Der Abruf im Cockpit haelt deshalb Abstand und wiederholt."
         },
         {
           "id": "L3",

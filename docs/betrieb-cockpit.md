@@ -148,6 +148,16 @@ nichts gesetzt werden:
 | `AUTOIXPERT_FRUEHESTENS` | frühestes Anlagedatum, Standard `2026-05-01T00:00:00.000Z` |
 | `AUTOIXPERT_SCHREIBEN=erlaubt` | erlaubt schreibende Zugriffe — **bewusst setzen, nicht dauerhaft** |
 
+**Kleinanzeigen-Beschaffung** — hier muss **nichts** gesetzt werden. Ohne
+Angabe beantwortet das Cockpit die Aufrufe des WBW-Plugins selbst und vergibt
+sich beim Start ein eigenes Zugangswort:
+
+| Variable | Wirkung |
+| --- | --- |
+| `KA_API_BASE` | Zeigt die Beschaffung auf einen ausgelagerten Dienst statt auf das Cockpit. Gesetzt: der alte Weg. Leer: der eigene. |
+| `KA_API_USER` / `KA_API_PASS` | Zugangsdaten dazu. Ohne `KA_API_BASE` werden sie beim Start erzeugt. |
+| `KLEINANZEIGEN_ABSTAND_MS` | Mindestabstand zwischen zwei Abrufen bei Kleinanzeigen, Standard `1500`. |
+
 **Anmeldung über Microsoft Entra** (fehlt eine der drei, blendet die
 Anmeldemaske den Microsoft-Knopf aus und bietet nur Passwortanmeldung):
 
@@ -300,3 +310,68 @@ Drei Angaben in [`betrieb.md`](betrieb.md) stimmen nicht mehr:
   wurde am 07.09.2026 gegen echte Daten geprüft (7 offene Gutachten ab Mai 2026).
 - **Kalkulationsbeträge sind zu bekommen** — nicht im Gutachten-Objekt, aber über
   `GET /reports/{id}/vxs` als DAT-XML. Das ist der nächste Ausbauschritt.
+
+## Kleinanzeigen ohne zweiten Dienst
+
+Bis zum 07.09.2026 lief die Beschaffung der Vergleichsfahrzeuge über eine
+**eigene Anwendung** auf Coolify: `ka-api.gollenstede.app`, zwei Container
+(ein Basic-Auth-Vorschalter und der unveränderte Upstream
+`DanielWTE/ebay-kleinanzeigen-api`), eine öffentliche Domain, ein Passwort.
+Das Cockpit beantwortet dieselben Aufrufe jetzt selbst.
+
+**Warum das geht.** Der ausgelagerte Dienst fährt für jede Seite ein Chromium
+hoch. Gebraucht wird das nicht: Kleinanzeigen liefert Trefferliste und
+Detailseite fertig gerendert aus. Nachgemessen am 07.09.2026 mit einem
+gewöhnlichen HTTP-Aufruf — ohne Browser, ohne JavaScript, ohne Cookies —
+kamen dieselben 27 Treffer und dieselben 15 Merkmalzeilen heraus. Beide
+Antworten liegen als Beleg in `tests/fixtures/`.
+
+**Was der Browser tatsächlich abfing**, und was an seine Stelle tritt:
+Kleinanzeigen weist Anfragen zeitweise mit HTTP 403 ab („IP-Bereich
+vorübergehend gesperrt"). Das ist eine Frequenzbremse, keine
+Browsererkennung — sechs Aufrufe ohne Pause ergaben `403 200 200 403 403 200`,
+dieselbe Adresse mit vier Sekunden Abstand dreimal `200`. Das Cockpit hält
+deshalb **einen Abruf zur Zeit**, einen Mindestabstand dazwischen, und fragt
+nach einer Abweisung mit wachsender Wartezeit erneut.
+
+**Was sich dadurch ändert:**
+
+| | vorher | jetzt |
+| --- | --- | --- |
+| Anwendungen in Coolify | Cockpit + ka-api | Cockpit |
+| Öffentliche Adressen | zwei | eine |
+| Zu pflegende Passwörter | `KA_API_USER`/`KA_API_PASS` von Hand | wird beim Start erzeugt |
+| Zwei Suchseiten holen | Chromium-Start + 2 s Pause je Seite | 2,4 s insgesamt (gemessen) |
+| Speicherbedarf | ein Chromium je Abruf | keiner |
+
+**Am Plugin ändert sich nichts.** Es spricht weiter gegen `KA_API_BASE` —
+diese Adresse zeigt nur auf das Cockpit statt nach draussen. Geprüft mit dem
+unveränderten Adapter `wbw-plugin/adapters/kleinanzeigen.js`: Such-URL,
+Trefferliste, fünf Detailabrufe, vollständige Fahrzeuge mit Laufleistung,
+Erstzulassung, Leistung in kW, Getriebe, Türen, Ausstattung und Bildern.
+
+**Der alte Weg bleibt offen.** Wer `KA_API_BASE` in Coolify auf
+`https://ka-api.gollenstede.app` setzt, bekommt wieder den ausgelagerten
+Dienst. Der Wechsel ist eine Variable und kein Umbau — deshalb sollte die
+alte Anwendung erst abgeschaltet werden, wenn ein vollständiger Lauf über den
+neuen Weg im Alltag durchgelaufen ist.
+
+**Nebenbefund.** Die neue Trefferliste von Kleinanzeigen trägt Laufleistung
+und Erstzulassung bereits mit; beim ausgelagerten Dienst standen sie nur auf
+der Detailseite. Das Cockpit gibt sie in `results[]` mit aus. Genutzt wird das
+noch nicht — das Plugin holt die Detailseiten ohnehin wegen der Ausstattung —
+aber es liegt bereit, wenn ein schneller Überblick ohne Detailabrufe gebraucht
+wird.
+
+## Die alte Kleinanzeigen-Anwendung abschalten
+
+Wenn der neue Weg sich bewährt hat:
+
+1. In Coolify die Anwendung hinter `ka-api.gollenstede.app` stoppen.
+2. Den DNS-Eintrag für `ka-api.gollenstede.app` entfernen.
+3. Im Cockpit **kein** `KA_API_BASE` setzen (oder ein gesetztes löschen) —
+   sonst zeigt die Beschaffung weiter ins Leere.
+
+Der Quelltext der alten Anwendung liegt weiter in
+`Lzm010409/WBW-Sachverstaendigenbuero` unter `ops/ka-api/`; sie lässt sich
+jederzeit wieder anlegen.

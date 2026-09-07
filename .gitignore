@@ -24,3 +24,7 @@ coverage
 
 # Startbefuellung entsteht beim Bauen des Abbilds
 seed/
+
+# Von `next dev` erzeugt (Hinweisdateien fuer KI-Werkzeuge), nicht gepflegt.
+/AGENTS.md
+/CLAUDE.md

@@ -18,15 +18,34 @@ import { describe, expect, it } from 'vitest'
  */
 
 const BEREICH = join(process.cwd(), 'src/app/(app)')
+const ROUTEN = join(process.cwd(), 'src/app/api')
 
-function seitenDateien(ordner: string): string[] {
+/**
+ * Routen, die bewusst ohne Anmeldung erreichbar sind — jede mit dem Grund.
+ * Wer eine neue Route hinzufuegt, muss sie entweder pruefen lassen oder hier
+ * begruenden; stillschweigend offen bleibt keine.
+ */
+const OFFEN: Record<string, string> = {
+  'api/gesundheit/route.ts': 'Zustandsauskunft fuer den Container-Healthcheck',
+  'api/auth/entra/start/route.ts': 'Beginn der Anmeldung — vor der Anmeldung',
+  'api/auth/entra/callback/route.ts': 'Rueckkehr von Microsoft — vor der Anmeldung',
+}
+
+/** Die Aufrufe, die als Anmeldepruefung gelten. */
+const WACHEN = ['benutzerOderAntwort(', 'pruefeZugang(', 'verlangeAnmeldung(']
+
+function dateien(ordner: string, name: string): string[] {
   const gefunden: string[] = []
   for (const eintrag of readdirSync(ordner)) {
     const pfad = join(ordner, eintrag)
-    if (statSync(pfad).isDirectory()) gefunden.push(...seitenDateien(pfad))
-    else if (eintrag === 'page.tsx') gefunden.push(pfad)
+    if (statSync(pfad).isDirectory()) gefunden.push(...dateien(pfad, name))
+    else if (eintrag === name) gefunden.push(pfad)
   }
   return gefunden
+}
+
+function seitenDateien(ordner: string): string[] {
+  return dateien(ordner, 'page.tsx')
 }
 
 describe('Anmeldepflicht im geschuetzten Bereich', () => {
@@ -54,6 +73,30 @@ describe('Anmeldepflicht im geschuetzten Bereich', () => {
       // Steht ein anderes `await` davor, koennte es bereits Daten holen.
       expect(ersteWache).toBeGreaterThanOrEqual(0)
       expect(ersteWache).toBeLessThan(ersterLadevorgang === -1 ? Infinity : ersterLadevorgang)
+    },
+  )
+})
+
+/**
+ * Dasselbe fuer die Routen. Eine Route hat kein Layout ueber sich, das etwas
+ * auffangen koennte — sie ist genau so offen, wie sie geschrieben ist.
+ */
+describe('Anmeldepflicht der Routen', () => {
+  const routen = dateien(ROUTEN, 'route.ts')
+
+  it('findet ueberhaupt Routen', () => {
+    expect(routen.length).toBeGreaterThan(0)
+  })
+
+  it.each(routen.map((p) => [p.replace(process.cwd() + '/src/app/', ''), p]))(
+    '%s prueft die Anmeldung oder ist begruendet offen',
+    (name, pfad) => {
+      if (OFFEN[name]) {
+        expect(OFFEN[name]).toBeTruthy()
+        return
+      }
+      const inhalt = readFileSync(pfad, 'utf8')
+      expect(WACHEN.some((w) => inhalt.includes(w))).toBe(true)
     },
   )
 })

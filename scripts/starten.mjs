@@ -233,6 +233,34 @@ async function legeErstenZugangAn(sql) {
   )
 }
 
+/**
+ * Verdrahtet die Kleinanzeigen-Beschaffung mit der Anwendung selbst.
+ *
+ * Das WBW-Plugin fragt die Trefferliste über `KA_API_BASE` ab. Bisher zeigte
+ * diese Adresse auf einen zweiten, eigens betriebenen Dienst; das Cockpit
+ * beantwortet dieselben Aufrufe jetzt selbst unter `/api/kleinanzeigen`.
+ * Voreingestellt wird deshalb der eigene Server — und ein Zugangswort dazu,
+ * damit die Route nicht offen im Netz steht.
+ *
+ * **Nichts wird überschrieben.** Wer `KA_API_BASE` in Coolify setzt, spricht
+ * weiter gegen den alten Dienst; der Wechsel bleibt eine Variable.
+ */
+function richteKleinanzeigenEin() {
+  if (process.env.KA_API_BASE) {
+    melde(`Kleinanzeigen-Beschaffung über ${process.env.KA_API_BASE}.`)
+    return
+  }
+  const port = process.env.PORT ?? '3000'
+  process.env.KA_API_BASE = `http://127.0.0.1:${port}/api/kleinanzeigen`
+  if (!process.env.KA_API_USER || !process.env.KA_API_PASS) {
+    // Ein Wort, das nur dieser Prozess kennt: das Plugin läuft als Kindprozess
+    // und erbt es, von aussen ist es nicht zu erraten und nirgends abgelegt.
+    process.env.KA_API_USER = 'cockpit'
+    process.env.KA_API_PASS = randomBytes(24).toString('hex')
+  }
+  melde('Kleinanzeigen-Beschaffung läuft über die Anwendung selbst.')
+}
+
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url) {
@@ -251,6 +279,8 @@ async function main() {
   } finally {
     await sql.end({ timeout: 5 })
   }
+
+  richteKleinanzeigenEin()
 
   // Der Next-Server liegt im Abbild neben diesem Skript im Arbeitsverzeichnis.
   // Die Auflösung geht bewusst über das Arbeitsverzeichnis und nicht relativ

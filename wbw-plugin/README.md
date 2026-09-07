@@ -13,7 +13,18 @@ eine Anwendung braucht:
 | `modelle.js` | Liefert die Modellnamen, die ein Portal für eine Marke wirklich kennt. |
 | `zentrum.js` | Löst eine Postleitzahl in Koordinaten auf. |
 
-**Warum unverändert:** Das Plugin wird weiterentwickelt. Jede Änderung hier
+## Zwei Eingriffe, beide begründet
+
+Am Plugin selbst wurde zweimal etwas geändert. Beides gehört bei einer neuen
+Fassung des Plugins geprüft — und beides gehört in das Plugin-Projekt
+zurückgemeldet, damit die Änderung hier wieder entfällt.
+
+| Datei | Was | Warum |
+| --- | --- | --- |
+| `adapters/kleinanzeigen.js` | Trennzeichen im Suchbegriff: `_` statt `-` | Kleinanzeigen führt `marke_s:mercedes_benz`. Mit `mercedes-benz` wird der Filter **stillschweigend fallengelassen**: gemessen 5 statt 27 Mercedes auf der ersten Seite, bei `model_s:t-roc` sogar 0 statt 25. |
+| `providers.json` | Begründung der Stufe L1 richtiggestellt | Dort stand, der direkte Zugriff auf kleinanzeigen.de werde IP-gesperrt. Am 07.09.2026 nachgemessen stimmt das so nicht: es ist eine Frequenzbremse, die nach einer Pause wieder durchlässt. Der Endpunkt selbst (`KA_API_BASE`) ist unverändert — er zeigt nur auf das Cockpit statt auf einen zweiten Dienst. |
+
+**Warum sonst unverändert:** Das Plugin wird weiterentwickelt. Jede Änderung hier
 müsste bei einer neuen Fassung von Hand nachgezogen werden. Was das Cockpit
 zusätzlich braucht — Markenfilter, Fortschritt, Ablage — liegt deshalb in
 `src/wbw/`, nicht in diesen Dateien.
