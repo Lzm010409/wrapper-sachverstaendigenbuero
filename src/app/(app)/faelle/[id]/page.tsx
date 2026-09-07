@@ -13,6 +13,7 @@ import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
+import { KalkulationReiter } from './reiter/kalkulation'
 import { WbwReiter } from './reiter/wbw'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
 import { Reichtext } from './reiter/reichtext'
@@ -108,6 +109,7 @@ export default async function FallSeite({
         <>
           {aktiv === 'beteiligte' ? <BeteiligteReiter d={fall.daten} /> : null}
           {aktiv === 'fahrzeug' ? <FahrzeugReiter d={fall.daten} /> : null}
+          {aktiv === 'kalkulation' ? <KalkulationReiter gutachten={fall.gutachten} /> : null}
           {aktiv === 'wbw' ? <WbwReiter gutachten={fall.gutachten} /> : null}
           {aktiv === 'vorgang' ? (
             <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
@@ -273,9 +275,13 @@ function FahrzeugReiter({ d }: { d: Falldaten }) {
       </div>
 
       <aside className="seitenleiste">
-        <div className="hinweis warn">
-          Kalkulationsbeträge stehen noch nicht im Gutachten-Objekt der Schnittstelle. Die
-          Kürzungspositionen kommen deshalb aus dem Prüfbericht.
+        <div className="karte">
+          <h2>Kalkulation</h2>
+          <p className="unterzeile" style={{ margin: 0 }}>
+            Die Reparaturkosten stehen im Reiter „Kalkulation" — sie kommen aus der
+            DAT-Datei des Gutachtens, nicht aus dem Gutachten-Objekt. Die
+            Kürzungspositionen stammen weiterhin aus dem Prüfbericht.
+          </p>
         </div>
       </aside>
     </div>

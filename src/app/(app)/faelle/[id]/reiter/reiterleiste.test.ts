@@ -18,7 +18,7 @@ describe('leseReiter', () => {
   })
 
   it('faellt bei unbekannter Angabe auf den ersten Reiter zurueck', () => {
-    expect(leseReiter('kalkulation')).toBe('beteiligte')
+    expect(leseReiter('rechnung')).toBe('beteiligte')
     expect(leseReiter('')).toBe('beteiligte')
     expect(leseReiter('__proto__')).toBe('beteiligte')
   })
