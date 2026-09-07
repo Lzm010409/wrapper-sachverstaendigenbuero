@@ -53,8 +53,17 @@ WORKDIR /app
 
 # poppler-utils liefert pdftotext und pdftoppm. Beide werden für das Einlesen
 # der Prüfberichte gebraucht — auch der Bildpfad für eingescannte Berichte.
+#
+# `curl` steht dabei, weil **Coolify** seinen Healthcheck im Container
+# ausführt und dafür curl oder wget erwartet. Ohne beides meldete das
+# Deployment zehnmal
+#   /bin/sh: 1: curl: not found
+# und rollte zurück — obwohl die Anwendung sauber hochgekommen war
+# (Migrationen gelaufen, Bibliothek auf Stand, Next bereit). Die Alternative
+# wäre gewesen, den Healthcheck abzuschalten; dann merkt niemand mehr, wenn
+# der Container steht, aber nicht antwortet.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends poppler-utils ca-certificates && \
+    apt-get install -y --no-install-recommends poppler-utils ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
