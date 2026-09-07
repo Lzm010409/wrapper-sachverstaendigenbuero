@@ -84,6 +84,11 @@ COPY --from=build --chown=werkbank:werkbank /app/public ./public
 # für den Markdown-Rückexport gebraucht.
 COPY --from=build --chown=werkbank:werkbank /app/skills ./skills
 
+# Das WBW-Plugin. Es wird als eigener Prozess aufgerufen (`node
+# wbw-plugin/fetch-portal.js …`), nicht in die Anwendung hineingezogen —
+# Next spürt es deshalb beim Bauen nicht selbst auf.
+COPY --from=build --chown=werkbank:werkbank /app/wbw-plugin ./wbw-plugin
+
 # Schema, Startbefüllung und die Abhängigkeit des Startvorgangs.
 COPY --from=build --chown=werkbank:werkbank /app/drizzle ./drizzle
 COPY --from=build --chown=werkbank:werkbank /app/seed ./seed

@@ -18,6 +18,7 @@ const konfiguration = [
       'node_modules/**',
       'drizzle/**',
       'skills/**',
+      'wbw-plugin/**',
       'public/**',
       'next-env.d.ts',
     ],
