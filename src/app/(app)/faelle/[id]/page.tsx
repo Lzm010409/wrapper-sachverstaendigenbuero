@@ -15,6 +15,7 @@ import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
 import { WbwReiter } from './reiter/wbw'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
+import { Reichtext } from './reiter/reichtext'
 import { verlangeAnmeldung } from '@/auth/wache'
 
 const HERKUNFT: Record<string, string> = {
@@ -137,16 +138,13 @@ function BeteiligteReiter({ d }: { d: Falldaten }) {
               <Zeile label="Unfalltag" wert={formatiereDatum(d.unfall.datum)} />
               <Zeile label="Ort" wert={d.unfall.ort} />
             </dl>
-            {d.unfall.hergang ? (
-              <p className="fliesstext" style={{ fontSize: 14.5, marginTop: 12, marginBottom: 0 }}>
-                {d.unfall.hergang}
-              </p>
-            ) : null}
-            {d.fahrzeug.schadenbeschreibung ? (
-              <p className="fliesstext" style={{ fontSize: 14.5, marginTop: 10, marginBottom: 0 }}>
-                {d.fahrzeug.schadenbeschreibung}
-              </p>
-            ) : null}
+            {/* Beide Felder kommen aus autoiXpert als HTML. */}
+            <div style={{ marginTop: 12, fontSize: 14.5 }}>
+              <Reichtext wert={d.unfall.hergang} />
+            </div>
+            <div style={{ marginTop: 10, fontSize: 14.5 }}>
+              <Reichtext wert={d.fahrzeug.schadenbeschreibung} />
+            </div>
             {unfallLeer ? <Ohne was="Angaben zum Unfall" /> : null}
           </div>
         </div>
@@ -254,14 +252,20 @@ function FahrzeugReiter({ d }: { d: Falldaten }) {
             </div>
             <div className="karte fliesstext" style={{ fontSize: 14.5 }}>
               {d.fahrzeug.vorschaedenRepariert ? (
-                <p style={{ margin: '0 0 8px' }}>
-                  <strong>Repariert:</strong> {d.fahrzeug.vorschaedenRepariert}
-                </p>
+                <div style={{ marginBottom: 10 }}>
+                  <div className="block-label" style={{ justifyContent: 'flex-start', marginBottom: 4 }}>
+                    Repariert
+                  </div>
+                  <Reichtext wert={d.fahrzeug.vorschaedenRepariert} />
+                </div>
               ) : null}
               {d.fahrzeug.vorschaedenUnrepariert ? (
-                <p style={{ margin: 0 }}>
-                  <strong>Unrepariert:</strong> {d.fahrzeug.vorschaedenUnrepariert}
-                </p>
+                <div>
+                  <div className="block-label" style={{ justifyContent: 'flex-start', marginBottom: 4 }}>
+                    Unrepariert
+                  </div>
+                  <Reichtext wert={d.fahrzeug.vorschaedenUnrepariert} />
+                </div>
               ) : null}
             </div>
           </div>
