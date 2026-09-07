@@ -105,14 +105,38 @@ verändert, gilt:
 Nachgebaut aus Screenshots der autoiXpert-Oberfläche vom 07.09.2026 (Gutachtenliste,
 Unfall & Beteiligte, Fahrzeugauswahl, Fotos, Kalkulation). Kennzeichnend:
 
-- schmale Icon-Leiste links, helle Kopfzeile
-- weiße Karten auf hellem Grund, Überschriften gesperrt in Großbuchstaben, zentriert
-- Formularfelder ohne Rahmen, nur Unterstrich, winziges graues Label darüber
-- Blau als einzige Akzentfarbe, Beträge grün mit grauem Sekundärwert
-- Kennzeichen als Schild, Status als Chip mit farbigem Punkt
+- schmale Icon-Leiste links (56 px), flache helle Kopfzeile (56 px)
+- weiße Karten auf hellem Grund, **Schatten statt Rändern**
+- Kartenüberschriften zentriert und gesperrt in Großbuchstaben
+- Formularfelder **ohne Rahmen, nur Unterstrich**, kleines graues Label darüber
+- Blau als einzige Signalfarbe, Beträge grün mit grauem Sekundärwert
+- Status als helle Pille mit farbigem Punkt — die Farbe trägt der Punkt, nicht die Fläche
 
-Alle Werte liegen als Designtokens in `src/app/globals.css`. Keine Farbe und kein
-Radius steht direkt in einer Komponente.
+Alles hängt an den Variablen in `src/app/globals.css`. Umgestellt wurde das Aussehen,
+nicht das Gerüst: die Variablennamen der Werkbank sind geblieben.
+
+**Was dabei entfallen ist:** die dunkle Zierschiene (30 px) und das Menü daneben
+(250 px) sind zu einer 56 px breiten Leiste zusammengefallen; die gewonnenen 224 px
+gehören dem Inhalt. Damit entfielen auch der Menüschalter, sein gemerkter Stand, die
+Grenze bei 900 px und die Deckfläche für den Klick daneben — eine 56-px-Leiste muss
+man nicht wegklappen.
+
+**Ausnahme:** Der Brief bleibt in Serifenschrift. Er soll wie ein Schreiben aussehen
+und nicht wie eine Bildschirmmaske. autoiXpert hat dafür kein Gegenstück, also gibt
+es auch nichts nachzuahmen.
+
+## Vorgefundene Befunde (nicht durch die Überführung entstanden)
+
+| Befund | Stand |
+| --- | --- |
+| `pnpm lint` zeigte auf keine Konfiguration und prüfte nie eine Datei | behoben, Flat-Config ergänzt |
+| 8 React-Compiler-Befunde (Refs während des Renderns, `setState` im Effekt) im Brief-Editor, der Bildsuchleiste und dem Erscheinungsschalter | auf Warnung gesetzt, **offen** |
+| 5 unmaskierte Anführungszeichen im JSX | auf Warnung gesetzt, **offen** |
+| `.env.example` nannte die autoiXpert-Basis-URL ohne `/v1` | behoben |
+| `loeseAuf` versuchte das Aktenzeichen nie als externe ID und lief in die teure Listensuche | behoben |
+
+Die React-Befunde sind bewusst nicht beiläufig repariert: sie sitzen in verwickeltem,
+laufendem Code. Sie gehören in einen eigenen Schritt.
 
 ## Offene Punkte
 

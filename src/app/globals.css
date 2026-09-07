@@ -9,38 +9,48 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 /**
- * Farben, Masse und Formen folgen der Vorlage „Judia" (Bootstrap 5.3):
- * Blau als einzige Signalfarbe, kühle Blaugrautöne für Text, helle
- * Flächen mit dünnen Rändern statt Schatten. Die Namen der Variablen
- * bleiben, wie sie waren — umgestellt wird das Aussehen, nicht das Gerüst.
+ * Farben, Masse und Formen folgen jetzt **autoiXpert** (nachgemessen an
+ * Screenshots vom 07.09.2026: Gutachtenliste, Unfall & Beteiligte,
+ * Fahrzeugauswahl, Fotos, Kalkulation). Vorher war es die Vorlage „Judia".
+ *
+ * Der Grund ist der Benutzerfluss: wer den ganzen Tag in autoiXpert
+ * arbeitet, soll beim Wechsel ins Cockpit nicht umlernen. Kennzeichnend
+ * sind vier Dinge — helle Flächen mit **Schatten statt Rändern**,
+ * Kartenüberschriften **zentriert und gesperrt in Grossbuchstaben**,
+ * Formularfelder **ohne Rahmen, nur mit Unterstrich**, und Blau als
+ * einzige Signalfarbe.
+ *
+ * Die Namen der Variablen bleiben, wie sie waren — umgestellt wird das
+ * Aussehen, nicht das Gerüst.
  *
  * Eine Ausnahme bleibt bewusst bestehen: der Brief selbst wird in einer
  * Serifenschrift gesetzt. Er soll wie ein Schreiben aussehen und nicht wie
  * eine Bildschirmmaske — das ist der Unterschied zwischen der Anwendung und
- * ihrem Erzeugnis.
+ * ihrem Erzeugnis. autoiXpert hat kein Gegenstück dazu, also gibt es auch
+ * nichts nachzuahmen.
  */
 
 :root {
-  --ground: #f8f9fa;
+  --ground: #e8ebef;
   --surface: #ffffff;
-  --surface-alt: #f7f7f9;
-  --line: #e9ecef;
-  --line-soft: #f1f3f5;
-  --ink: #424e66;
-  --ink-mid: #4a566c;
-  --ink-soft: #8291af;
-  --accent: #007fff;
-  --accent-stark: #0066cc;
-  --accent-soft: #e7f1ff;
-  --accent-rand: #99ccff;
+  --surface-alt: #f5f6f8;
+  --line: #e2e6ea;
+  --line-soft: #eceff1;
+  --ink: #37474f;
+  --ink-mid: #4a5c66;
+  --ink-soft: #9aa4ad;
+  --accent: #1f8fd4;
+  --accent-stark: #1878b4;
+  --accent-soft: #e6f3fb;
+  --accent-rand: #8fcbeb;
   --accent-ink: #ffffff;
   --quelle-marke: #ddebff;
   --warn: #997404;
   --warn-soft: #fff3cd;
   --crit: #c1441c;
   --crit-soft: #fae1d8;
-  --good: #0a6a49;
-  --good-soft: #cfefe4;
+  --good: #43a047;
+  --good-soft: #e6f4e7;
 
   /*
    * Die Farben der Handlungen.
@@ -58,25 +68,25 @@
   --freigabe-fest: #0a6a49;
   --freigabe-ink: #ffffff;
 
-  --schiene: #1e2f50;
-  --schiene-ink: #869bc3;
-  --menue: #f7f7f9;
-  --menue-ink: #595970;
-  --menue-titel: #727287;
+  --schiene: #f7f8fa;
+  --schiene-ink: #9aa4ad;
+  --menue: #ffffff;
+  --menue-ink: #5f7480;
+  --menue-titel: #9aa4ad;
 
-  --schatten: 0 2px 4px rgba(20, 18, 30, 0.06);
-  --schatten-menue: 0 2px 4px rgba(20, 18, 30, 0.14);
+  --schatten: 0 1px 3px rgba(38, 50, 56, 0.12), 0 1px 2px rgba(38, 50, 56, 0.06);
+  --schatten-menue: 0 1px 3px rgba(38, 50, 56, 0.14);
 
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial,
     sans-serif;
   --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, 'Times New Roman', serif;
   --mono: SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
-  --radius: 0.375rem;
-  --radius-klein: 0.25rem;
+  --radius: 4px;
+  --radius-klein: 3px;
 
-  --schiene-breite: 30px;
-  --menue-breite: 250px;
+  --schiene-breite: 56px;
+  --menue-breite: 0px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -89,8 +99,8 @@
     --ink: #f8f9fa;
     --ink-mid: #dee2e6;
     --ink-soft: #a7acb1;
-    --accent: #66b2ff;
-    --accent-stark: #85c1ff;
+    --accent: #5cb8ec;
+    --accent-stark: #7fc9f2;
     --accent-soft: #001933;
     --accent-rand: #004c99;
     --accent-ink: #06182e;
@@ -109,8 +119,8 @@
     --freigabe-fest: #0d7a55;
     --freigabe-ink: #ffffff;
 
-    --schiene: #16203a;
-    --schiene-ink: #6d80a6;
+    --schiene: #1b2429;
+    --schiene-ink: #7a8b94;
     --menue: #212529;
     --menue-ink: #ced4da;
     --menue-titel: #8291af;
@@ -129,8 +139,8 @@
   --ink: #f8f9fa;
   --ink-mid: #dee2e6;
   --ink-soft: #a7acb1;
-  --accent: #66b2ff;
-  --accent-stark: #85c1ff;
+  --accent: #5cb8ec;
+  --accent-stark: #7fc9f2;
   --accent-soft: #001933;
   --accent-rand: #004c99;
   --accent-ink: #06182e;
@@ -149,8 +159,8 @@
   --freigabe-fest: #0d7a55;
   --freigabe-ink: #ffffff;
 
-  --schiene: #16203a;
-  --schiene-ink: #6d80a6;
+  --schiene: #1b2429;
+  --schiene-ink: #7a8b94;
   --menue: #212529;
   --menue-ink: #ced4da;
   --menue-titel: #8291af;
@@ -198,8 +208,14 @@ a:hover {
 /* ---------- Die Schiene, das Menü, die Kopfleiste ---------- */
 
 /**
- * Der Aufbau der Vorlage: eine schmale dunkle Schiene ganz links, daneben
- * das Menü, darüber eine Kopfleiste. Der Inhalt rückt um beides ein.
+ * Der Aufbau von autoiXpert: **eine** schmale helle Leiste ganz links, die
+ * die Piktogramme der Bereiche trägt, darüber eine niedrige Kopfleiste.
+ *
+ * Vorher waren es zwei Spalten — eine dunkle Zierschiene von 30px und
+ * daneben ein Menü von 250px mit Beschriftungen. Die 250px sind ersatzlos
+ * entfallen: autoiXpert hat sie nicht, und der Inhalt gewinnt sie. Was die
+ * Beschriftungen leisteten, leisten jetzt `title` und ein Text nur für
+ * Screenreader — sichtbar bleibt das Piktogramm.
  */
 .schiene {
   position: fixed;
@@ -208,38 +224,23 @@ a:hover {
   left: 0;
   width: var(--schiene-breite);
   background: var(--schiene);
+  border-right: 1px solid var(--line);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 2px;
+  padding-top: 5px;
   z-index: 1000;
 }
 
-.schiene span {
-  writing-mode: vertical-rl;
-  color: var(--schiene-ink);
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
+/* Das breite Menü ist entfallen; die Punkte stehen in der Schiene. */
 .menue {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: var(--schiene-breite);
-  width: var(--menue-breite);
-  background: var(--menue);
-  box-shadow: var(--schatten-menue);
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.25s ease;
+  display: contents;
 }
 
+/* Der Name steht jetzt in der Kopfleiste, nicht über dem Menü. */
 .marke {
-  display: block;
+  display: none;
   padding: 22px 24px 18px;
   font-family: var(--mono);
   font-size: 13px;
@@ -256,57 +257,54 @@ a:hover {
 }
 
 .menue-titel {
+  display: none;
   font-size: 13px;
   color: var(--menue-titel);
   margin: 5px 24px 6px;
 }
 
 .menue-nav {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+  display: contents;
 }
 
+/* Ein Punkt der Schiene: quadratisch, nur Piktogramm, 44px Zielfläche. */
 .menue-nav a {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 24px;
-  color: var(--menue-ink);
-  font-size: 0.925rem;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  color: var(--schiene-ink);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .menue-nav a svg {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  opacity: 0.75;
 }
 
 .menue-nav a:hover,
 .menue-nav a[aria-current='page'] {
   color: var(--accent);
+  background: var(--accent-soft);
   text-decoration: none;
 }
 
-.menue-nav a[aria-current='page'] {
-  font-weight: 600;
-}
-
-.menue-nav a[aria-current='page'] svg {
-  opacity: 1;
-}
-
+/* Benutzer und Abmelden sind in die Kopfleiste gewandert, rechts aussen. */
 .menue-fuss {
-  padding: 16px 24px 22px;
-  border-top: 1px solid var(--line);
-  font-size: 13px;
+  margin-top: auto;
+  padding: 0 0 12px;
+  font-size: 11px;
   color: var(--ink-soft);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 6px;
 }
 
 .menue-benutzer {
@@ -318,25 +316,99 @@ a:hover {
 .topbar {
   position: sticky;
   top: 0;
-  height: 70px;
+  /* autoiXpert setzt eine flache Kopfzeile; 70px wirkten daneben wuchtig. */
+  height: 56px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 26px;
+  gap: 12px;
+  padding: 0 16px;
   z-index: 900;
 }
 
 .topbar-titel {
-  font-weight: 600;
+  /* autoiXpert setzt den Titel normal, nicht fett. */
+  font-weight: 400;
   color: var(--ink);
-  font-size: 1rem;
+  font-size: 1.0625rem;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * Das Zeichen am Kopf der Leiste, wie das „X" in autoiXpert: links aussen,
+ * auf Höhe der Kopfzeile. Es stand zuerst in der Kopfzeile selbst — dort
+ * begann es aber erst hinter der Leiste, also 56px zu weit rechts.
+ */
+.schiene-zeichen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 46px;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--accent);
+  text-decoration: none;
+  flex: none;
+}
+
+.schiene-zeichen:hover {
+  text-decoration: none;
+}
+
+.topbar-rechts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Namenszeichen des angemeldeten Benutzers: Kreis mit Anfangsbuchstaben. */
+.benutzer-zeichen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+}
+
+.benutzer-name {
+  font-size: 0.875rem;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+/* Auf schmalen Schirmen weicht der ausgeschriebene Name dem Zeichen. */
+@media (max-width: 640px) {
+  .benutzer-name {
+    display: none;
+  }
+}
+
+/* Ein Knopf ohne Rahmen — für Nebensächliches wie das Abmelden. */
+.knopf-schlicht {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.knopf-schlicht:hover {
+  color: var(--accent);
+  background: none;
 }
 
 .menue-schalter {
@@ -345,32 +417,22 @@ a:hover {
 }
 
 .huelle {
-  margin-left: calc(var(--schiene-breite) + var(--menue-breite));
-  min-height: 100vh;
-  transition: margin-left 0.25s ease;
-}
-
-body.menue-zu .menue {
-  transform: translateX(-100%);
-}
-
-body.menue-zu .huelle {
   margin-left: var(--schiene-breite);
+  min-height: 100vh;
 }
 
-@media (max-width: 900px) {
-  .menue {
-    transform: translateX(-100%);
-  }
+/*
+ * Der Ein- und Ausklappstand des alten Menüs hat keine Wirkung mehr: die
+ * Schiene ist 56px breit und steht immer. Die Klassen bleiben, weil die
+ * Kopfleiste sie noch setzt — sie tun nur nichts.
+ */
 
-  .huelle {
-    margin-left: var(--schiene-breite);
-  }
-
-  body.menue-auf .menue {
-    transform: none;
-  }
-}
+/*
+ * Hier stand eine Regel, die das 250px breite Menü unterhalb von 900px aus
+ * dem Bild schob. Die schmale Leiste braucht das nicht — sie ist 56px breit
+ * und passt auf jeden Schirm. Ohne diese Streichung hätte `translateX(-100%)`
+ * die Piktogramme auf dem Telefon unsichtbar gemacht.
+ */
 
 /* ---------- Grundgerüst ---------- */
 
@@ -425,43 +487,75 @@ h3 {
   gap: 5px;
 }
 
+/*
+ * autoiXpert setzt das Label klein und grau ÜBER das Feld, nicht fett
+ * daneben. Es ist eine Beschriftung, keine Überschrift.
+ */
 label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-mid);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink-soft);
 }
 
+/*
+ * Das prägendste Merkmal der autoiXpert-Masken: Felder haben keinen Rahmen,
+ * nur einen Unterstrich. Eine Maske mit dreissig Feldern wirkt damit ruhig
+ * statt wie ein Gitter aus Kästen.
+ */
 input[type='text'],
 input[type='email'],
 input[type='password'],
 input[type='search'],
 input[type='file'],
+input[type='number'],
+input[type='date'],
 select,
 textarea {
   font-family: inherit;
-  font-size: 0.925rem;
-  color: var(--ink-mid);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.525rem 0.9rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 2px 0 5px;
   width: 100%;
 }
 
+/*
+ * Ausnahme: das mehrzeilige Feld ist eine Schreibfläche, kein Formularfeld.
+ * Es behält Rahmen und Fläche, sonst schwämme der Text im Nichts.
+ */
 textarea {
   font-family: var(--serif);
   font-size: 15px;
   line-height: 1.6;
   resize: vertical;
   min-height: 120px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.8rem;
 }
 
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+/*
+ * Beim Hineinklicken verdickt sich der Unterstrich, statt dass ein Ring um
+ * das Feld erscheint — ein Ring bräuchte einen Rahmen, den es hier nicht
+ * gibt. Der zweite Schatten ist die zweite Linie: `border-bottom` kennt
+ * keine halben Pixel, ein zusätzlicher `box-shadow` schon.
+ */
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent-rand);
+  border-bottom-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 0.2rem rgba(0, 127, 255, 0.2);
+  box-shadow: 0 1px 0 0 var(--accent);
 }
 
 button,
@@ -586,12 +680,17 @@ button.haupt:disabled:hover {
 
 /* ---------- Karten und Listen ---------- */
 
+/*
+ * autoiXpert trägt seine Karten auf Schatten, nicht auf Rändern - deshalb
+ * fällt der Rand weg und der Innenabstand wächst. Ein Rand *und* ein
+ * Schatten wären zwei Begrenzungen für eine Kante.
+ */
 .karte {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   box-shadow: var(--schatten);
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .werkzeugleiste {
@@ -688,6 +787,10 @@ button.haupt:disabled:hover {
 
 .zeile:hover {
   background: var(--surface-alt);
+  /* Die ganze Zeile ist ein Verweis. Ohne diese Zeile griff die globale
+     Regel `a:hover` und unterstrich beim Überfahren jeden Text darin -
+     Titel, Aktenzeichen, Kennwerte. autoiXpert wechselt nur die Fläche. */
+  text-decoration: none;
 }
 
 /*
@@ -772,41 +875,61 @@ button.haupt:disabled:hover {
 
 /* ---------- Marker ---------- */
 
+/*
+ * Statuskennzeichen wie in der autoiXpert-Gutachtenliste: ein farbiger
+ * Punkt trägt die Bedeutung, der Text bleibt grau. Vorher war die ganze
+ * Pille eingefärbt - bei vier Kennzeichen nebeneinander (»Vertrag an Kunde
+ * geschickt«, »Vorakte angelegt«, …) wurde daraus ein Farbband.
+ */
 .marke-pille {
-  font-size: 0.75em;
-  font-weight: 700;
-  line-height: 1;
-  padding: 0.35em 0.65em;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.2;
+  padding: 0.3em 0.6em;
   border-radius: var(--radius-klein);
   white-space: nowrap;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  background: var(--surface-alt);
+  color: var(--ink-mid);
+  border: 0;
 }
 
-.m-entwurf {
-  background: var(--surface-alt);
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
+.marke-pille::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
 }
-.m-pruefung {
-  background: var(--warn-soft);
-  color: var(--warn);
+
+/* Nur der Punkt traegt die Farbe, der Text bleibt lesbar grau. */
+.m-entwurf::before {
+  background: var(--ink-soft);
 }
-.m-freigegeben {
-  background: var(--good-soft);
-  color: var(--good);
+.m-pruefung::before {
+  background: var(--warn);
 }
-.m-zurueckgezogen {
-  background: var(--crit-soft);
-  color: var(--crit);
+.m-freigegeben::before {
+  background: var(--good);
 }
-.m-akzent {
-  background: var(--accent-soft);
-  color: var(--accent);
+.m-zurueckgezogen::before {
+  background: var(--crit);
 }
-.m-warn {
-  background: var(--warn-soft);
-  color: var(--warn);
+.m-akzent::before {
+  background: var(--accent);
 }
+.m-warn::before {
+  background: var(--warn);
+}
+
+/*
+ * Die Klassen bleiben, ihre Füllung nicht: Fläche und Schrift sind für alle
+ * gleich, die Bedeutung trägt der Punkt (siehe `.marke-pille::before`).
+ * Damit lesen sich auch vier Kennzeichen nebeneinander noch als Text.
+ */
 
 /* ---------- Detailansicht ---------- */
 
@@ -827,16 +950,22 @@ button.haupt:disabled:hover {
   margin-bottom: 20px;
 }
 
+/*
+ * Die Überschrift einer Karte steht in autoiXpert mittig, gesperrt und in
+ * Grossbuchstaben - ANSPRUCHSTELLER, UNFALLDATEN, KALKULATION. Sie ist
+ * dadurch Aufschrift und nicht Satzanfang.
+ */
 .block-label {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.11em;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-soft);
-  font-weight: 600;
-  margin-bottom: 6px;
+  color: var(--ink-mid);
+  font-weight: 500;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 

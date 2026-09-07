@@ -4,10 +4,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 /**
- * Die Menüpunkte.
+ * Die Menüpunkte — in autoiXpert sind sie eine Reihe von Piktogrammen in der
+ * schmalen Leiste links, ohne Beschriftung.
  *
  * Als Client-Baustein, weil der aktive Punkt am Pfad hängt — und weil ein
  * Menü, das nicht zeigt, wo man steht, kein Menü ist.
+ *
+ * Die Beschriftung entfällt nur für das Auge: `title` zeigt sie beim
+ * Verweilen, und ein Text für Screenreader bleibt im Markup. Ein Piktogramm
+ * allein wäre für die Tastatur- und Sprachbedienung eine Verschlechterung.
  */
 
 const PUNKTE = [
@@ -43,6 +48,7 @@ export function Menuepunkte() {
           key={p.pfad}
           href={p.pfad}
           aria-current={pfad.startsWith(p.pfad) ? 'page' : undefined}
+          title={p.name}
         >
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path
@@ -54,7 +60,7 @@ export function Menuepunkte() {
               strokeLinejoin="round"
             />
           </svg>
-          {p.name}
+          <span className="nur-vorlesen">{p.name}</span>
         </Link>
       ))}
     </div>
