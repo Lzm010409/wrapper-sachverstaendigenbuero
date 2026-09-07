@@ -1,6 +1,7 @@
 import { alleThemen, nochNichtUebernommen, sucheBilder } from '@/bilder/bibliothek'
 import { Bildkarte, Bildaufnahme } from './bildkarte'
 import { Suchleiste } from './suchleiste'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 /**
  * Die Bildbibliothek.
@@ -38,6 +39,12 @@ export default async function BilderSeite({
 }: {
   searchParams: Promise<{ q?: string | string[]; thema?: string | string[] }>
 }) {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const roh = await searchParams
   const q = ersterWert(roh.q)
   const thema = ersterWert(roh.thema)

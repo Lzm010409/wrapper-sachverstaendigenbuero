@@ -13,6 +13,7 @@ import { Kopfbereich } from './kopf'
 import { KlappenSchliesser } from './klappen'
 import { Loeschknopf } from '../loeschknopf'
 import { Auswertungslauf } from './auswertungslauf'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 function euro(wert: string | number | null | undefined): string {
   if (wert === null || wert === undefined) return '—'
@@ -43,6 +44,12 @@ export default async function StellungnahmeSeite({
 }: {
   params: Promise<{ id: string }>
 }) {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const { id } = await params
   if (!KENNUNG.test(id)) notFound()
 

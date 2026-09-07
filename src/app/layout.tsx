@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Kürzungsabwehr-Werkbank',
+  title: 'Cockpit — Sachverständigenbüro Gollenstede',
   description:
-    'Stellungnahmen gegen Kürzungsschreiben und Prüfberichte von Kfz-Versicherern.',
+    'Fallakte, Wiederbeschaffungswert und Kürzungsabwehr für autoiXpert, Pipedrive und sevDesk.',
 }
 
 /**

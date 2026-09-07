@@ -5,7 +5,8 @@ import { and, eq, gt, lt } from 'drizzle-orm'
 import { db } from '@/db'
 import { benutzer, sitzung } from '@/db/schema'
 
-export const COOKIE_NAME = 'werkbank_sitzung'
+export { COOKIE_NAME } from './sitzung-name'
+import { COOKIE_NAME } from './sitzung-name'
 const GUELTIGKEIT_TAGE = 14
 
 /**

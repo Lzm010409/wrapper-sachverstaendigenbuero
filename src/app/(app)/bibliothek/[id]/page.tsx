@@ -6,6 +6,7 @@ import { setzeWerteEin } from '@/dokument/platzhalter'
 import { StatusPille } from '../status-pille'
 import { Freigabeleiste } from './freigabeleiste'
 import { BelegPruefung } from './beleg-pruefung'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 const BEREICHSNAMEN: Record<string, string> = {
   kalkulation: 'Kalkulation',
@@ -36,6 +37,12 @@ const HERKUNFTSNAMEN: Record<string, string> = {
 const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default async function EintragSeite({ params }: { params: Promise<{ id: string }> }) {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const { id } = await params
   if (!UUID_MUSTER.test(id)) notFound()
 

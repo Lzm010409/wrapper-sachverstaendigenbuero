@@ -8,6 +8,7 @@ import {
 } from '@/bibliothek/abfragen'
 import { StatusPille } from '@/app/(app)/bibliothek/status-pille'
 import { Suchleiste } from './suchleiste'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 const BEREICHSNAMEN: Record<Bereich, string> = {
   kalkulation: 'Kalkulation',
@@ -38,6 +39,12 @@ export default async function BibliothekSeite({
 }: {
   searchParams: Promise<{ q?: string; bereich?: string; status?: string; abschnitt?: string }>
 }) {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const p = await searchParams
   const filter = {
     suche: p.q,

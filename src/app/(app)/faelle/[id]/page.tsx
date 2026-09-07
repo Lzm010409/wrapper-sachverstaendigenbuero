@@ -15,6 +15,7 @@ import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
 import { WbwReiter } from './reiter/wbw'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 const HERKUNFT: Record<string, string> = {
   anwalt: 'Rechtsanwalt aus dem Gutachten',
@@ -44,6 +45,12 @@ export default async function FallSeite({
   params: Promise<{ id: string }>
   searchParams: Promise<{ reiter?: string }>
 }) {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const { id } = await params
   // Ohne diese Prüfung ginge eine Adresse wie /faelle/unfug als Abfrage an die
   // Datenbank und endete in einer Serverfehlerseite statt in „nicht gefunden".

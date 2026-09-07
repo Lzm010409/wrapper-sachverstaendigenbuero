@@ -3,8 +3,15 @@ import { ladeFaelle } from '@/autoixpert/aktionen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import { ImportFormular } from './import-formular'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 export default async function FaelleSeite() {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const faelle = await ladeFaelle()
   const eingerichtet = Boolean(process.env.AUTOIXPERT_API_TOKEN)
 

@@ -7,6 +7,7 @@ import { gutachtenSchema } from '@/autoixpert/typen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { BerichtFormular } from './bericht-formular'
 import { Loeschknopf } from './loeschknopf'
+import { verlangeAnmeldung } from '@/auth/wache'
 
 /**
  * Die Beschriftung einer Zeile.
@@ -39,6 +40,12 @@ function tagesdatum(wert: Date | string): string {
 }
 
 export default async function StellungnahmenSeite() {
+  // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
+  // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
+  // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
+  // Umleitung mit hinaus.
+  await verlangeAnmeldung()
+
   const [liste, faelle, werkzeuge] = await Promise.all([
     ladeStellungnahmen(),
     ladeFaelle(),
