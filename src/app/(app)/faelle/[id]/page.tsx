@@ -11,6 +11,7 @@ import {
   type Schreiben,
 } from '@/fall/ansicht'
 import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
+import { ladeVorgangsschritte } from '@/fall/vorgangsschritte'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
@@ -19,8 +20,10 @@ import { KalkulationReiter } from './reiter/kalkulation'
 import { WbwReiterMitVorschlag } from './reiter/wbw-laden'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
 import { Reichtext } from './reiter/reichtext'
+import { Vorgangsschritte } from './reiter/vorgangsschritte'
 import { verlangeAnmeldung } from '@/auth/wache'
-import { SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
+import { Balken, SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
+import { Meldung } from '@/app/teile/meldung'
 
 const HERKUNFT: Record<string, string> = {
   anwalt: 'Rechtsanwalt aus dem Gutachten',
@@ -146,7 +149,7 @@ export default async function FallSeite({
           ) : null}
           {aktiv === 'vorgang' ? (
             <Suspense fallback={<SkelettReiter was="Der Vorgang" />}>
-              <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
+              <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} fallId={fall.id} />
             </Suspense>
           ) : null}
         </>
@@ -378,9 +381,11 @@ async function StellungnahmenReiter({ fall }: { fall: FallAnsicht }) {
 async function VorgangReiter({
   d,
   aktenzeichen,
+  fallId,
 }: {
   d: Falldaten
   aktenzeichen: string | null
+  fallId: string
 }) {
   const { vorschlag, platzhalter } = leseVorgangsangaben(d)
   const vorgang = await ladeVorgang(aktenzeichen)
@@ -418,6 +423,17 @@ async function VorgangReiter({
             </dl>
           </div>
         </div>
+
+        {vorgang.stand === 'gefunden' ? (
+          <div className="block">
+            <div className="block-label">Vorgangsschritte</div>
+            <div className="karte">
+              <Suspense fallback={<VorgangsschritteSkelett />}>
+                <VorgangsschritteKarte fallId={fallId} dealId={vorgang.deal!.dealId} />
+              </Suspense>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <aside className="seitenleiste">
@@ -478,8 +494,8 @@ async function VorgangReiter({
 }
 
 /**
- * Die vier Ausgänge des Pipedrive-Abrufs, jeder mit eigener Aussage.
- * „Kein Deal gefunden" für alle vier wäre die gefährlichste davon: wer das
+ * Die fünf Ausgänge des Pipedrive-Abrufs, jeder mit eigener Aussage.
+ * „Kein Deal gefunden" für alle fünf wäre die gefährlichste davon: wer das
  * liest, legt den Vorgang womöglich ein zweites Mal in Pipedrive an.
  */
 function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
@@ -496,6 +512,16 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
     return (
       <div className="hinweis fehler" style={{ margin: 0 }}>
         Pipedrive war nicht erreichbar: {vorgang.meldung}
+      </div>
+    )
+  }
+
+  if (vorgang.stand === 'mehrdeutig') {
+    return (
+      <div className="hinweis warn" style={{ margin: 0 }}>
+        <strong className="hinweis-titel">Mehrere Deals tragen dieses Aktenzeichen als Titel.</strong>
+        Das muss in Pipedrive geprüft werden, bevor eine Phase verlässlich stimmt: Deal-IDs{' '}
+        {vorgang.treffer?.map((t) => t.id).join(', ')}.
       </div>
     )
   }
@@ -526,4 +552,44 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
 function euro(wert: number | undefined): string | null {
   if (wert === undefined) return null
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(wert)
+}
+
+/**
+ * Eigene Suspense-Grenze für Notizen und Mails, getrennt von der Deal-Karte
+ * darüber: zwei zusätzliche Pipedrive-Aufrufe (Notizen, Mail-Metadaten)
+ * sollen die bereits geladene Phase nicht mit ausbremsen.
+ */
+async function VorgangsschritteKarte({ fallId, dealId }: { fallId: string; dealId: number }) {
+  const { schritte, notizenFehler, mailsFehler } = await ladeVorgangsschritte(dealId)
+
+  return (
+    <>
+      {notizenFehler ? (
+        <Meldung art="warnung" style={{ marginBottom: 12 }}>
+          {notizenFehler}
+        </Meldung>
+      ) : null}
+      {mailsFehler ? (
+        <Meldung art="warnung" style={{ marginBottom: 12 }}>
+          {mailsFehler}
+        </Meldung>
+      ) : null}
+      <Vorgangsschritte fallId={fallId} schritte={schritte} />
+    </>
+  )
+}
+
+function VorgangsschritteSkelett() {
+  return (
+    <div aria-busy="true" aria-live="polite">
+      <span className="nur-vorlesen">Die Vorgangsschritte werden geladen …</span>
+      <Balken breite={70} />
+      <div style={{ marginTop: 8 }}>
+        <Balken breite={55} />
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <Balken breite={62} />
+      </div>
+    </div>
+  )
 }
