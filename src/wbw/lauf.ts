@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { filtereNachMarke } from './markenfilter'
 import type { Bauart } from './karosserie'
 import {
+  MINDESTKORB,
   ZYKLEN,
   genugGefunden,
   modelleFuerStufe,
@@ -326,6 +327,14 @@ export interface Zyklusbericht {
   neu: number
   /** Davon nach der Prüfung als aufnehmbar beurteilt. */
   brauchbar: number
+  /**
+   * Wie viele Fahrzeuge nach diesem Zyklus im Korb lagen.
+   *
+   * Die Zahl, an der die Suche entscheidet, ob sie weitermacht — nicht
+   * `brauchbar`. Die Prüfung urteilt über das Inserat, der Korb entsteht
+   * danach aus den Filtern des Plugins.
+   */
+  imKorb: number
 }
 
 /**
@@ -390,6 +399,28 @@ function kennzeichnung(eintrag: Record<string, unknown>): string {
   // Ohne Adresse und ohne id bleibt nur der Inhalt selbst — besser als eine
   // leere Kennung, unter der alle Fahrzeuge dasselbe Urteil bekämen.
   return kennung || JSON.stringify(eintrag).slice(0, 200)
+}
+
+/**
+ * Wie viele Fahrzeuge die Auswertung in den Korb gelegt hat.
+ *
+ * **Warum diese Zahl und nicht die der Prüfung.** Bis zum 08.09.2026 hörte
+ * die Suche auf, sobald die KI-Prüfung genug Inserate für brauchbar hielt.
+ * Das Protokoll meldete dann „8 brauchbare Vergleichsfahrzeuge — weitere
+ * Zyklen nicht nötig", und im Korb stand ein einziges Fahrzeug. Beide Zahlen
+ * stimmten: die Prüfung urteilt fachlich über das Inserat, der Korb entsteht
+ * danach aus Toleranz-, Linien-, Karosserie- und Getriebefilter. Nur die
+ * zweite Zahl steht am Ende im Gutachten, und nur an ihr darf sich die
+ * Abbruchbedingung messen.
+ */
+export function korbgroesse(ergebnis: unknown): number {
+  if (!ergebnis || typeof ergebnis !== 'object') return 0
+  const daten = ergebnis as { statistik?: unknown; korb?: unknown }
+  const statistik = daten.statistik as { imKorb?: unknown } | undefined
+  if (typeof statistik?.imKorb === 'number' && Number.isFinite(statistik.imKorb)) {
+    return statistik.imKorb
+  }
+  return Array.isArray(daten.korb) ? daten.korb.length : 0
 }
 
 /**
@@ -522,9 +553,63 @@ export async function fuehreLaufAus(
   */
   const rohProPortal = new Map<Portal, Record<string, unknown>[]>()
   const protokollProPortal = new Map<Portal, unknown>()
+  /** Die Auswertung des zuletzt gelaufenen Zyklus — sie ist das Ergebnis. */
+  let ergebnis: unknown = null
+  /** Wo Bericht, Linkliste und PDF dieser Auswertung liegen. */
+  let ergebnisOrdner = 'out'
+
+  /**
+   * Wertet den Gesamtkorb aus allem aus, was bis hierher beisammen ist.
+   *
+   * Je Portal geht **eine** Datei hinaus, nicht eine je Zyklus: `run-report.js`
+   * legt seine Quellen nach Portalnamen ab, und gleiche Namen verdrängen
+   * einander.
+   *
+   * `ohneLinie` lässt die Ausstattungslinie aus den Parametern. Das ist der
+   * zweite Durchgang des weichen Linienfilters — siehe unten.
+   */
+  const werteAus = async (
+    parameterdatei: string,
+    unterordner: string,
+    ohneLinie = false,
+  ): Promise<unknown> => {
+    const quellen: string[] = []
+    for (const [portal, eintraege] of rohProPortal) {
+      const datei = `${ROHDATEI[portal].replace(/\.json$/, '')}-gesamt.json`
+      const beschaffung = protokollProPortal.get(portal)
+      await writeFile(
+        join(ordner, datei),
+        JSON.stringify(
+          { items: eintraege, ...(beschaffung ? { beschaffungsprotokoll: beschaffung } : {}) },
+          null,
+          2,
+        ),
+        'utf8',
+      )
+      quellen.push(`${portal}=${datei}`)
+    }
+
+    let datei = parameterdatei
+    if (ohneLinie) {
+      datei = parameterdatei.replace(/\.json$/, '-ohne-linie.json')
+      const roh = JSON.parse(await readFile(join(ordner, parameterdatei), 'utf8')) as {
+        subject?: Record<string, unknown>
+      }
+      await writeFile(
+        join(ordner, datei),
+        JSON.stringify({ ...roh, subject: { ...roh.subject, variante: '' } }, null, 2),
+        'utf8',
+      )
+    }
+
+    await rufeSkript('run-report.js', [datei, unterordner, ...quellen], {
+      cwd: ordner,
+      timeoutMs: 15 * 60 * 1000,
+    })
+    return JSON.parse(await readFile(join(ordner, unterordner, 'result.json'), 'utf8'))
+  }
   const urteile = new Map<string, Pruefurteil>()
   const gesehen = new Set<string>()
-  let letzteParameter = 'params-eng.json'
 
   for (const stufe of ZYKLEN) {
     const modelle = modelleFuerStufe(
@@ -535,7 +620,6 @@ export async function fuehreLaufAus(
     )
     const parameterdatei = `params-${stufe.name}.json`
     const eingabedatei = `search-inputs-${stufe.name}.json`
-    letzteParameter = parameterdatei
 
     await writeFile(
       join(ordner, parameterdatei),
@@ -697,6 +781,50 @@ export async function fuehreLaufAus(
       })
     }
 
+    // --- Korb auswerten ----------------------------------------------------
+    /*
+      Nach jedem Zyklus, nicht erst am Schluss: die Abbruchbedingung zählte
+      bisher die Urteile der KI-Prüfung, und die sagen nichts über den Korb.
+      Am 08.09.2026 meldete der Lauf „8 brauchbare Vergleichsfahrzeuge —
+      weitere Zyklen nicht nötig", und im Korb stand eines. Zyklus 3 wäre
+      genau der Ausweg gewesen und lief nie.
+    */
+    const auswertungsname = `${stufe.beschriftung}: Korb auswerten`
+    halteFest({ name: auswertungsname, stand: 'laeuft' })
+    ergebnis = await werteAus(parameterdatei, `./out-${stufe.name}`)
+    ergebnisOrdner = `out-${stufe.name}`
+    let imKorb = korbgroesse(ergebnis)
+
+    /*
+      Weicher Linienfilter. Die Ausstattungslinie filtert im Plugin hart, und
+      seit sie aus der DAT vorbelegt wird, greift sie auch: im selben Lauf
+      entfernte sie 12 von 15 Fahrzeugen, die die Toleranzen überstanden
+      hatten. Fachlich ist ein Highline kein Trendline — aber ein Korb aus
+      einem Fahrzeug trägt kein Gutachten. Bleibt zu wenig übrig, wird die
+      Linie für die Auswertung fallengelassen und das im Protokoll gesagt.
+    */
+    let ohneLinie = false
+    if (imKorb < MINDESTKORB && eingabe.subjekt.variante.trim()) {
+      const zweiter = await werteAus(parameterdatei, `./out-${stufe.name}-ohne-linie`, true)
+      const zweiteZahl = korbgroesse(zweiter)
+      if (zweiteZahl > imKorb) {
+        ergebnis = zweiter
+        ergebnisOrdner = `out-${stufe.name}-ohne-linie`
+        imKorb = zweiteZahl
+        ohneLinie = true
+      }
+    }
+
+    halteFest({
+      name: auswertungsname,
+      stand: 'fertig',
+      text:
+        `${imKorb} im Korb` +
+        (ohneLinie
+          ? ` — ohne die Linie „${eingabe.subjekt.variante}", mit ihr waren es zu wenige`
+          : ''),
+    })
+
     const brauchbarGesamt = brauchbare(urteile.values())
     zyklen.push({
       name: stufe.name,
@@ -705,13 +833,14 @@ export async function fuehreLaufAus(
       portale: berichte,
       neu: neueAngaben.length,
       brauchbar: brauchbarGesamt,
+      imKorb,
     })
 
-    if (genugGefunden(brauchbarGesamt, eingabe.mindestzahl)) {
+    if (genugGefunden(imKorb, eingabe.mindestzahl)) {
       halteFest({
         name: 'Suche beendet',
         stand: 'fertig',
-        text: `${brauchbarGesamt} brauchbare Vergleichsfahrzeuge — weitere Zyklen nicht nötig`,
+        text: `${imKorb} Fahrzeuge im Korb — weitere Zyklen nicht nötig`,
       })
       break
     }
@@ -721,32 +850,9 @@ export async function fuehreLaufAus(
     throw new Error('Kein Portal hat Treffer geliefert. Der Lauf wurde abgebrochen.')
   }
 
-  // --- Gesamtkorb ----------------------------------------------------------
-  // Eine Datei je Portal, nicht eine je Zyklus und Portal: gleiche Namen
-  // verdrängen sich in `run-report.js` gegenseitig.
-  const quellenGesamt: string[] = []
-  for (const [portal, eintraege] of rohProPortal) {
-    const datei = `${ROHDATEI[portal].replace(/\.json$/, '')}-gesamt.json`
-    const beschaffung = protokollProPortal.get(portal)
-    await writeFile(
-      join(ordner, datei),
-      JSON.stringify(
-        { items: eintraege, ...(beschaffung ? { beschaffungsprotokoll: beschaffung } : {}) },
-        null,
-        2,
-      ),
-      'utf8',
-    )
-    quellenGesamt.push(`${portal}=${datei}`)
+  if (!ergebnis) {
+    throw new Error('Die Auswertung des Gesamtkorbs ist nicht zustande gekommen.')
   }
-
-  halteFest({ name: 'Gesamtkorb auswerten', stand: 'laeuft' })
-  await rufeSkript('run-report.js', [letzteParameter, './out', ...quellenGesamt], {
-    cwd: ordner,
-    timeoutMs: 15 * 60 * 1000,
-  })
-  const ergebnis = JSON.parse(await readFile(join(ordner, 'out', 'result.json'), 'utf8'))
-  halteFest({ name: 'Gesamtkorb auswerten', stand: 'fertig' })
 
   return {
     ordner,
@@ -756,9 +862,9 @@ export async function fuehreLaufAus(
     zyklen,
     urteile: Object.fromEntries(urteile),
     dateien: {
-      html: join(ordner, 'out', 'WBW-Vergleichsfahrzeuge.html'),
-      pdf: join(ordner, 'out', 'WBW-Vergleichsfahrzeuge.pdf'),
-      linkliste: join(ordner, 'out', 'Linkliste.md'),
+      html: join(ordner, ergebnisOrdner, 'WBW-Vergleichsfahrzeuge.html'),
+      pdf: join(ordner, ergebnisOrdner, 'WBW-Vergleichsfahrzeuge.pdf'),
+      linkliste: join(ordner, ergebnisOrdner, 'Linkliste.md'),
     },
   }
 }

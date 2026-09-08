@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { vereineRohtreffer } from './lauf'
+import { korbgroesse, vereineRohtreffer } from './lauf'
 
 /**
  * Der Lauf vom 08.09.2026, Fall 0826/2072TG (VW Sharan).
@@ -56,5 +56,29 @@ describe('vereineRohtreffer', () => {
     const ohne1 = { titel: 'Sharan 2.0 TDI', preis: 9990 }
     const ohne2 = { titel: 'Sharan 1.4 TSI', preis: 8500 }
     expect(vereineRohtreffer([ohne1], [ohne2])).toHaveLength(2)
+  })
+})
+
+describe('korbgroesse', () => {
+  /*
+    Warum das gebraucht wird: die Abbruchbedingung zaehlte bisher, was die
+    KI-Pruefung fuer brauchbar hielt. Im Lauf vom 08.09.2026 meldete sie
+    "8 brauchbare Vergleichsfahrzeuge — weitere Zyklen nicht noetig", waehrend
+    im Korb ein einziges Fahrzeug stand. Die KI urteilt fachlich, der Korb
+    entsteht aus Toleranz-, Linien-, Karosserie- und Getriebefilter — zwei
+    verschiedene Zahlen, und nur die zweite steht am Ende im Gutachten.
+  */
+  it('liest die Zahl aus der Statistik der Auswertung', () => {
+    expect(korbgroesse({ statistik: { imKorb: 7 }, korb: [1, 2] })).toBe(7)
+  })
+
+  it('faellt auf die Laenge des Korbs zurueck', () => {
+    expect(korbgroesse({ korb: [1, 2, 3] })).toBe(3)
+  })
+
+  it('nimmt eine unbrauchbare Auswertung als leeren Korb', () => {
+    expect(korbgroesse(null)).toBe(0)
+    expect(korbgroesse({})).toBe(0)
+    expect(korbgroesse({ statistik: { imKorb: 'viele' } })).toBe(0)
   })
 })

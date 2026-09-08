@@ -131,3 +131,44 @@ describe('trichterzeilen', () => {
     ])
   })
 })
+
+describe('Ein Korb, der keinen Median trägt', () => {
+  /*
+    Der Lauf vom 08.09.2026 wies „10.645 €" aus — bereinigt auf den Euro,
+    gebildet aus einem einzigen Fahrzeug. Die Zahl trägt die Autorität einer
+    Rechnung und den Gehalt eines Einzelpreises, und sie steht am Ende unter
+    der Unterschrift des Sachverständigen.
+  */
+  const mitKorbgroesse = (anzahl: number) => ({
+    wbw: { vorschlagBrutto: 10645, anzahl, bereinigt: { median: 10645 }, roh: { median: 9990, min: 9990, max: 9990 } },
+    statistik: { imKorb: anzahl },
+    korb: [],
+  })
+
+  it('weist unterhalb der Mindestzahl keinen Vorschlag aus', () => {
+    const e = leseErgebnis(mitKorbgroesse(1))!
+    expect(e.wert.zuKleinerKorb).toBe(true)
+    expect(e.wert.vorschlagBrutto).toBe(null)
+    expect(e.wert.medianBereinigt).toBe(null)
+  })
+
+  it('lässt die Spanne und den rohen Median stehen', () => {
+    // Was gefunden wurde, bleibt sichtbar — nur sieht es nicht mehr aus wie
+    // ein Ergebnis.
+    const e = leseErgebnis(mitKorbgroesse(1))!
+    expect(e.wert.medianRoh).toBe(9990)
+    expect(e.wert.min).toBe(9990)
+    expect(e.wert.anzahl).toBe(1)
+  })
+
+  it('weist ab der Mindestzahl wieder einen Vorschlag aus', () => {
+    const e = leseErgebnis(mitKorbgroesse(4))!
+    expect(e.wert.zuKleinerKorb).toBe(false)
+    expect(e.wert.vorschlagBrutto).toBe(10645)
+  })
+
+  it('zählt den Korb, wo die Auswertung keine Anzahl nennt', () => {
+    const e = leseErgebnis({ wbw: { vorschlagBrutto: 10645 }, statistik: { imKorb: 2 } })!
+    expect(e.wert.zuKleinerKorb).toBe(true)
+  })
+})
