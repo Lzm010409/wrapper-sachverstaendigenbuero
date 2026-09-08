@@ -88,6 +88,8 @@ export function WbwReiter({
   const modellwert = eingaben.modell ?? params.subject.modell
   const markeWert = params.subject.marke
 
+  const baureiheWert = vorschlag?.baureihe ?? null
+
   const pruefeModell = useCallback(
     async (marke: string, modell: string) => {
       const schluessel = `${marke}|${modell}`.toLowerCase()
@@ -97,7 +99,7 @@ export function WbwReiter({
       zuletztGeprueft.current = schluessel
       setzePruefungLaeuft(true)
       try {
-        const antwort = await pruefeModellname(marke, modell)
+        const antwort = await pruefeModellname(marke, modell, baureiheWert)
         setzeModellpruefung(antwort)
         // Ein Abruffehler ist keine Antwort — beim nächsten Verlassen des
         // Feldes darf dieselbe Frage noch einmal gestellt werden.
@@ -106,7 +108,7 @@ export function WbwReiter({
         setzePruefungLaeuft(false)
       }
     },
-    [],
+    [baureiheWert],
   )
 
   useEffect(() => {
@@ -500,7 +502,9 @@ function Modellhinweis({
   if (pruefung.bekannt) {
     return (
       <span className="unterzeile" style={{ display: 'block', marginTop: 4 }}>
-        AutoScout24 führt das als „{pruefung.aufgeloest}“.
+        {pruefung.quelle === 'baureihe'
+          ? `AutoScout24 kennt „${modell}“ nicht — gesucht wird über die Baureihe „${pruefung.aufgeloest}“.`
+          : `AutoScout24 führt das als „${pruefung.aufgeloest}“.`}
       </span>
     )
   }
@@ -512,9 +516,10 @@ function Modellhinweis({
         {pruefung.anzahl > 0 ? ` — unter ${pruefung.anzahl} Modellen von ${marke}` : ''}
       </span>
       <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
-        Das Portal lässt einen unbekannten Namen stillschweigend fallen und sucht über die ganze
-        Marke. Mit den engen Toleranzen des ersten Zyklus kommt dabei meist nichts zurück — der
-        Korb stammt dann allein aus den übrigen Portalen.
+        Auch die Baureihe trifft keines seiner Modelle. Das Portal lässt einen unbekannten Namen
+        stillschweigend fallen und sucht über die ganze Marke. Mit den engen Toleranzen des ersten
+        Zyklus kommt dabei meist nichts zurück — der Korb stammt dann allein aus den übrigen
+        Portalen.
       </span>
       {pruefung.vorschlaege.length > 0 ? (
         <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>

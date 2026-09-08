@@ -19,15 +19,19 @@
  * eine Linie sind sie nicht. Bleibt danach nichts übrig, ist das Modellfeld
  * leer, und die aufrufende Stelle fällt auf die Baureihe zurück.
  *
- * **Die Liste ist bewusst unvollständig.** Sie deckt die geläufigen
- * deutschen Linienbezeichnungen ab. Eine unbekannte Linie bleibt im
- * Modellfeld stehen — und wird dann von der Vorab-Prüfung gegen die
- * Modellliste von AutoScout24 aufgefangen, die der Sachverständige vor dem
- * Lauf sieht. Diese Prüfung ist das Sicherheitsnetz, nicht diese Liste.
+ * **Die Liste ist bewusst unvollständig, und sie ist nicht das
+ * Sicherheitsnetz.** Sie deckt die geläufigen Linienbezeichnungen ab, damit
+ * das Modellfeld sauber aussieht. Eine unbekannte Linie bleibt darin stehen —
+ * beim Citroën Berlingo war es `Feel XL`, und die Liste kannte `Feel` nicht.
+ * Aufgefangen wird das eine Ebene tiefer von `waehleSuchmodell`: löst der
+ * Untertyp beim Portal nicht auf, wird die Baureihe genommen. Das braucht
+ * kein Herstellerwissen und gilt auch für die Linie, die morgen dazukommt.
  *
  * Was hier **nicht** hineingehört, ist alles, was Teil eines Modellnamens
  * sein kann: `AMG` ohne `Line` (AutoScout24 führt `E 53 AMG` als eigenes
- * Modell), `GTI`, `FR`, oder ein blosses `sport`.
+ * Modell), `GTI`, `FR`, ein blosses `sport` — und Baugrössen wie `XL` oder
+ * `Maxi`. Beim Citroën Berlingo bezeichnet `XL` die Langversion; sie
+ * stillschweigend zu entfernen machte aus dem Fahrzeug ein anderes.
  */
 
 /**
@@ -76,6 +80,22 @@ const LINIEN = [
   'Innovation',
   'GS Line',
   'Edition',
+  // Citroën, Peugeot, DS
+  'GT Line',
+  'Allure',
+  'Shine',
+  'Feel',
+  'Live',
+  // Renault, Dacia
+  'Intens',
+  'Equilibre',
+  'Techno',
+  'Zen',
+  'Expression',
+  // Fiat, Alfa Romeo
+  'Lounge',
+  'Pop Star',
+  'Sportivo',
   // herstellerübergreifend
   'Style',
   'Life',
@@ -89,6 +109,8 @@ const LINIEN = [
  */
 const ZUSAETZE = [
   'BlueMotion Technology',
+  'PureTech',
+  'BlueHDi',
   'BlueEFFICIENCY',
   'EfficientDynamics',
   'BlueMotion',

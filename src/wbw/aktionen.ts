@@ -4,7 +4,7 @@ import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { holeLauf, starteLauf, type LaufEingaben, type Laufstand } from './auftrag'
 import { ermittleModelle } from './lauf'
-import { loeseModellAuf } from './modell'
+import { waehleSuchmodell } from './modell'
 import { uebernimmAuswahl } from './korb'
 import { ladeBelegeHoch } from './hochladen'
 
@@ -140,10 +140,12 @@ export async function ladeBelegeInGutachtenordner(laufId: string): Promise<Uploa
 }
 
 export interface Modellpruefung {
-  /** Ob AutoScout24 den Suchbegriff auflösen kann. */
+  /** Ob AutoScout24 den Suchbegriff auflösen kann — über Untertyp oder Baureihe. */
   bekannt: boolean
   /** Der Name, unter dem das Portal das Fahrzeug führt. */
   aufgeloest: string | null
+  /** Woher der aufgelöste Name stammt. */
+  quelle: 'untertyp' | 'baureihe' | 'offen'
   /** Was das Portal selbst zu diesem Namen vorschlägt. */
   vorschlaege: string[]
   /** Wie viele Modelle die Marke bei AutoScout24 hat. */
@@ -165,18 +167,31 @@ export interface Modellpruefung {
  * Die Prüfung ist ein Hinweis, keine Sperre: der Sachverständige darf
  * wissentlich über die Marke suchen.
  */
-export async function pruefeModellname(marke: string, modell: string): Promise<Modellpruefung> {
+export async function pruefeModellname(
+  marke: string,
+  modell: string,
+  baureihe?: string | null,
+): Promise<Modellpruefung> {
   await verlangeBenutzer()
 
-  const leer: Modellpruefung = { bekannt: true, aufgeloest: null, vorschlaege: [], anzahl: 0 }
+  const leer: Modellpruefung = {
+    bekannt: true,
+    aufgeloest: null,
+    quelle: 'offen',
+    vorschlaege: [],
+    anzahl: 0,
+  }
   if (!marke.trim() || !modell.trim()) return leer
 
   try {
     const liste = await ermittleModelle(marke, modell)
-    const treffer = loeseModellAuf(modell, liste.modelle)
+    // Dieselbe Wahl wie im Lauf: Untertyp zuerst, Baureihe als Rückfall. Die
+    // Oberfläche darf nichts anderes anzeigen, als nachher gesucht wird.
+    const treffer = waehleSuchmodell(modell, baureihe ?? null, liste.modelle)
     return {
       bekannt: treffer.modell !== null,
       aufgeloest: treffer.modell,
+      quelle: treffer.quelle,
       vorschlaege: liste.vorschlaege.slice(0, 6),
       anzahl: liste.anzahl,
     }

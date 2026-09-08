@@ -70,4 +70,26 @@ describe('Linie vom Modell trennen', () => {
     expect(trenneLinie('Tiguan HIGHLINE').linie).toBe('Highline')
     expect(trenneLinie('A4 s-line').linie).toBe('S line')
   })
+
+  it('kennt die Linien der französischen Marken', () => {
+    // Der Citroën-Fall vom 08.09.2026: „Feel" ist die Linie, „XL" die
+    // Langversion des Berlingo — im Modellfeld stand beides.
+    expect(trenneLinie('Berlingo Feel')).toEqual({
+      modell: 'Berlingo',
+      linie: 'Feel',
+      entfernt: [],
+    })
+    expect(trenneLinie('208 Allure').linie).toBe('Allure')
+    expect(trenneLinie('Clio Intens').linie).toBe('Intens')
+  })
+
+  it('lässt XL am Modell, weil es die Baulänge meint und nicht die Linie', () => {
+    // „Berlingo XL" ist ein anderes Fahrzeug als „Berlingo" — die Länge darf
+    // nicht stillschweigend verschwinden.
+    expect(trenneLinie('Berlingo XL Feel')).toEqual({
+      modell: 'Berlingo XL',
+      linie: 'Feel',
+      entfernt: [],
+    })
+  })
 })
