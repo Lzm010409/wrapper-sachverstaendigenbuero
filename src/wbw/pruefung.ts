@@ -1,11 +1,14 @@
 import { z } from 'zod'
 import {
   AUFFAELLIGKEITEN,
+  UNBEKANNTE_BAUART,
   ungeprueft,
   type Auffaelligkeit,
+  type ErkannteBauart,
   type Inseratsangabe,
   type Pruefurteil,
 } from './urteil'
+import { BAUARTEN, type Bauart } from './karosserie'
 import { MODELLE, rufeMitWerkzeugAuf } from '@/ki/client'
 import { protokolliereWarnung } from '@/protokoll'
 
@@ -46,6 +49,15 @@ const urteilSchema = z.object({
     kippen — 25 Inserate ungeprüft wegen einer 105.
   */
   vergleichbarkeit: z.number().transform((wert) => Math.min(100, Math.max(0, wert))),
+  erkanntesModell: z.string().default(''),
+  /*
+    `catch` statt `default`: eine Bauart, die das Modell erfindet, darf nicht
+    über `safeParse` 25 Inserate mitreissen. Sie wird zu „unbekannt", und
+    unbekannt heisst hier: stehen lassen, nicht verwerfen.
+  */
+  erkannteBauart: z
+    .enum([UNBEKANNTE_BAUART, ...BAUARTEN] as [ErkannteBauart, ...ErkannteBauart[]])
+    .catch(UNBEKANNTE_BAUART),
   begruendung: z.string(),
   auffaelligkeiten: z
     .array(z.enum(Object.keys(AUFFAELLIGKEITEN) as [Auffaelligkeit, ...Auffaelligkeit[]]))
@@ -104,6 +116,19 @@ export const PRUEF_WERKZEUG = {
                 'Ganze Zahl von 0 bis 100 — fachliche Nähe zum Subjektfahrzeug. ' +
                 '100 = praktisch gleiches Fahrzeug, 0 = als Vergleich unbrauchbar.',
             },
+            erkanntesModell: {
+              type: 'string',
+              description:
+                'Marke und Modell, wie sie im Inserat stehen, z. B. „VW Golf VI". ' +
+                'Aus Titel und Beschreibung, nicht geraten. Leer, wenn nicht erkennbar.',
+            },
+            erkannteBauart: {
+              type: 'string',
+              enum: [UNBEKANNTE_BAUART, ...BAUARTEN],
+              description:
+                'Die Bauart des angebotenen Fahrzeugs aus Titel und Beschreibung. ' +
+                '„unbekannt", wenn der Text sie nicht hergibt — nicht raten.',
+            },
             begruendung: {
               type: 'string',
               description: 'Ein Satz auf Deutsch, höchstens 200 Zeichen.',
@@ -119,6 +144,8 @@ export const PRUEF_WERKZEUG = {
             'erkannteAusstattung',
             'fehlendeAusstattung',
             'vergleichbarkeit',
+            'erkanntesModell',
+            'erkannteBauart',
             'begruendung',
             'auffaelligkeiten',
             'empfehlung',
@@ -140,8 +167,18 @@ Grundsätze:
   Unfallschäden und Exportabsicht stehen dort und fast nie in der
   Ausstattungsliste des Portals.
 - Als Vergleich taugt nur, was am selben Markt angeboten wird. Export,
-  Bastlerfahrzeuge, offene Unfallschäden und ein anderes Modell schliessen ein
-  Fahrzeug fachlich aus — das ist eine Auffälligkeit und meist "verwerfen".
+  Bastlerfahrzeuge und offene Unfallschäden schliessen ein Fahrzeug fachlich
+  aus — das ist eine Auffälligkeit und meist "verwerfen".
+- **Baureihe und Bauart entscheiden zuerst.** Trägt das Inserat eine andere
+  Baureihe als das Subjektfahrzeug (ein Golf, wo ein Sharan gesucht ist) oder
+  eine andere Bauart (eine Limousine, wo ein Van gesucht ist), dann ist es
+  "verwerfen" mit der Auffälligkeit "falsches_modell" — unabhängig davon, wie
+  gut Preis, Laufleistung und Leistung passen. Ein anderes Fahrzeug wird durch
+  ähnliche Zahlen nicht vergleichbar.
+- "erkanntesModell" und "erkannteBauart" werden aus Titel und Beschreibung
+  gelesen. Gibt der Text die Bauart nicht her, ist sie "unbekannt" — das ist
+  eine gültige Antwort und besser als eine geratene. Bei Kleinanzeigen steht
+  die Bauart fast nie im Titel; dort hilft nur der Beschreibungstext.
 - Ein Händlerangebot ist kein Mangel; es wird nur vermerkt, weil
   Händlerpreise über Privatpreisen liegen.
 - Unsicher heisst "pruefen", nicht "verwerfen". Wegwerfen darf nur, wer
@@ -177,12 +214,59 @@ export interface Pruefauftrag {
   subjekt: {
     marke: string
     modell: string
+    /**
+     * Die Baureihe, z. B. `Sharan (7N1)`.
+     *
+     * Ohne sie sieht die Prüfung nur `modell` — und das trägt bisweilen die
+     * Ausstattungslinie („Highline BMT") statt des Fahrzeugs. Dann kann sie
+     * ein falsches Modell nicht erkennen.
+     */
+    baureihe: string | null
     variante: string
     ez: string
     kilometerstand: number | null
     leistungKw: number | null
+    /** Die Bauart aus autoiXpert, z. B. `Van`. */
+    bauart: Bauart | null
   }
   sollAusstattung: string[]
+}
+
+/**
+ * Zieht ein Urteil zurück, das ein anderes Fahrzeug aufnehmen will.
+ *
+ * **Warum die Regel hier steht und nicht nur im Systemtext.** Am 08.09.2026
+ * empfahl die Prüfung einen VW Golf VI für den Korb einer VW-Sharan-Suche mit
+ * „aufnehmen · 60" — die Begründung nannte den Golf sogar beim Namen. Eine
+ * Anweisung im Text ist eine Bitte; hier wird sie zur Bedingung.
+ *
+ * Verworfen wird nur bei **belegter** Abweichung: eine unbekannte Bauart
+ * bleibt stehen. Auf Kleinanzeigen ist sie der Normalfall, und wegwerfen darf
+ * nur, wer sicher ist.
+ */
+function ziehePassendesUrteil(
+  urteil: Pruefurteil,
+  subjekt: Pruefauftrag['subjekt'],
+): Pruefurteil {
+  const bauartWeichtAb =
+    subjekt.bauart !== null &&
+    urteil.erkannteBauart !== UNBEKANNTE_BAUART &&
+    urteil.erkannteBauart !== subjekt.bauart
+
+  const falschesModell = urteil.auffaelligkeiten.includes('falsches_modell') || bauartWeichtAb
+  if (!falschesModell || urteil.empfehlung === 'verwerfen') {
+    return bauartWeichtAb && !urteil.auffaelligkeiten.includes('falsches_modell')
+      ? { ...urteil, auffaelligkeiten: [...urteil.auffaelligkeiten, 'falsches_modell'] }
+      : urteil
+  }
+
+  return {
+    ...urteil,
+    empfehlung: 'verwerfen',
+    auffaelligkeiten: urteil.auffaelligkeiten.includes('falsches_modell')
+      ? urteil.auffaelligkeiten
+      : [...urteil.auffaelligkeiten, 'falsches_modell'],
+  }
 }
 
 /**
@@ -246,7 +330,10 @@ export async function pruefePaket(
   return inserate.map((i) => {
     const urteil = nachId.get(i.id)
     if (!urteil) return ungeprueft(i.id, 'Zu diesem Inserat kam kein Urteil — bitte selbst ansehen.')
-    return { ...urteil, begruendung: urteil.begruendung.slice(0, 300) }
+    return ziehePassendesUrteil(
+      { ...urteil, begruendung: urteil.begruendung.slice(0, 300) },
+      auftrag.subjekt,
+    )
   })
 }
 

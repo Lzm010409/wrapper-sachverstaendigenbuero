@@ -189,6 +189,7 @@ async function fuehreAus(
       subjekt: {
         marke: eingaben.marke,
         modell: eingaben.modell,
+        baureihe: eingaben.baureihe,
         variante: eingaben.variante,
         ez: eingaben.ez,
         mileage: eingaben.laufleistung,

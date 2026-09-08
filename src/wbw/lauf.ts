@@ -43,6 +43,15 @@ export interface WbwSubjekt {
   marke: string
   /** Der Name aus autoiXpert, z. B. `E Limousine (BM 213)`. Nur zur Anzeige. */
   modell: string
+  /**
+   * Die Baureihe, z. B. `E-Klasse`.
+   *
+   * Sie geht an Kleinanzeigen (siehe `modellProPortal`) **und** an die
+   * KI-Prüfung: `modell` trägt bisweilen die Ausstattungslinie statt des
+   * Fahrzeugs, und dann ist die Baureihe die einzige Angabe, an der die
+   * Prüfung ein falsches Modell erkennen kann.
+   */
+  baureihe: string | null
   variante: string
   /** Monat/Jahr, `MM/JJJJ`. */
   ez: string
@@ -588,10 +597,12 @@ export async function fuehreLaufAus(
           subjekt: {
             marke: eingabe.subjekt.marke,
             modell: eingabe.subjekt.modell,
+            baureihe: eingabe.subjekt.baureihe,
             variante: eingabe.subjekt.variante,
             ez: eingabe.subjekt.ez,
             kilometerstand: eingabe.subjekt.mileage,
             leistungKw: eingabe.subjekt.power,
+            bauart: eingabe.subjekt.bauart,
           },
           sollAusstattung: eingabe.sollAusstattung,
         },
