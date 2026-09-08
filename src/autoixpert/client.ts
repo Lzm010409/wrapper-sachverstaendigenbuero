@@ -76,6 +76,16 @@ export interface Auflösung {
   gelesendeSeiten: number
 }
 
+/**
+ * Wie lange auf autoiXpert gewartet wird.
+ *
+ * Vorher gab es kein Zeitlimit — ein hängendes autoiXpert blockierte eine
+ * Serveraktion unbegrenzt, und der Benutzer sah einen Knopf, der sich nie
+ * wieder löste. 30 Sekunden reichen für ein Gutachten samt Anhängen; die
+ * VXS-Datei (412 KB) kam in 1,3 Sekunden.
+ */
+const ZEITLIMIT_MS = 30_000
+
 export class AutoixpertClient {
   private readonly token: string
   private readonly basisUrl: string
@@ -102,11 +112,10 @@ export class AutoixpertClient {
           authorization: `Bearer ${this.token}`,
           accept: 'application/json',
         },
+        signal: AbortSignal.timeout(ZEITLIMIT_MS),
       })
     } catch (fehler) {
-      throw new AutoixpertFehler(
-        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
-      )
+      throw new AutoixpertFehler(nichtErreichbar(fehler))
     }
 
     if (antwort.status === 404) {
@@ -169,11 +178,10 @@ export class AutoixpertClient {
     try {
       antwort = await this.hole(url, {
         headers: { authorization: `Bearer ${this.token}`, accept: 'application/xml' },
+        signal: AbortSignal.timeout(ZEITLIMIT_MS),
       })
     } catch (fehler) {
-      throw new AutoixpertFehler(
-        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
-      )
+      throw new AutoixpertFehler(nichtErreichbar(fehler))
     }
     // Keine Kalkulation ist ein Ergebnis, kein Fehler.
     if (antwort.status === 404 || antwort.status === 400) return null
@@ -353,11 +361,12 @@ export class AutoixpertClient {
     try {
       antwort = await this.hole(url.toString(), {
         headers: { authorization: `Bearer ${this.token}` },
+        // Ein Original hat 3 MB; das Zeitlimit gilt bis zur Antwortkopfzeile,
+        // nicht bis zum letzten Byte des Stroms.
+        signal: AbortSignal.timeout(ZEITLIMIT_MS),
       })
     } catch (fehler) {
-      throw new AutoixpertFehler(
-        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
-      )
+      throw new AutoixpertFehler(nichtErreichbar(fehler))
     }
 
     if (!antwort.ok) {
@@ -408,11 +417,10 @@ export class AutoixpertClient {
           'content-type': 'application/json',
         },
         body: JSON.stringify(aenderung),
+        signal: AbortSignal.timeout(ZEITLIMIT_MS),
       })
     } catch (fehler) {
-      throw new AutoixpertFehler(
-        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
-      )
+      throw new AutoixpertFehler(nichtErreichbar(fehler))
     }
 
     if (!antwort.ok) {
@@ -425,6 +433,20 @@ export class AutoixpertClient {
   }
 }
 
+
+/**
+ * Die Meldung, wenn der Aufruf gar nicht ankam.
+ *
+ * Ein abgelaufenes Zeitlimit wird als solches benannt: „nicht erreichbar" und
+ * „antwortet zu langsam" sind zwei verschiedene Störungen und führen zu zwei
+ * verschiedenen Massnahmen.
+ */
+function nichtErreichbar(fehler: unknown): string {
+  if (fehler instanceof Error && fehler.name === 'TimeoutError') {
+    return `autoiXpert hat nicht innerhalb von ${ZEITLIMIT_MS / 1000} Sekunden geantwortet.`
+  }
+  return `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`
+}
 
 /** Vergleichsform für Aktenzeichen: ohne Leerraum, klein geschrieben. */
 export function normalisiere(wert: string): string {

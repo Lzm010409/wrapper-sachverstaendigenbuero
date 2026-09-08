@@ -14,6 +14,7 @@ import { KlappenSchliesser } from './klappen'
 import { Loeschknopf } from '../loeschknopf'
 import { Auswertungslauf } from './auswertungslauf'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { darf } from '@/rechte/zugriff'
 
 function euro(wert: string | number | null | undefined): string {
   if (wert === null || wert === undefined) return '—'
@@ -49,6 +50,9 @@ export default async function StellungnahmeSeite({
   // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
   // Umleitung mit hinaus.
   await verlangeAnmeldung()
+  // Einen Knopf gar nicht erst zeigen ist freundlicher, als ihn nach dem
+  // Klick abzuweisen. Die Aktion prüft trotzdem — das hier ist Anzeige.
+  const darfLoeschen = await darf('stellungnahme.loeschen')
 
   const { id } = await params
   if (!KENNUNG.test(id)) notFound()
@@ -196,7 +200,7 @@ export default async function StellungnahmeSeite({
           einleitungMedium={s.einleitungMedium}
         />
 
-        {!s.versendetAm ? (
+        {!s.versendetAm && darfLoeschen ? (
           <Loeschknopf
             stellungnahmeId={s.id}
             betreff={s.betreff ?? 'Ohne Betreff'}

@@ -15,7 +15,7 @@ import { COOKIE_NAME } from '@/auth/sitzung-name'
  * mit dem sich am 07.09.2026 die Fallliste im Rumpf einer 307-Antwort
  * auslesen liess. Die Prüfung in der Seite wehrt alles Übrige ab.
  */
-const GESCHUETZT = ['/faelle', '/stellungnahmen', '/bibliothek', '/bilder']
+const GESCHUETZT = ['/faelle', '/stellungnahmen', '/bibliothek', '/bilder', '/verwaltung']
 
 export function middleware(anfrage: NextRequest) {
   const pfad = anfrage.nextUrl.pathname
@@ -30,5 +30,13 @@ export function middleware(anfrage: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/faelle/:path*', '/stellungnahmen/:path*', '/bibliothek/:path*', '/bilder/:path*'],
+  matcher: [
+    '/faelle/:path*',
+    '/stellungnahmen/:path*',
+    '/bibliothek/:path*',
+    '/bilder/:path*',
+    // Die Verwaltung führt Namen und E-Mail-Adressen aller Zugänge — sie
+    // gehört genauso hinter den äusseren Riegel wie die Fallliste.
+    '/verwaltung/:path*',
+  ],
 }

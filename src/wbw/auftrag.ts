@@ -7,6 +7,7 @@ import { ermittleModelle, fuehreLaufAus, type Schritt, type WbwEingabe } from '.
 import { notiere } from '@/melden/ablage'
 import { leseErgebnis } from './ergebnis'
 import { fehlendeLaufangaben, type LaufEingaben } from './lauf-eingaben'
+import { protokolliereFehler, protokolliereWarnung } from '@/protokoll'
 
 export type { LaufEingaben } from './lauf-eingaben'
 export { fehlendeLaufangaben } from './lauf-eingaben'
@@ -137,7 +138,10 @@ async function schreibeSchritt(id: string, schritte: Schritt[]): Promise<void> {
     await db.update(wbwLauf).set({ protokoll: schritte }).where(eq(wbwLauf.id, id))
   } catch (fehler) {
     // Ein verlorener Fortschrittseintrag darf den Lauf nicht abbrechen.
-    console.error('WBW-Fortschritt liess sich nicht schreiben:', fehler)
+    protokolliereWarnung('wbw.fortschritt', 'Ein Fortschrittseintrag ging verloren.', {
+      laufId: id,
+      grund: fehler instanceof Error ? fehler.message : String(fehler),
+    })
   }
 }
 
@@ -226,7 +230,12 @@ async function fuehreAus(
     })
   } catch (fehler) {
     const meldung = fehler instanceof Error ? fehler.message : String(fehler)
-    console.error(`WBW-Lauf ${id} fehlgeschlagen:`, fehler)
+    protokolliereFehler('wbw.lauf', 'Der Recherchelauf ist gescheitert.', fehler, {
+      laufId: id,
+      fallId,
+      benutzerId: benutzerId ?? undefined,
+      portale: eingaben.portale,
+    })
     try {
       await db
         .update(wbwLauf)
@@ -238,7 +247,12 @@ async function fuehreAus(
         })
         .where(eq(wbwLauf.id, id))
     } catch (schreibfehler) {
-      console.error(`WBW-Lauf ${id}: Fehler liess sich nicht festhalten:`, schreibfehler)
+      protokolliereFehler(
+        'wbw.lauf.festhalten',
+        'Der gescheiterte Lauf liess sich nicht in der Datenbank vermerken.',
+        schreibfehler,
+        { laufId: id, fallId },
+      )
     }
     await notiere({
       benutzerId,

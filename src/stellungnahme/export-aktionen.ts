@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { bild, stellungnahme } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
+import { verlangeRecht } from '@/rechte/zugriff'
 import { verarbeiteImHintergrund } from './auswertung'
 
 /**
@@ -21,7 +22,8 @@ export interface ExportErgebnis {
 
 /** Merkt die Stellungnahme als versendet. */
 export async function markiereVersendet(stellungnahmeId: string): Promise<ExportErgebnis> {
-  await verlangeBenutzer()
+  // Eine Aussage über die Aussenwelt und Grundlage für Fristen.
+  await verlangeRecht('versand.vermerken')
   await db
     .update(stellungnahme)
     .set({ versendetAm: new Date() })
@@ -41,7 +43,7 @@ export async function markiereVersendet(stellungnahmeId: string): Promise<Export
  * kein Zustand der Anwendung — und Notizen dürfen berichtigt werden.
  */
 export async function nimmVersandZurueck(stellungnahmeId: string): Promise<ExportErgebnis> {
-  await verlangeBenutzer()
+  await verlangeRecht('versand.vermerken')
   await db
     .update(stellungnahme)
     .set({ versendetAm: null })
@@ -109,7 +111,8 @@ export async function speichereKopf(
  * Versandvermerk vorher zurücknehmen.
  */
 export async function loescheStellungnahme(stellungnahmeId: string): Promise<ExportErgebnis> {
-  await verlangeBenutzer()
+  // Unwiederbringlich: Positionen, Bausteine und Bilder gehen mit.
+  await verlangeRecht('stellungnahme.loeschen')
 
   const [vorhanden] = await db
     .select({

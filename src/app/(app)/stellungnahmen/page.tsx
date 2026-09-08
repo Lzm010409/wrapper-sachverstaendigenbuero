@@ -8,6 +8,7 @@ import { leseFalldaten } from '@/autoixpert/felder'
 import { BerichtFormular } from './bericht-formular'
 import { Loeschknopf } from './loeschknopf'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { darf } from '@/rechte/zugriff'
 
 /**
  * Die Beschriftung einer Zeile.
@@ -45,6 +46,9 @@ export default async function StellungnahmenSeite() {
   // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
   // Umleitung mit hinaus.
   await verlangeAnmeldung()
+  // Einen Knopf gar nicht erst zeigen ist freundlicher, als ihn nach dem
+  // Klick abzuweisen. Die Aktion prüft trotzdem — das hier ist Anzeige.
+  const darfLoeschen = await darf('stellungnahme.loeschen')
 
   const [liste, faelle, werkzeuge] = await Promise.all([
     ladeStellungnahmen(),
@@ -179,7 +183,7 @@ export default async function StellungnahmenSeite() {
                 gibt. Gescheitert darf gelöscht werden — dort ist nichts mehr
                 unterwegs.
               */}
-              {!s.versendetAm && s.auswertungsstand !== 'laeuft' ? (
+              {!s.versendetAm && s.auswertungsstand !== 'laeuft' && darfLoeschen ? (
                 <Loeschknopf stellungnahmeId={s.id} betreff={beschriftung(s.betreff)} />
               ) : null}
             </div>

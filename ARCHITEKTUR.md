@@ -348,6 +348,85 @@ Platte, und man sieht sie einzeln an.
 **Die Route nimmt die Fall-ID, nicht die autoiXpert-ID.** Sonst wäre sie ein
 Fenster zu jedem Gutachten des Büros für jeden Angemeldeten.
 
+## Protokoll: eine Kennung, die den Weg zurückfindet
+
+Vorher: siebzehn `console.error` mit einem handgeschriebenen deutschen Satz.
+Keine Stufen, kein Format, keine Kennung — und keine Möglichkeit, aus „bei mir
+kam gerade ein Fehler" die passende Zeile zu finden.
+
+**Die Kennung ist der Kern.** Jeder Fehler bekommt eine (`FX6M-KN4X`, acht
+Zeichen aus einem Alphabet ohne I/L/O/U/0/1, weil sie am Telefon durchgegeben
+wird). Sie steht in der Meldung an den Benutzer und in der Zeile im
+Protokoll.
+
+**Zwei Ausgänge, verschiedene Aufgaben.** Der Strom nach stdout ist für den
+Betrieb: vollständig, sofort, flüchtig. Die Tabelle `ereignis` ist für die
+Nacharbeit: durchsuchbar, sie steht morgen noch da. In sie gehen nur Fehler
+und Warnungen — Auskünfte wären das Rauschen, in dem die zwei wichtigen
+Zeilen untergehen.
+
+**Geschwärzt wird am Ausgang, nicht an der Aufrufstelle** (`schwaerzen.ts`),
+weil man es dort vergisst. Kennzeichen, Fahrgestellnummern, E-Mail-Adressen,
+IBANs, Token, lange Hexketten und der Parameterblock einer gescheiterten
+Datenbankabfrage gehen nicht hinaus. Was bleibt, ist die Fall-ID: wer den
+Fall sehen darf, sieht ihn in der Anwendung.
+
+Drei Dinge, die erst der Betrieb am 08.09.2026 gezeigt hat:
+
+1. **Was niemand abfängt, stand nirgends.** Im Protokoll landete nur, was
+   eine Aufrufstelle ausdrücklich meldete — also nie die Fehler, von denen
+   niemand wusste, dass sie auftreten können. `onRequestError` in
+   `instrumentation.ts` fängt sie jetzt alle ab. Die Brücke zur Fehlerseite
+   ist Nexts `digest`: der Benutzer liest ihn ab, die Suche im Protokoll
+   findet ihn.
+2. **Drizzle hängt die Parameter an jede gescheiterte Abfrage.** Beim
+   Ausfall der Datenbank stand deshalb der Hash eines Sitzungstokens im
+   Protokoll. Der Parameterblock wird jetzt geschwärzt, die Abfrage selbst
+   bleibt stehen — sie sagt, was schiefging, ihre Werte sagen es nicht.
+3. **Die Ausgangsliste gehört an `globalThis`, nicht ans Modul.** Next
+   bündelt `instrumentation.ts` getrennt vom Anwendungscode; beide bekommen
+   eine eigene Instanz. Mit einem modul-lokalen Array meldete der Start die
+   Fehlerliste in der einen Instanz an, während jede Meldung aus einer Seite
+   durch die andere lief und die Datenbank nie erreichte.
+
+**Die Fehlerseiten stehen gestaffelt.** `src/app/(app)/error.tsx` fängt einen
+Fehler *innerhalb* des angemeldeten Bereichs: Schiene, Kopfleiste und Menü
+bleiben stehen, ersetzt wird nur der Inhalt. Erst was darüber stolpert,
+erreicht die nackte Wurzelseite. Damit das Layout nicht selbst zum
+Auslöser wird, ist seine einzige Rechteabfrage — die für den Menüpunkt
+„Verwaltung" — gegen Fehler abgesichert: fehlt sie, fehlt der Punkt, nicht
+die Anwendung.
+
+## Rechte: die Rolle ist die Voreinstellung, nicht das letzte Wort
+
+Drei Rollen (`ersteller`, `freigeber`, `admin`) und acht Einzelrechte. Die
+Rolle bringt einen Satz Rechte mit; eine ausdrückliche Entscheidung je Recht
+und Zugang schlägt sie — **in beide Richtungen**. Der dritte Zustand ist der
+eigentliche Grund für diesen Aufbau: der Freigeber, dem man das Löschen
+abgenommen hat, ohne ihn zum Ersteller zu machen. Ein blosses Häkchen könnte
+das nicht.
+
+Welche acht Rechte es sind, entscheidet ein Kriterium: **was ist nicht
+rückholbar, kostet Geld oder wirkt nach draussen.**
+
+| Recht | Warum es eines ist |
+|---|---|
+| `stellungnahme.loeschen`, `bild.loeschen` | Es gibt keinen Papierkorb. |
+| `bibliothek.freigeben` | „Freigegeben" ist die Zusage, dass ein Text so hinausgeht. |
+| `autoixpert.schreiben` | Wirkt im führenden System, nicht nur hier. |
+| `wbw.kostenpflichtig` | Der Recherchelauf greift auf einen kostenpflichtigen Dienst zu. |
+| `versand.vermerken` | Eine Aussage über die Aussenwelt und Grundlage für Fristen. |
+| `benutzer.verwalten`, `protokoll.lesen` | Die Verwaltung ihrer selbst. |
+
+Alles Übrige ist tägliche Arbeit und braucht kein Recht — ein Rechtekatalog,
+der jede Schaltfläche abbildet, wird nicht gepflegt und dann umgangen.
+
+**Ausblenden ist Höflichkeit, Prüfen ist der Schutz.** Ein Knopf, den man
+nicht sehen kann, ist keine Sperre: jede Serveraktion ruft `verlangeRecht`
+selbst, und jede Ablehnung geht ins Protokoll. Die Verwaltung schützt sich
+zusätzlich gegen den Griff ins eigene Knie — der letzte Administrator kann
+sich weder herabstufen noch sperren.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,

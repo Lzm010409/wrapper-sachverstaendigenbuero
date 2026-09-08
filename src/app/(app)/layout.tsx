@@ -5,6 +5,8 @@ import { meldeAb } from '@/auth/aktionen'
 import { Kopfleiste } from '@/app/teile/kopfleiste'
 import { Menuepunkte } from '@/app/teile/menue'
 import { Melder } from '@/app/teile/melder'
+import { darf } from '@/rechte/zugriff'
+import { protokolliereWarnung } from '@/protokoll'
 
 const ROLLENNAMEN: Record<string, string> = {
   ersteller: 'Ersteller',
@@ -35,6 +37,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const benutzer = await aktuellerBenutzer()
   if (!benutzer) redirect('/anmelden')
 
+  /*
+   * Ausblenden ist Höflichkeit, keine Sperre — die Seite prüft selbst.
+   *
+   * Und weil es nur Höflichkeit ist, darf diese Abfrage die Anwendung nicht
+   * mitnehmen: das Layout steht über jeder Seite und über der Fehlerseite des
+   * Bereichs. Als am 08.09.2026 die Rechtetabelle für ein paar Sekunden nicht
+   * lesbar war, landete jeder Aufruf auf der nackten Fehlerseite der Wurzel,
+   * ohne Menü und ohne Kopfleiste — wegen eines Menüpunkts. Scheitert die
+   * Abfrage, fehlt jetzt der Punkt, nicht die Anwendung.
+   */
+  const darfVerwalten = await darf('benutzer.verwalten').catch((fehler: unknown) => {
+    protokolliereWarnung('layout.menue', 'Das Menürecht liess sich nicht lesen.', {
+      benutzerId: benutzer.id,
+      grund: fehler instanceof Error ? fehler.message : String(fehler),
+    })
+    return false
+  })
+
   return (
     <Melder>
       <div className="schiene">
@@ -45,7 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {/* `display: contents` reicht die Verweise als Kinder der Schiene
             durch — die Auszeichnung als Navigation bleibt trotzdem stehen. */}
         <nav className="menue" aria-label="Hauptmenü">
-          <Menuepunkte />
+          <Menuepunkte darfVerwalten={darfVerwalten} />
         </nav>
       </div>
 

@@ -19,6 +19,7 @@ const BEREICHE: { pfad: string; name: string }[] = [
   { pfad: '/stellungnahmen', name: 'Stellungnahmen' },
   { pfad: '/bibliothek', name: 'Argumentbibliothek' },
   { pfad: '/bilder', name: 'Bildbibliothek' },
+  { pfad: '/verwaltung', name: 'Verwaltung' },
 ]
 
 export function Kopfleiste({ rechts }: { rechts?: React.ReactNode }) {

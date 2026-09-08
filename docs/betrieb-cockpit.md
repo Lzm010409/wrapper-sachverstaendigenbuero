@@ -433,3 +433,45 @@ der Benutzer bekommt eine Meldung darüber.
 `FOTO_SPEICHER` hinzeigt). Ein Fall mit 67 Fotos belegt dort rund 1,8 MB.
 Nach einem Neustart ist der Speicher leer und füllt sich beim nächsten
 Öffnen wieder; das kostet einmal etwa anderthalb Sekunden je Reiteraufruf.
+
+## Wenn ein Benutzer einen Fehler meldet
+
+Der Benutzer sieht auf der Fehlerseite eine Kennung, etwa `2512298898`. Sie
+ist der einzige Weg von „da kam ein Fehler" zur richtigen Zeile.
+
+1. **Verwaltung → Fehlerprotokoll** (`/verwaltung/protokoll`), die Kennung in
+   das Suchfeld. Es findet sie in der eigenen Kennung (`FX6M-KN4X`), in der
+   Stelle, im Meldungstext und in dem `digest`, den die Fehlerseite zeigt.
+2. Die Zeile trägt Stelle, Zeitpunkt, Fehlermeldung, den Zusammenhang
+   (Pfad, Methode, Fall-ID, Benutzer-ID) und die auf acht Zeilen gekürzte
+   Stapelspur.
+3. Steht dort nichts, war der Fehler älter als 30 Tage oder die Datenbank war
+   selbst der Grund — dann steht er nur im Containerprotokoll von Coolify.
+   Dort ist jede Zeile ein JSON-Objekt und lässt sich nach `"stufe":"fehler"`
+   oder `"stelle":"wbw.lauf"` filtern.
+
+Das Fehlerprotokoll verlangt das Recht `protokoll.lesen`; die Administration
+bringt es mit. **Personenbezogene Daten stehen nicht darin** — Kennzeichen,
+Fahrgestellnummern, E-Mail-Adressen, IBANs und die Parameter einer
+gescheiterten Datenbankabfrage werden vor dem Schreiben ersetzt.
+
+## Rollen und Rechte vergeben
+
+**Verwaltung** (`/verwaltung`) — sichtbar für Zugänge mit dem Recht
+`benutzer.verwalten`, das die Rolle *Administration* mitbringt.
+
+- Die **Rolle** ist die Voreinstellung. Neue Zugänge beginnen immer als
+  *Ersteller*, egal ob sie über Microsoft entstehen (`ENTRA_AUTO_ANLEGEN=true`)
+  oder über `pnpm benutzer:anlegen`.
+- Der Knopf mit der Rechtezahl klappt die acht Einzelrechte auf. Jedes hat
+  drei Zustände: *aus der Rolle*, *ausdrücklich gegeben*, *ausdrücklich
+  entzogen*. Die ausdrückliche Entscheidung schlägt die Rolle in beide
+  Richtungen. Wer sie auf *aus der Rolle* zurückstellt, bekommt wieder, was
+  die Rolle mitbringt — auch wenn sich die Rolle später ändert.
+- **Sperren** statt löschen: der Zugang bleibt mit seiner Historie stehen,
+  die Anmeldung wird abgewiesen.
+- Der **letzte Administrator kann sich weder herabstufen noch sperren**.
+  Gibt es keinen zweiten, muss erst einer angelegt werden.
+
+Wer ein Recht setzt, steht in der Datenbank (`benutzer_recht.gesetzt_von`),
+und jede abgewiesene Aktion steht als Warnung im Fehlerprotokoll.

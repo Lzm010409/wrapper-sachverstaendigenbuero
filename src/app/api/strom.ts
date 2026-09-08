@@ -1,4 +1,5 @@
 import 'server-only'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Macht aus einem Ereignisstrom eine Antwort.
@@ -18,7 +19,7 @@ export function alsStrom(ereignisse: AsyncIterable<unknown>): Response {
           steuerung.enqueue(geber.encode(JSON.stringify(ereignis) + '\n'))
         }
       } catch (fehler) {
-        console.error('Ereignisstrom abgebrochen:', fehler)
+        protokolliereFehler('strom', 'Der Ereignisstrom ist abgebrochen.', fehler)
         steuerung.enqueue(
           geber.encode(
             JSON.stringify({

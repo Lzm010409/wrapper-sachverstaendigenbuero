@@ -101,17 +101,19 @@ export async function verlangeBenutzer(): Promise<AngemeldeterBenutzer> {
   return b
 }
 
-/**
- * Verlangt eine Rolle, die freigeben darf. Der Statuswechsel eines
- * Bibliothekseintrags auf `freigegeben` hängt daran (Konzept E5).
- */
-export async function verlangeFreigeber(): Promise<AngemeldeterBenutzer> {
-  const b = await verlangeBenutzer()
-  if (b.rolle !== 'freigeber' && b.rolle !== 'admin') {
-    throw new Error('Für die Freigabe fehlt die Berechtigung.')
-  }
-  return b
-}
+/*
+  Hier stand `verlangeFreigeber()` — die einzige Rechteprüfung, die es im
+  ganzen Code gab. Sie fragte die Rolle direkt ab und liess `freigeber` und
+  `admin` durch.
+
+  Ersetzt durch `verlangeRecht('bibliothek.freigeben')` aus
+  `src/rechte/zugriff.ts`. Der Unterschied ist nicht die Strenge, sondern die
+  Beweglichkeit: die Freigabe hängt jetzt an einem **Recht**, das eine Rolle
+  mitbringt — und das man einem einzelnen Ersteller zusätzlich geben kann,
+  ohne ihn zum Freigeber zu machen. Konzept E5 bleibt: kein KI-Aufruf
+  erreicht diesen Weg, der Statuswechsel geht ausschliesslich über die
+  Oberfläche.
+*/
 
 export async function beendeSitzung(): Promise<void> {
   const speicher = await cookies()

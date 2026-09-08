@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { bild } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
+import { verlangeRecht } from '@/rechte/zugriff'
 import { sucheBilder, wirdVerwendet, type Bibliotheksbild } from './bibliothek'
 import { leseThemen } from './themen'
 
@@ -116,7 +117,8 @@ export async function ausBibliothekNehmen(bildId: string): Promise<BildErgebnis>
  * dann steht dort nur noch der Marker.
  */
 export async function loescheBild(bildId: string): Promise<BildErgebnis> {
-  await verlangeBenutzer()
+  // Ohne Papierkorb — deshalb ein eigenes Recht.
+  await verlangeRecht('bild.loeschen')
 
   const anzahl = await wirdVerwendet(bildId)
   if (anzahl > 0) {

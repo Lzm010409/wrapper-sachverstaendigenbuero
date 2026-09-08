@@ -1,6 +1,7 @@
 import { benutzerOderAntwort } from '@/app/api/wache'
 import { speichereBild } from '@/bilder/ablage'
 import { Bildfehler } from '@/bilder/lesen'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Nimmt ein Bild direkt in die Bildbibliothek auf.
@@ -44,7 +45,9 @@ export async function POST(anfrage: Request): Promise<Response> {
     if (fehler instanceof Bildfehler) {
       return Response.json({ fehler: fehler.message, angelegt }, { status: 415 })
     }
-    console.error('Bild konnte nicht gespeichert werden:', fehler)
+    protokolliereFehler('bilder.hochladen', 'Ein Bild liess sich nicht ablegen.', fehler, {
+      benutzerId: benutzer.id,
+    })
     return Response.json({ fehler: 'Das Bild liess sich nicht speichern.' }, { status: 500 })
   }
 

@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { beleg, eintrag, eintragVorbedingung } from '@/db/schema'
-import { verlangeBenutzer, verlangeFreigeber } from '@/auth/sitzung'
+import { verlangeBenutzer } from '@/auth/sitzung'
+import { verlangeRecht } from '@/rechte/zugriff'
 
 export interface AktionsErgebnis {
   fehler?: string
@@ -19,7 +20,7 @@ export interface AktionsErgebnis {
  * Kein KI-Aufruf erreicht sie.
  */
 export async function gebeFrei(id: string): Promise<AktionsErgebnis> {
-  const benutzer = await verlangeFreigeber()
+  const benutzer = await verlangeRecht('bibliothek.freigeben')
 
   const zeilen = await db.select().from(eintrag).where(eq(eintrag.id, id)).limit(1)
   const treffer = zeilen[0]
@@ -96,7 +97,7 @@ export async function setzeStatus(
   const nimmtFreigabeZurueck = vorher.status === 'freigegeben'
 
   try {
-    if (nimmtFreigabeZurueck) await verlangeFreigeber()
+    if (nimmtFreigabeZurueck) await verlangeRecht('bibliothek.freigeben')
     else await verlangeBenutzer()
   } catch {
     return {

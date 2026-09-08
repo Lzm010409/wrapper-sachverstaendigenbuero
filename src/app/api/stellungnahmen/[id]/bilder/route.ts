@@ -1,6 +1,7 @@
 import { benutzerOderAntwort } from '@/app/api/wache'
 import { speichereBild } from '@/bilder/ablage'
 import { Bildfehler } from '@/bilder/lesen'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Nimmt ein Bild zu einer Stellungnahme entgegen.
@@ -44,7 +45,10 @@ export async function POST(
     if (fehler instanceof Bildfehler) {
       return Response.json({ fehler: fehler.message }, { status: 415 })
     }
-    console.error('Bild konnte nicht gespeichert werden:', fehler)
+    protokolliereFehler('stellungnahme.bild.hochladen', 'Ein Bild liess sich nicht ablegen.', fehler, {
+      stellungnahmeId: id,
+      benutzerId: benutzer.id,
+    })
     return Response.json({ fehler: 'Das Bild liess sich nicht speichern.' }, { status: 500 })
   }
 }

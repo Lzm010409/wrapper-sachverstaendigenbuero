@@ -7,6 +7,7 @@ import { fall } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { AutoixpertFehler, clientAusUmgebung } from './client'
 import { leseFalldaten } from './felder'
+import { protokolliereFehler, protokolliereWarnung } from '@/protokoll'
 
 export interface ImportZustand {
   fehler?: string
@@ -24,7 +25,7 @@ export async function importiereFall(
   _zustand: ImportZustand,
   formular: FormData,
 ): Promise<ImportZustand> {
-  await verlangeBenutzer()
+  const benutzer = await verlangeBenutzer()
 
   const eingabe = String(formular.get('eingabe') ?? '').trim()
   if (!eingabe) return { fehler: 'Bitte ein Aktenzeichen oder eine ID eingeben.' }
@@ -43,8 +44,13 @@ export async function importiereFall(
     aufloesung = await client.loeseAuf(eingabe)
   } catch (fehler) {
     if (fehler instanceof AutoixpertFehler) return { fehler: fehler.message }
-    console.error('Fallimport fehlgeschlagen:', fehler)
-    return { fehler: 'Der Fall konnte nicht geladen werden.' }
+    const kennung = protokolliereFehler(
+      'autoixpert.importiereFall',
+      'Der Fall liess sich nicht laden.',
+      fehler,
+      { benutzerId: benutzer.id, dienst: 'autoixpert', eingabe },
+    )
+    return { fehler: `Der Fall konnte nicht geladen werden. Kennung ${kennung}` }
   }
 
   const daten = leseFalldaten(aufloesung.gutachten)
@@ -94,7 +100,7 @@ export async function importiereFall(
 
 /** Lädt einen bereits importierten Fall erneut aus autoiXpert. */
 export async function aktualisiereFall(fallId: string): Promise<ImportZustand> {
-  await verlangeBenutzer()
+  const benutzer = await verlangeBenutzer()
 
   const zeilen = await db.select().from(fall).where(eq(fall.id, fallId)).limit(1)
   const vorhanden = zeilen[0]
@@ -111,8 +117,26 @@ export async function aktualisiereFall(fallId: string): Promise<ImportZustand> {
       .set({ aktenzeichen: daten.aktenzeichen, daten: gutachten, abgerufenAm: new Date() })
       .where(eq(fall.id, fallId))
   } catch (fehler) {
-    if (fehler instanceof AutoixpertFehler) return { fehler: fehler.message }
-    throw fehler
+    // Ein Fehler der Schnittstelle trägt seine eigene, verständliche Meldung
+    // — der geht an den Benutzer, nicht in eine Ausnahme.
+    if (fehler instanceof AutoixpertFehler) {
+      protokolliereWarnung('autoixpert.aktualisiereFall', fehler.message, {
+        fallId,
+        benutzerId: benutzer.id,
+        dienst: 'autoixpert',
+        status: fehler.status,
+      })
+      return { fehler: fehler.message }
+    }
+    // Alles Übrige ist unerwartet. Vorher flog es ungeloggt bis zur
+    // Fehlerseite; jetzt steht es mit Kennung im Protokoll.
+    const kennung = protokolliereFehler(
+      'autoixpert.aktualisiereFall',
+      'Der Fall liess sich nicht neu laden.',
+      fehler,
+      { fallId, benutzerId: benutzer.id, dienst: 'autoixpert' },
+    )
+    return { fehler: `Der Fall konnte nicht neu geladen werden. Kennung ${kennung}` }
   }
 
   revalidatePath('/faelle')

@@ -7,6 +7,7 @@ import { StatusPille } from '../status-pille'
 import { Freigabeleiste } from './freigabeleiste'
 import { BelegPruefung } from './beleg-pruefung'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { darf } from '@/rechte/zugriff'
 
 const BEREICHSNAMEN: Record<string, string> = {
   kalkulation: 'Kalkulation',
@@ -49,7 +50,12 @@ export default async function EintragSeite({ params }: { params: Promise<{ id: s
   const [e, benutzer] = await Promise.all([ladeEintrag(id), aktuellerBenutzer()])
   if (!e) notFound()
 
-  const darfFreigeben = benutzer?.rolle === 'freigeber' || benutzer?.rolle === 'admin'
+  /*
+    Die Anzeige fragt dasselbe wie die Aktion — über `darf()` und nicht über
+    die Rolle. Sonst driften Knopf und Wirkung auseinander: ein Ersteller mit
+    dem zusätzlichen Recht sähe den Knopf gesperrt, obwohl er dürfte.
+  */
+  const darfFreigeben = await darf('bibliothek.freigeben')
   const werte = e.platzhalter.filter((p) => p.art === 'wert')
   const regie = e.platzhalter.filter((p) => p.art === 'regieanweisung')
   const unbestaetigt = e.belege.filter((b) => !b.verifiziertAm)

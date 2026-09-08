@@ -130,7 +130,7 @@ describe('Anmeldepflicht der Serveraktionen', () => {
   }
 
   /** Die Aufrufe, die als Anmeldepruefung gelten. */
-  const WACHEN = ['verlangeBenutzer(', 'aktuellerBenutzer(', 'verlangeFreigeber(']
+  const WACHEN = ['verlangeBenutzer(', 'aktuellerBenutzer(', 'verlangeRecht(']
 
   it('findet ueberhaupt Aktionsdateien', () => {
     expect(aktionsdateien.length).toBeGreaterThan(4)

@@ -1,4 +1,5 @@
 import { dealFelder, monetaerWert, phasenNamen, pipedrive } from '@/pipedrive/client'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Die Datenschicht des Reiters „Vorgang" — der Blick nach Pipedrive.
@@ -44,9 +45,16 @@ export async function ladeVorgang(aktenzeichen: string | null): Promise<VorgangA
   try {
     deal = await pipedrive.findeDeal(aktenzeichen)
   } catch (fehler) {
+    // Vorher ging dieser Fehler ausschliesslich an die Oberfläche und stand
+    // nirgends im Protokoll: ein dauerhaft kaputtes Pipedrive sah aus wie
+    // ein Anzeigeproblem und wurde nie untersucht.
+    const kennung = protokolliereFehler('pipedrive.findeDeal', 'Pipedrive war nicht erreichbar.', fehler, {
+      dienst: 'pipedrive',
+      aktenzeichen,
+    })
     return {
       stand: 'fehler',
-      meldung: fehler instanceof Error ? fehler.message : String(fehler),
+      meldung: `${fehler instanceof Error ? fehler.message : String(fehler)} (Kennung ${kennung})`,
     }
   }
 

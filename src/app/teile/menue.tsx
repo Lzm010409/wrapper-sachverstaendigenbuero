@@ -41,12 +41,26 @@ const PUNKTE = [
   },
 ]
 
-export function Menuepunkte() {
+/**
+ * Die Verwaltung steht unten und nur für die, die sie bedienen dürfen.
+ *
+ * Sie auszublenden ist Höflichkeit, keine Sperre — die Seite prüft das Recht
+ * selbst, und wer den Pfad kennt, kommt daran nicht vorbei.
+ */
+const VERWALTUNG = {
+  pfad: '/verwaltung',
+  name: 'Verwaltung',
+  pfadDaten:
+    'M10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM10 2.5l1 2.2 2.4-.4.6 2.3 2.2 1-1.2 2.1 1.2 2.1-2.2 1-.6 2.3-2.4-.4-1 2.2-1-2.2-2.4.4-.6-2.3-2.2-1L4 12.7l-1.2-2.1 2.2-1 .6-2.3 2.4.4 1-2.2z',
+}
+
+export function Menuepunkte({ darfVerwalten = false }: { darfVerwalten?: boolean }) {
   const pfad = usePathname()
+  const punkte = darfVerwalten ? [...PUNKTE, VERWALTUNG] : PUNKTE
 
   return (
     <div className="menue-nav">
-      {PUNKTE.map((p) => (
+      {punkte.map((p) => (
         <Link
           key={p.pfad}
           href={p.pfad}

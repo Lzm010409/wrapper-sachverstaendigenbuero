@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { pruefeZugang } from '@/kleinanzeigen/zugang'
 import { holeInserat } from '@/kleinanzeigen/dienst'
+import { protokolliereFehler } from '@/protokoll'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -39,7 +40,10 @@ export async function GET(
     }
     return NextResponse.json(ergebnis)
   } catch (fehler) {
-    console.error(`Kleinanzeigen-Abruf ${adid} fehlgeschlagen:`, fehler)
+    protokolliereFehler('kleinanzeigen.inserat', 'Der Abruf einer Anzeige ist gescheitert.', fehler, {
+      dienst: 'kleinanzeigen',
+      adid,
+    })
     return NextResponse.json(
       { success: false, error: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler.' },
       { status: 502 },

@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { fall } from '@/db/schema'
-import { verlangeBenutzer } from '@/auth/sitzung'
+import { verlangeRecht } from '@/rechte/zugriff'
 import { clientAusUmgebung } from '@/autoixpert/client'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import type { Aktionsergebnis } from '@/melden/typen'
@@ -29,7 +29,9 @@ export async function beschrifteFoto(
     inStellungnahme?: boolean
   },
 ): Promise<Aktionsergebnis> {
-  await verlangeBenutzer()
+  // Wirkt im führenden System, nicht nur hier. Die globale Sperre
+  // AUTOIXPERT_SCHREIBEN gilt zusätzlich — das Recht allein genügt nicht.
+  await verlangeRecht('autoixpert.schreiben')
 
   const client = clientAusUmgebung()
   if (!client) return { fehler: 'autoiXpert ist auf diesem Server nicht eingerichtet.' }

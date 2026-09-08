@@ -1,6 +1,7 @@
 'use server'
 
 import { verlangeBenutzer } from '@/auth/sitzung'
+import { verlangeRecht } from '@/rechte/zugriff'
 import { holeLauf, starteLauf, type LaufEingaben, type Laufstand } from './auftrag'
 
 /**
@@ -22,6 +23,18 @@ export async function starteRecherche(
   eingaben: LaufEingaben,
 ): Promise<Startantwort> {
   const benutzer = await verlangeBenutzer()
+
+  // Das Recht wird nur verlangt, wenn der Lauf wirklich Geld ausgeben soll.
+  // Ein Lauf über die kostenlosen Portale ist tägliche Arbeit und braucht
+  // keine Sondererlaubnis.
+  if (eingaben.kostenpflichtigErlaubt) {
+    try {
+      await verlangeRecht('wbw.kostenpflichtig')
+    } catch (fehler) {
+      return { fehler: fehler instanceof Error ? fehler.message : 'Keine Berechtigung.' }
+    }
+  }
+
   const ergebnis = await starteLauf(fallId, eingaben, benutzer.id)
   return 'id' in ergebnis ? { id: ergebnis.id } : { fehler: ergebnis.fehler }
 }

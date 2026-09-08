@@ -44,6 +44,9 @@ export const wbwZustandEnum = pgEnum('wbw_zustand', ['laeuft', 'fertig', 'fehler
 /** Die Art einer Meldung — sie entscheidet über Farbe, Vorlesen und Verweildauer. */
 export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfolg', 'info'])
 
+/** Die Stufe eines Protokolleintrags. */
+export const protokollstufeEnum = pgEnum('protokollstufe', ['fehler', 'warnung', 'info'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -135,6 +138,41 @@ export const benutzer = pgTable(
   (t) => [
     uniqueIndex('benutzer_email_idx').on(sql`lower(${t.email})`),
     uniqueIndex('benutzer_entra_idx').on(t.entraOid),
+  ],
+)
+
+/**
+ * Ein Recht, das einem Benutzer zusätzlich gegeben oder ausdrücklich
+ * entzogen wurde.
+ *
+ * **Warum eine Zeile je Abweichung und keine Liste am Benutzer.** Weil hier
+ * beides steht: `gewaehrt: true` gibt ein Recht, das die Rolle nicht
+ * mitbringt, `gewaehrt: false` nimmt eines weg, das sie mitbringt. Eine
+ * blosse Liste könnte nur das Erste. Und beides kommt vor: der Ersteller,
+ * der ausnahmsweise freigeben darf, und der Freigeber, dem man das Löschen
+ * abgenommen hat, nachdem er sich einmal vergriffen hat.
+ *
+ * **Warum die Abweichung und nicht der volle Satz gespeichert wird.** Ändert
+ * sich später, was eine Rolle mitbringt, gilt das sofort für alle — ohne
+ * dass jemand fünfzehn Konten nachpflegen muss. Was von Hand entschieden
+ * wurde, bleibt trotzdem stehen.
+ */
+export const benutzerRecht = pgTable(
+  'benutzer_recht',
+  {
+    benutzerId: uuid()
+      .notNull()
+      .references(() => benutzer.id, { onDelete: 'cascade' }),
+    /** Der Schlüssel aus `src/rechte/katalog.ts`, z. B. `bibliothek.freigeben`. */
+    recht: text().notNull(),
+    /** `true` gibt zusätzlich, `false` nimmt weg. */
+    gewaehrt: boolean().notNull(),
+    gesetztVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    gesetztAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('benutzer_recht_eindeutig').on(t.benutzerId, t.recht),
+    index('benutzer_recht_benutzer_idx').on(t.benutzerId),
   ],
 )
 
@@ -428,6 +466,50 @@ export const meldung = pgTable(
   (t) => [index('meldung_benutzer_idx').on(t.benutzerId, t.erstelltAm)],
 )
 
+/**
+ * Die Fehlerliste.
+ *
+ * **Warum es sie neben dem Containerprotokoll gibt.** Das Containerprotokoll
+ * überlebt keinen Neustart, ist nur über Coolify zu erreichen und lässt sich
+ * nicht durchsuchen. Wer einen Fehler untersuchen will, braucht beides: die
+ * volle Zeile im Strom (für den Betrieb) und einen Ort, an dem sie noch
+ * morgen steht (für die Nacharbeit).
+ *
+ * **Die Kennung ist der Schlüssel dazu.** Sie steht in der Fehlermeldung, die
+ * der Benutzer sieht, in der Zeile im Strom und hier. Damit wird aus „bei mir
+ * kam ein Fehler" eine Suche mit einem Treffer.
+ *
+ * **Was hier nicht steht:** personenbezogene Daten. Alles ist durch dieselbe
+ * Schwärzung gegangen wie das Containerprotokoll — Kennzeichen,
+ * Fahrgestellnummern, E-Mail-Adressen und Token sind schon vorher heraus.
+ */
+export const ereignis = pgTable(
+  'ereignis',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** Die kurze Kennung, die der Benutzer sieht: `K7M2-QP4X`. */
+    kennung: text(),
+    stufe: protokollstufeEnum().notNull(),
+    /** Wo es passiert ist, in Punktschreibweise: `wbw.lauf.autoscout24`. */
+    stelle: text().notNull(),
+    meldung: text().notNull(),
+    fehlerName: text(),
+    fehlerMeldung: text(),
+    spur: text(),
+    /** Der übrige Zusammenhang, geschwärzt. */
+    zusammenhang: jsonb(),
+    /** Herausgezogen, weil danach gesucht wird. */
+    benutzerId: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    fallId: uuid().references(() => fall.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('ereignis_zeit_idx').on(t.erstelltAm),
+    index('ereignis_kennung_idx').on(t.kennung),
+    index('ereignis_stelle_idx').on(t.stelle),
+  ],
+)
+
 export const stellungnahme = pgTable(
   'stellungnahme',
   {
@@ -694,3 +776,5 @@ export type Beleg = typeof beleg.$inferSelect
 export type Benutzer = typeof benutzer.$inferSelect
 export type WbwLauf = typeof wbwLauf.$inferSelect
 export type Gemeldetes = typeof meldung.$inferSelect
+export type Ereignis = typeof ereignis.$inferSelect
+export type BenutzerRecht = typeof benutzerRecht.$inferSelect

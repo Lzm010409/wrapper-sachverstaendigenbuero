@@ -5,6 +5,7 @@ import { benutzerOderAntwort } from '@/app/api/wache'
 import { clientAusUmgebung } from '@/autoixpert/client'
 import { gutachtenSchema, type Fotoformat } from '@/autoixpert/typen'
 import { ausSpeicher, inSpeicher } from '@/fotos/speicher'
+import { protokolliereFehler } from '@/protokoll'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,7 +92,13 @@ export async function GET(
     const typ = datei.typ.startsWith('image/') ? datei.typ : 'image/jpeg'
     return new Response(koerper, { headers: kopfzeilen(typ, datei.laenge, false) })
   } catch (fehler) {
-    console.error(`Foto ${fotoId} liess sich nicht laden:`, fehler)
+    protokolliereFehler('fotos.laden', 'Das Foto liess sich nicht laden.', fehler, {
+      fallId: id,
+      benutzerId: benutzer.id,
+      dienst: 'autoixpert',
+      fotoId,
+      format,
+    })
     return new Response('Das Foto liess sich nicht laden.', { status: 502 })
   }
 }

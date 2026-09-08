@@ -6,6 +6,7 @@ import { benutzer } from '@/db/schema'
 import { leseEntraKonfiguration, tauscheCodeGegenKonto } from '@/auth/entra'
 import { raeumeAbgelaufeneSitzungen, starteSitzung } from '@/auth/sitzung'
 import { STARTSEITE } from '@/auth/startseite'
+import { protokolliereFehler } from '@/protokoll'
 
 function zurueck(grund: string): NextResponse {
   const basis = process.env.APP_BASIS_URL ?? 'http://localhost:3000'
@@ -41,7 +42,9 @@ export async function GET(anfrage: NextRequest) {
   try {
     konto = await tauscheCodeGegenKonto(konfig, { code, verifier, nonce })
   } catch (fehler) {
-    console.error('Entra-Anmeldung fehlgeschlagen:', fehler)
+    protokolliereFehler('auth.entra.callback', 'Die Anmeldung über Microsoft ist gescheitert.', fehler, {
+      dienst: 'entra',
+    })
     return zurueck('entra-pruefung-fehlgeschlagen')
   }
 

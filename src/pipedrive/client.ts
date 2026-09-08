@@ -66,6 +66,17 @@ function basisUrl(): string {
   return process.env.PIPEDRIVE_BASE_URL ?? 'https://api.pipedrive.com/api/v2'
 }
 
+/**
+ * Wie lange auf Pipedrive gewartet wird.
+ *
+ * Vorher gab es kein Zeitlimit. Ein hängendes Pipedrive hielt damit die
+ * ganze Fallseite an — der Reiter „Vorgang" wartet auf diesen Aufruf, und
+ * ohne Grenze wartet er, bis der Browser aufgibt. Zehn Sekunden sind
+ * grosszügig für eine Suche und kurz genug, dass die Seite noch etwas
+ * anzeigen kann.
+ */
+const ZEITLIMIT_MS = 10_000
+
 async function anfrage<T>(pfad: string, suche: Record<string, string | number> = {}) {
   const url = new URL(basisUrl() + pfad)
   for (const [schluessel, wert] of Object.entries(suche)) {
@@ -73,7 +84,21 @@ async function anfrage<T>(pfad: string, suche: Record<string, string | number> =
   }
   url.searchParams.set('api_token', token())
 
-  const antwort = await fetch(url, { cache: 'no-store' })
+  let antwort: Response
+  try {
+    antwort = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(ZEITLIMIT_MS) })
+  } catch (fehler) {
+    // `AbortSignal.timeout` wirft einen `TimeoutError`. Ihn als solchen zu
+    // benennen erspart die Frage, ob Pipedrive langsam oder unerreichbar war.
+    const abgelaufen = fehler instanceof Error && fehler.name === 'TimeoutError'
+    throw new Error(
+      abgelaufen
+        ? `Pipedrive hat auf ${pfad} nicht innerhalb von ${ZEITLIMIT_MS / 1000} Sekunden geantwortet.`
+        : `Pipedrive ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
+      { cause: fehler },
+    )
+  }
+
   if (!antwort.ok) {
     throw new Error(`Pipedrive antwortete mit ${antwort.status} auf ${pfad}.`)
   }

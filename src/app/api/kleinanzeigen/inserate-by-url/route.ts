@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { pruefeZugang } from '@/kleinanzeigen/zugang'
 import { istKleinanzeigenUrl, sucheUeberUrl } from '@/kleinanzeigen/dienst'
+import { protokolliereFehler } from '@/protokoll'
 
 export const dynamic = 'force-dynamic'
 /** Mehrere Seiten mit Abstand dazwischen brauchen Zeit. */
@@ -45,7 +46,11 @@ export async function POST(anfrage: Request) {
   try {
     return NextResponse.json(await sucheUeberUrl(url, seiten))
   } catch (fehler) {
-    console.error('Kleinanzeigen-Suche fehlgeschlagen:', fehler)
+    protokolliereFehler('kleinanzeigen.suche', 'Die Suche ist gescheitert.', fehler, {
+      dienst: 'kleinanzeigen',
+      suchUrl: url,
+      seiten,
+    })
     return NextResponse.json(
       {
         success: false,

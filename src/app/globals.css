@@ -3218,3 +3218,15 @@ body {
   .foto-buehne { padding: 10px; }
   .foto-buehne-bild img { max-height: 58vh; }
 }
+
+/* Benutzerverwaltung: eine Zeile je Recht */
+.recht-zeile {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.recht-zeile:last-child { border-bottom: 0; }

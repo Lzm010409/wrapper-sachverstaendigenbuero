@@ -10,6 +10,7 @@ import { gutachtenSchema } from '@/autoixpert/typen'
 import { leseFalldaten, schlageEmpfaengerVor } from '@/autoixpert/felder'
 import { kiVerfuegbar } from '@/ki/client'
 import { STANDARD_ANREDE } from '@/export/hausstil'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Die Auswertung eines Prüfberichts, Schritt für Schritt.
@@ -181,7 +182,9 @@ export async function* werteBerichtAus(auftrag: {
   try {
     extraktion = (await extrahierePositionen(bericht)).extraktion
   } catch (fehler) {
-    console.error('Auswertung des Prüfberichts fehlgeschlagen:', fehler)
+    protokolliereFehler('stellungnahme.auswertung', 'Die Auswertung ist gescheitert.', fehler, {
+      dienst: 'anthropic',
+    })
     yield {
       art: 'fehler',
       fehler:
@@ -397,7 +400,9 @@ export async function verarbeiteImHintergrund(stellungnahmeId: string): Promise<
       }
     }
   } catch (fehler) {
-    console.error('Auswertung im Hintergrund gescheitert:', fehler)
+    protokolliereFehler('stellungnahme.auswertung.hintergrund', 'Die Auswertung im Hintergrund ist gescheitert.', fehler, {
+      dienst: 'anthropic',
+    })
     await schreibeStand(stellungnahmeId, {
       auswertungsstand: 'fehler',
       auswertungsfehler:

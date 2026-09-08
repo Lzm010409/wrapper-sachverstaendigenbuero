@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
 import { meldung } from '@/db/schema'
 import type { Meldungsart } from './typen'
+import { protokolliereFehler } from '@/protokoll'
 
 /**
  * Meldungen, die den Blick überdauern.
@@ -49,7 +50,10 @@ export async function notiere(eintrag: {
       quelle: eintrag.quelle ?? null,
     })
   } catch (fehler) {
-    console.error('Meldung liess sich nicht festhalten:', fehler)
+    protokolliereFehler('melden.notiere', 'Eine Benachrichtigung ging verloren.', fehler, {
+      benutzerId: eintrag.benutzerId,
+      quelle: eintrag.quelle,
+    })
   }
 }
 

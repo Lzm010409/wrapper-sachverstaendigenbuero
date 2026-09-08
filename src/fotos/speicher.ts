@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { protokolliereWarnung } from '@/protokoll'
 
 /**
  * Der Zwischenspeicher für Vorschaubilder.
@@ -113,7 +114,12 @@ export async function inSpeicher(
       const { rename } = await import('node:fs/promises')
       await rename(vorlaeufig, pfad)
     } catch (fehler) {
-      console.error('Vorschaubild liess sich nicht ablegen:', fehler)
+      protokolliereWarnung('fotos.speicher', 'Ein Vorschaubild liess sich nicht ablegen.', {
+        reportId,
+        fotoId,
+        format,
+        grund: fehler instanceof Error ? fehler.message : String(fehler),
+      })
       void fuerPlatte.cancel().catch(() => {})
     }
   })()

@@ -64,6 +64,20 @@
       "when": 1788845959441,
       "tag": "0008_rich_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788849651839,
+      "tag": "0009_known_sinister_six",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788849791595,
+      "tag": "0010_silly_tattoo",
+      "breakpoints": true
     }
   ]
 }
