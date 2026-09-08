@@ -39,7 +39,13 @@ const urteilSchema = z.object({
   id: z.string(),
   erkannteAusstattung: z.array(z.string()).default([]),
   fehlendeAusstattung: z.array(z.string()).default([]),
-  vergleichbarkeit: z.number().min(0).max(100),
+  /*
+    Geklemmt, nicht abgelehnt. `strict` kann `minimum`/`maximum` nicht
+    erzwingen (siehe PRUEF_WERKZEUG), die Grenze steht also nur im Auftragstext.
+    Ein einzelner Ausreisser würde sonst über `safeParse` das ganze Paket
+    kippen — 25 Inserate ungeprüft wegen einer 105.
+  */
+  vergleichbarkeit: z.number().transform((wert) => Math.min(100, Math.max(0, wert))),
   begruendung: z.string(),
   auffaelligkeiten: z
     .array(z.enum(Object.keys(AUFFAELLIGKEITEN) as [Auffaelligkeit, ...Auffaelligkeit[]]))
@@ -49,7 +55,22 @@ const urteilSchema = z.object({
 
 const antwortSchema = z.object({ urteile: z.array(urteilSchema) })
 
-const WERKZEUG = {
+/**
+ * Die Werkzeugdefinition der Prüfung.
+ *
+ * **`strict: true` kennt nur einen Teil von JSON Schema.** Zahlengrenzen
+ * (`minimum`, `maximum`, `multipleOf`), Textlängen (`minLength`,
+ * `maxLength`), Muster und Mengenangaben für Listen weist die Schnittstelle
+ * mit einem 400 ab — der Aufruf kommt gar nicht erst beim Modell an. Am
+ * 08.09.2026 stand hier `minimum: 0, maximum: 100`, und jedes einzelne Paket
+ * scheiterte mit „For 'integer' type, properties maximum, minimum are not
+ * supported"; die ganze Prüfung lief ins Leere, ohne dass die Suche stehen
+ * blieb. Grenzen gehören deshalb in den Beschreibungstext, und die
+ * Nachprüfung macht das Zod-Schema oben.
+ *
+ * Exportiert, damit ein Test das nachhalten kann, ohne das Modell zu rufen.
+ */
+export const PRUEF_WERKZEUG = {
   name: 'urteile_abgeben',
   description:
     'Gibt für jedes übergebene Inserat genau ein Urteil zurück — in derselben Reihenfolge ' +
@@ -79,11 +100,9 @@ const WERKZEUG = {
             },
             vergleichbarkeit: {
               type: 'integer',
-              minimum: 0,
-              maximum: 100,
               description:
-                'Fachliche Nähe zum Subjektfahrzeug. 100 = praktisch gleiches Fahrzeug, ' +
-                '0 = als Vergleich unbrauchbar.',
+                'Ganze Zahl von 0 bis 100 — fachliche Nähe zum Subjektfahrzeug. ' +
+                '100 = praktisch gleiches Fahrzeug, 0 = als Vergleich unbrauchbar.',
             },
             begruendung: {
               type: 'string',
@@ -197,7 +216,7 @@ export async function pruefePaket(
       modell: MODELLE.schnell,
       system: SYSTEM,
       inhalt: [{ type: 'text', text: auftragstext }],
-      werkzeug: WERKZEUG,
+      werkzeug: PRUEF_WERKZEUG,
       // 25 Urteile mit Begründung brauchen Platz; zu knapp bemessen bricht
       // die Antwort mitten im letzten Urteil ab und das ganze Paket ist hin.
       maxTokens: 8000,

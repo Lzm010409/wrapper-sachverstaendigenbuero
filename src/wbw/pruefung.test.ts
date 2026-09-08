@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   brauchbare,
   inPakete,
+  PRUEF_WERKZEUG,
   pruefePaket,
   ungeprueft,
   vorbelegt,
@@ -135,6 +136,20 @@ describe('Ein Paket prüfen', () => {
     expect(ergebnis[0]?.begruendung.length).toBe(300)
   })
 
+  it('rettet einen Wert ausserhalb von 0 bis 100, statt das Paket zu verlieren', async () => {
+    // Die Schnittstelle kann die Grenze bei `strict` nicht erzwingen. Ein
+    // einzelner Ausreisser darf nicht 25 Inserate ungeprüft lassen.
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { vergleichbarkeit: 140 }), urteil('b', { vergleichbarkeit: -5 })],
+    })
+
+    const ergebnis = await pruefePaket(AUFTRAG, [inserat('a'), inserat('b')])
+
+    expect(ergebnis[0]?.vergleichbarkeit).toBe(100)
+    expect(ergebnis[1]?.vergleichbarkeit).toBe(0)
+    expect(ergebnis.every((u) => u.ungeprueft)).toBe(false)
+  })
+
   it('ruft für eine leere Liste gar nicht erst auf', async () => {
     expect(await pruefePaket(AUFTRAG, [])).toEqual([])
     expect(ruf).not.toHaveBeenCalled()
@@ -147,6 +162,66 @@ describe('Ein Paket prüfen', () => {
     const inhalt = ruf.mock.calls[0]?.[0].inhalt[0]
     expect(inhalt?.text?.length).toBeLessThan(4000)
     expect(inhalt?.text).toContain('…')
+  })
+})
+
+describe('Die Werkzeugdefinition', () => {
+  /*
+    Am 08.09.2026 scheiterte jedes Prüfpaket mit
+    „tools.0.custom: For 'integer' type, properties maximum, minimum are not
+    supported". Grund: `strict: true` lässt nur einen Teil von JSON Schema zu —
+    Zahlengrenzen (`minimum`, `maximum`, `multipleOf`), Textlängen
+    (`minLength`, `maxLength`) und Feldmuster gehören nicht dazu. Die Grenzen
+    stehen deshalb im Beschreibungstext und werden hier geprüft, nicht dort.
+  */
+  const VERBOTEN = [
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'multipleOf',
+    'minLength',
+    'maxLength',
+    'pattern',
+    'minItems',
+    'maxItems',
+    'uniqueItems',
+  ]
+
+  function schluessel(wert: unknown, pfad = 'input_schema'): string[] {
+    if (Array.isArray(wert)) return wert.flatMap((e, i) => schluessel(e, `${pfad}[${i}]`))
+    if (wert === null || typeof wert !== 'object') return []
+    return Object.entries(wert).flatMap(([name, inhalt]) => [
+      ...(VERBOTEN.includes(name) ? [`${pfad}.${name}`] : []),
+      ...schluessel(inhalt, `${pfad}.${name}`),
+    ])
+  }
+
+  it('nutzt keine Schlüsselwörter, die `strict` ablehnt', () => {
+    expect(PRUEF_WERKZEUG.strict).toBe(true)
+    expect(schluessel(PRUEF_WERKZEUG.input_schema)).toEqual([])
+  })
+
+  function offeneObjekte(wert: unknown, pfad = 'input_schema'): string[] {
+    if (Array.isArray(wert)) return wert.flatMap((e, i) => offeneObjekte(e, `${pfad}[${i}]`))
+    if (wert === null || typeof wert !== 'object') return []
+    const knoten = wert as Record<string, unknown>
+    const tiefer = Object.entries(knoten).flatMap(([name, inhalt]) =>
+      offeneObjekte(inhalt, `${pfad}.${name}`),
+    )
+    if (knoten.type !== 'object') return tiefer
+    const felder = Object.keys((knoten.properties ?? {}) as Record<string, unknown>)
+    const verlangt = (knoten.required ?? []) as string[]
+    const fehlt = [
+      ...(knoten.additionalProperties === false ? [] : [`${pfad}: additionalProperties`]),
+      ...felder.filter((f) => !verlangt.includes(f)).map((f) => `${pfad}: required.${f}`),
+    ]
+    return [...fehlt, ...tiefer]
+  }
+
+  it('schliesst jedes Objekt und verlangt jedes Feld', () => {
+    // Beides fordert `strict`; fehlt eines, lehnt die Schnittstelle ebenso ab.
+    expect(offeneObjekte(PRUEF_WERKZEUG.input_schema)).toEqual([])
   })
 })
 
