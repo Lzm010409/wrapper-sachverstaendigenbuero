@@ -120,26 +120,13 @@ export async function aktualisiereFall(fallId: string): Promise<ImportZustand> {
   return { hinweis: 'Falldaten aktualisiert.' }
 }
 
-export async function ladeFaelle() {
-  return db
-    .select({
-      id: fall.id,
-      aktenzeichen: fall.aktenzeichen,
-      autoixpertId: fall.autoixpertId,
-      daten: fall.daten,
-      abgerufenAm: fall.abgerufenAm,
-    })
-    .from(fall)
-    .orderBy(desc(fall.abgerufenAm))
-    .limit(100)
-}
+/*
+  Hier standen `ladeFaelle`, `ladeFall` und `zaehleFaelle`.
 
-export async function ladeFall(id: string) {
-  const zeilen = await db.select().from(fall).where(eq(fall.id, id)).limit(1)
-  return zeilen[0] ?? null
-}
-
-export async function zaehleFaelle(): Promise<number> {
-  const zeilen = await db.select({ anzahl: sql<number>`count(*)`.mapWith(Number) }).from(fall)
-  return zeilen[0]?.anzahl ?? 0
-}
+  Jede exportierte Funktion einer `'use server'`-Datei ist ein aufrufbarer
+  Endpunkt — diese drei waren es ohne jede Anmeldeprüfung und gaben die
+  letzten 100 Fälle samt Anspruchsteller und Kennzeichen heraus. Sie sind
+  nach `abfragen.ts` gezogen und damit gar kein Endpunkt mehr; aufgerufen
+  werden sie nur von Serverkomponenten, die die Anmeldung als erste
+  Anweisung verlangen.
+*/

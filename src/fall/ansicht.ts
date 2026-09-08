@@ -1,4 +1,4 @@
-import { ladeFall } from '@/autoixpert/aktionen'
+import { ladeFall } from '@/autoixpert/abfragen'
 import { leseFalldaten, platzhalterWerte, schlageEmpfaengerVor } from '@/autoixpert/felder'
 import { gutachtenSchema, type Gutachten } from '@/autoixpert/typen'
 import { ladeStellungnahmenZumFall } from '@/stellungnahme/abfragen'

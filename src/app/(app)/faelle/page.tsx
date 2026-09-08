@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ladeFaelle } from '@/autoixpert/aktionen'
+import { ladeFaelle } from '@/autoixpert/abfragen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import { ImportFormular } from './import-formular'

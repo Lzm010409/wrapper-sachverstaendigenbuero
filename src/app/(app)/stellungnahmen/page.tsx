@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ladeStellungnahmen } from '@/stellungnahme/abfragen'
-import { ladeFaelle } from '@/autoixpert/aktionen'
+import { ladeFaelle } from '@/autoixpert/abfragen'
 import { kiVerfuegbar } from '@/ki/client'
 import { werkzeugeVorhanden } from '@/pruefbericht/einlesen'
 import { gutachtenSchema } from '@/autoixpert/typen'
