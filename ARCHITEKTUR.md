@@ -427,6 +427,108 @@ selbst, und jede Ablehnung geht ins Protokoll. Die Verwaltung schützt sich
 zusätzlich gegen den Griff ins eigene Knie — der letzte Administrator kann
 sich weder herabstufen noch sperren.
 
+## Die WBW-Suche läuft in Stufen, die KI liest den Fliesstext
+
+Eine eng gefasste Suche hat zwei Ausgänge: sie trifft, oder der Lauf war
+umsonst. Am 07.09.2026 war es der zweite — `e_53_amg` brachte bei
+Kleinanzeigen null E-Klassen, weil das Portal keine Motorvarianten führt.
+
+**Drei Stufen, zwei Dinge getrennt geweitet.**
+
+| Zyklus | Modellname | Toleranzen und Radius |
+|---|---|---|
+| 1 · eng | genau (`E 53 AMG`) | wie eingestellt |
+| 2 · geweitet | Haupttyp (`E 53`) | × 1,5 |
+| 3 · weit | Baureihe (`E-Klasse`) | × 2 |
+
+Getrennt, weil ein gröberer Name andere Fahrzeuge hereinholt als eine
+weitere Kilometerspanne — im Report soll erkennbar bleiben, was von beidem
+gewirkt hat. Aufgehört wird, sobald genug **brauchbare** Fahrzeuge beisammen
+sind (Vorgabe acht), nicht nach fester Stufenzahl.
+
+**Der gröbere Name wird nie erfunden.** `stufenFuer` wählt ihn aus der
+Modellliste, die das Portal selbst führt. Kennt AutoScout24 kein `E 53`,
+läuft Stufe 2 noch einmal mit `E 53 AMG` — zweimal dieselbe Suche ist besser
+als eine Suche auf einen Namen, den das Portal stillschweigend fallenlässt
+und dafür die ganze Marke liefert. Die Baureihe unterscheidet sich von der
+Variante durch die **fehlende Typnummer**, nicht durch die Zeichenlänge:
+`GLC 300` ist kürzer als `GLC-Klasse` und trotzdem die engere Suche.
+
+**Die Ausstattung fällt aus der Suchanfrage.** Die Portale führen sie
+unvollständig — bei Kleinanzeigen stand sie am 07.09.2026 bei keinem
+einzigen Inserat in der Ausstattungsliste, sondern im Beschreibungstext. Wer
+danach filtert, wirft die halbe Trefferliste weg und behält die Händler, die
+ihre Häkchen pflegen. Gelesen wird sie jetzt von der KI-Prüfung.
+
+**Die Prüfung entscheidet nicht, sie schlägt vor.** Je Inserat: erkannte
+Ausstattung, eine Vergleichbarkeit mit einem Satz Begründung,
+Auffälligkeiten (Export, Bastler, Unfall, Preisausreisser, Tacho, ohne
+Bilder, Händler, Dublette, falsches Modell) und eine Empfehlung. Der Haken
+in der Tabelle setzt der Sachverständige — ein Gutachten, dessen
+Vergleichskorb ein Modell zusammengestellt hat, wäre im Streitfall nicht zu
+vertreten.
+
+Zwei Regeln stehen als Test fest:
+
+1. **Nichts verschwindet.** Scheitert ein Paket oder passt die Antwort nicht
+   zum Schema, bekommen seine Inserate `pruefen` ohne Begründung und stehen
+   weiter in der Liste. Im Zweifel wegwerfen hiesse, dass ein Netzfehler
+   still den Korb ändert.
+2. **Zugeordnet wird über die id, nicht über die Reihenfolge.** Ein
+   verrutschtes Urteil wäre schlimmer als ein fehlendes: es sieht plausibel
+   aus und hängt am falschen Fahrzeug.
+
+**Reports:** je Zyklus und Portal einer als Nachweis der Suchtiefe, dazu der
+Gesamtkorb mit den Toleranzen des letzten gelaufenen Zyklus. Für die
+Gutachtenanlage aus der Auswahl stehen die Toleranzen **weit offen** — die
+Auswahl von Hand *ist* der Filter, und mit den Toleranzen des ersten Zyklus
+würfe die Auswertung genau die Fahrzeuge wieder heraus, für die geweitet
+wurde. Weicht die Zahl in der Anlage trotzdem von der Auswahl ab, sagt es
+die Meldung: eine Gutachtenanlage, die still weniger zeigt als ausgewählt
+wurde, ist schlimmer als eine, die gar nicht entsteht.
+
+## Suchen und Filtern: in der Abfrage, in der Adresse
+
+**Gefiltert wird in der Datenbank.** Die Listen schneiden bei hundert Zeilen
+ab; ein Filter, der erst im Browser greift, filtert genau diese hundert. Die
+Trefferzahl kommt aus einer eigenen Zählung — die Länge der Liste wäre bei
+hunderteins schon falsch.
+
+**Der Filterstand steht in der Adresse.** Ein gefilterter Listenstand ist
+etwas, das man weiterschickt, als Lesezeichen ablegt und zu dem der
+Zurück-Knopf zurückführen muss. Leere Felder werden vor dem Absenden
+entfernt: ein GET-Formular schickt jedes Feld mit, und
+`?suche=&zustand=&marke=BMW&modell=&baujahr=&von=&bis=` ist als Lesezeichen
+unbrauchbar.
+
+**Eine Leiste, drei Listen.** `Filterleiste` trägt Fälle und Stellungnahmen;
+die Bibliothek hatte ihre eigene, ältere und bleibt dabei. Vorn stehen zwei
+Felder, der Rest liegt hinter „Weitere Filter" — eine Leiste mit acht
+Feldern nebeneinander wird nicht gelesen, sondern übersprungen.
+
+**Der Vergleichskorb filtert im Browser** und ist damit die Ausnahme: seine
+Zeilen sind vollständig geladen, ein Serverabruf je Klick auf eine
+Spaltenüberschrift wäre Wartezeit für eine Sortierung, die schon dasteht.
+Der Filter ändert dort die Auswahl nicht — wer nach „nur mit
+Auffälligkeit" filtert, sieht weniger Zeilen, die Haken der ausgeblendeten
+bleiben gesetzt.
+
+**Das Kennzeichen wird ohne Trennzeichen getippt.** `OLAB4711` findet
+`OL-AB 4711`; verglichen wird auf beiden Seiten ohne Trennzeichen.
+
+**Die Suche in der Kopfleiste** trifft Bezeichner und Falldaten über alle
+vier Bereiche, je Art höchstens fünf Treffer — ein Begriff, der in fünfzig
+Fällen vorkommt, darf die Bibliothekstreffer nicht verdrängen. 250 ms Ruhe
+vor der Abfrage, und eine Zählung verwirft späte Antworten auf ältere
+Eingaben: sonst überschreibt die langsame Abfrage zu „Kri" die schnelle zu
+„Krilavicius".
+
+**Ein Wert aus einem `server-only`-Modul zieht den Postgres-Treiber ins
+Browserpaket.** Zweimal an einem Tag gemessen (`wbw/urteil.ts`,
+`suche/typen.ts`). Typen allein verschwinden beim Übersetzen, ein Wert nicht
+— sobald eine Client-Komponente einen *Wert* braucht, gehört er in eine
+Datei ohne Serverabhängigkeiten.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,

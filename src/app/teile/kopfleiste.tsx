@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Erscheinungsschalter } from './erscheinung'
 import { Meldungsglocke } from './melder'
+import { Kopfsuche } from './kopfsuche'
 
 /**
  * Die Kopfleiste über dem Inhalt, nach dem Vorbild von autoiXpert: flach,
@@ -29,6 +30,12 @@ export function Kopfleiste({ rechts }: { rechts?: React.ReactNode }) {
   return (
     <header className="topbar">
       <span className="topbar-titel">{bereich}</span>
+      {/*
+        Die Suche steht in der Mitte, nicht rechts bei den Schaltern: dort
+        wäre sie ein Werkzeug unter anderen. Sie ist der Weg zu allem, was
+        gerade nicht auf dem Schirm ist.
+      */}
+      <Kopfsuche />
       <div className="topbar-rechts">
         {rechts}
         <Meldungsglocke />

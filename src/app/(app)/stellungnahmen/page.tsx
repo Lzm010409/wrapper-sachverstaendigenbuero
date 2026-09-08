@@ -1,5 +1,10 @@
 import Link from 'next/link'
-import { ladeStellungnahmen } from '@/stellungnahme/abfragen'
+import {
+  ladeStellungnahmen,
+  stellungnahmenfilterGesetzt,
+  zaehleStellungnahmen,
+  type Stellungnahmenfilter,
+} from '@/stellungnahme/abfragen'
 import { ladeFaelle } from '@/autoixpert/abfragen'
 import { kiVerfuegbar } from '@/ki/client'
 import { werkzeugeVorhanden } from '@/pruefbericht/einlesen'
@@ -9,6 +14,7 @@ import { BerichtFormular } from './bericht-formular'
 import { Loeschknopf } from './loeschknopf'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
+import { Filterleiste } from '@/app/teile/filterleiste'
 
 /**
  * Die Beschriftung einer Zeile.
@@ -40,7 +46,17 @@ function tagesdatum(wert: Date | string): string {
   })
 }
 
-export default async function StellungnahmenSeite() {
+/** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
+function wert(roh: string | string[] | undefined): string | undefined {
+  const einzeln = Array.isArray(roh) ? roh[0] : roh
+  return einzeln?.trim() || undefined
+}
+
+export default async function StellungnahmenSeite({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
   // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
   // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
@@ -50,8 +66,18 @@ export default async function StellungnahmenSeite() {
   // Klick abzuweisen. Die Aktion prüft trotzdem — das hier ist Anzeige.
   const darfLoeschen = await darf('stellungnahme.loeschen')
 
-  const [liste, faelle, werkzeuge] = await Promise.all([
-    ladeStellungnahmen(),
+  const roh = await searchParams
+  const filter: Stellungnahmenfilter = {
+    suche: wert(roh.suche),
+    stand: wert(roh.stand),
+    von: wert(roh.von),
+    bis: wert(roh.bis),
+  }
+  const gefiltert = stellungnahmenfilterGesetzt(filter)
+
+  const [liste, gesamt, faelle, werkzeuge] = await Promise.all([
+    ladeStellungnahmen(filter),
+    zaehleStellungnahmen(filter),
     ladeFaelle(),
     werkzeugeVorhanden(),
   ])
@@ -75,16 +101,16 @@ export default async function StellungnahmenSeite() {
         <div>
           <h1>Stellungnahmen</h1>
           {/*
-            Die Abfrage holt höchstens 100 Zeilen. Steht die Liste auf
-            genau 100, ist die Zahl keine Gesamtzahl mehr, sondern eine
-            Obergrenze — und darf sich nicht als Gesamtzahl ausgeben.
+            Die Zahl kommt aus einer eigenen Zählung. Vorher stand hier die
+            Länge der Liste, und die schneidet bei hundert ab — „Die 100
+            neuesten" war der Notbehelf dafür.
           */}
           <p className="unterzeile">
-            {liste.length === 0
-              ? 'Noch keine Stellungnahme begonnen'
-              : liste.length >= 100
-                ? 'Die 100 neuesten Stellungnahmen'
-                : `${liste.length} ${liste.length === 1 ? 'Stellungnahme' : 'Stellungnahmen'}`}
+            {gesamt === 0
+              ? gefiltert
+                ? 'Keine Stellungnahme passt zu diesem Filter'
+                : 'Noch keine Stellungnahme begonnen'
+              : `${gesamt} ${gesamt === 1 ? 'Stellungnahme' : 'Stellungnahmen'}${gefiltert ? ' gefunden' : ''}`}
           </p>
         </div>
       </div>
@@ -106,10 +132,34 @@ export default async function StellungnahmenSeite() {
 
       <BerichtFormular faelle={fallAuswahl} aktiv={kiVerfuegbar() && werkzeuge.ok} />
 
+      <Filterleiste
+        weitereAb={2}
+        treffer={liste.length < gesamt ? `${liste.length} von ${gesamt} gezeigt` : undefined}
+        felder={[
+          { art: 'suche', name: 'suche', platzhalter: 'Betreff, Empfänger oder Aktenzeichen' },
+          {
+            art: 'auswahl',
+            name: 'stand',
+            beschriftung: 'Stand',
+            alle: 'Jeder Stand',
+            werte: [
+              { wert: 'offen', text: 'in Arbeit' },
+              { wert: 'versendet', text: 'versendet' },
+              { wert: 'laeuft', text: 'wird ausgewertet' },
+              { wert: 'fehler', text: 'Auswertung gescheitert' },
+            ],
+          },
+          { art: 'datum', name: 'von', beschriftung: 'Angelegt ab' },
+          { art: 'datum', name: 'bis', beschriftung: 'Angelegt bis' },
+        ]}
+      />
+
       {liste.length === 0 ? (
         <div className="leer">
           <p style={{ margin: 0 }}>
-            Lade einen Prüfbericht hoch — die Kürzungspositionen werden daraus ausgelesen.
+            {gefiltert
+              ? 'Keine Stellungnahme passt zu diesem Filter. Nimm eine Einschränkung heraus.'
+              : 'Lade einen Prüfbericht hoch — die Kürzungspositionen werden daraus ausgelesen.'}
           </p>
         </div>
       ) : (

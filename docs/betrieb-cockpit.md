@@ -475,3 +475,59 @@ gescheiterten Datenbankabfrage werden vor dem Schreiben ersetzt.
 
 Wer ein Recht setzt, steht in der Datenbank (`benutzer_recht.gesetzt_von`),
 und jede abgewiesene Aktion steht als Warnung im Fehlerprotokoll.
+
+## Der WBW-Lauf in Zyklen
+
+Ein Lauf sucht bis zu dreimal, von eng nach weit, und hört auf, sobald acht
+brauchbare Vergleichsfahrzeuge beisammen sind. Was das für den Betrieb
+heisst:
+
+- **Er dauert länger als vorher.** Jeder Zyklus ist ein voller
+  Portaldurchlauf, und je Zyklus und Portal entsteht ein eigener Report.
+  Bei drei Zyklen und drei Portalen sind das neun Reports plus den
+  Gesamtkorb. Der Lauf bleibt ein Hintergrundjob — die Glocke meldet sich,
+  wenn er fertig ist.
+- **Er kostet ein wenig KI.** Jedes neu gefundene Inserat wird einmal
+  geprüft, in Paketen zu 25 auf dem schnellen Modell. Grobe Schätzung: 10
+  bis 30 Cent je Lauf. Gefunden wird jedes Fahrzeug nur einmal, auch wenn
+  es in zwei Zyklen auftaucht.
+- **Ohne `ANTHROPIC_API_KEY` läuft er trotzdem** — dann bleibt der Korb
+  ungeprüft, jede Zeile steht auf „nicht geprüft", und der Haken ist
+  überall gesetzt. Die Suche selbst ist davon nicht betroffen.
+- **Die Reports liegen im Container** unter `/tmp/wbw-…` und überleben
+  keinen Neustart. Wer die Anlage braucht, erzeugt sie vor dem nächsten
+  Deployment — danach meldet „Korb übernehmen", dass die Rohdaten fort
+  sind, und speichert nur noch die Auswahl.
+
+## Die Auswahl im Vergleichskorb
+
+Die Prüfung schlägt vor, der Sachverständige entscheidet. Vorbelegt ist
+alles ausser dem, was die Prüfung verwerfen würde.
+
+1. Reiter **Wiederbeschaffungswert**, Abschnitt **Vergleichsfahrzeuge**.
+2. Filtern und sortieren nach Portal, Vorschlag, Höchstpreis,
+   Auffälligkeit — oder über die Spaltenüberschriften. Das ändert die
+   Auswahl nicht, nur die Sicht darauf.
+3. Haken setzen oder wegnehmen, dann **Korb übernehmen**. Daraus entsteht
+   der Report „Vergleichsfahrzeuge" als Gutachtenanlage; die Zyklus-Reports
+   bleiben als Nachweis der Suchtiefe daneben.
+
+Meldet die Anlage weniger Fahrzeuge, als angehakt waren, steht das in der
+Meldung — dann bitte in der Anlage nachsehen, bevor sie ins Gutachten geht.
+
+## Suchen und Filtern
+
+- **Oben in der Kopfleiste** liegt ein Feld für alles: Fälle,
+  Stellungnahmen, Bibliothekstexte und Bilder gleichzeitig. Strg+K oder das
+  Schrägstrich-Zeichen öffnet es, die Pfeiltasten wählen, die Eingabetaste
+  springt hin, Escape schliesst. Auf dem Telefon ist es ausgeblendet — dort
+  fehlt in der Leiste der Platz, und die Listen haben ihre eigenen Filter.
+- **Über den Listen** steht die Filterleiste. Der Stand wandert in die
+  Adresse: ein gefilterter Listenstand lässt sich weiterschicken und als
+  Lesezeichen ablegen. Die Marken unter der Leiste zeigen, was gerade
+  einschränkt, und lassen sich einzeln wegklicken.
+- **Kennzeichen ohne Trennzeichen** funktionieren: `OLAB4711` findet
+  `OL-AB 4711`.
+- **Die Trefferzahl** über der Liste ist die vollständige; gezeigt werden
+  höchstens hundert Zeilen, und steht die Liste an dieser Grenze, sagt es
+  die Leiste („12 von 340 gezeigt").

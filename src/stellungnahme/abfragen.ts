@@ -103,7 +103,77 @@ export async function sucheInBibliothek(begriff: string, hoechstens = 30) {
     .limit(hoechstens)
 }
 
-export async function ladeStellungnahmen() {
+/**
+ * Wonach sich die Schreibenliste einschränken lässt.
+ *
+ * Dieselbe Überlegung wie bei den Fällen: die Liste schneidet bei hundert
+ * ab, also muss die Einschränkung in die Abfrage und nicht in den Browser.
+ */
+export interface Stellungnahmenfilter {
+  /** Betreff, Empfänger oder Aktenzeichen des Falls. */
+  suche?: string
+  /** `offen`, `versendet` oder ein Auswertungsstand. */
+  stand?: string
+  von?: string
+  bis?: string
+}
+
+/** Ob überhaupt etwas eingeschränkt wurde. */
+export function stellungnahmenfilterGesetzt(filter?: Stellungnahmenfilter): boolean {
+  if (!filter) return false
+  return Object.values(filter).some((wert) => typeof wert === 'string' && wert.trim() !== '')
+}
+
+function stellungnahmenBedingungen(filter: Stellungnahmenfilter = {}) {
+  const alle = []
+
+  const suche = filter.suche?.trim()
+  if (suche) {
+    const muster = `%${suche}%`
+    const oder = or(
+      ilike(stellungnahme.betreff, muster),
+      ilike(stellungnahme.empfaengerName, muster),
+      ilike(fall.aktenzeichen, muster),
+    )
+    if (oder) alle.push(oder)
+  }
+
+  switch (filter.stand?.trim()) {
+    case 'offen':
+      // „Offen" heisst: nicht versendet und nicht mehr in der Auswertung —
+      // das sind die Schreiben, an denen jetzt zu arbeiten ist.
+      alle.push(
+        and(
+          sql`${stellungnahme.versendetAm} is null`,
+          ne(stellungnahme.auswertungsstand, 'laeuft'),
+        )!,
+      )
+      break
+    case 'versendet':
+      alle.push(sql`${stellungnahme.versendetAm} is not null`)
+      break
+    case 'laeuft':
+      alle.push(eq(stellungnahme.auswertungsstand, 'laeuft'))
+      break
+    case 'fehler':
+      alle.push(eq(stellungnahme.auswertungsstand, 'fehler'))
+      break
+  }
+
+  if (filter.von?.trim()) {
+    alle.push(sql`${stellungnahme.erstelltAm} >= ${`${filter.von.trim()} 00:00:00`}::timestamptz`)
+  }
+  if (filter.bis?.trim()) {
+    alle.push(
+      sql`${stellungnahme.erstelltAm} <= ${`${filter.bis.trim()} 23:59:59.999`}::timestamptz`,
+    )
+  }
+
+  return alle
+}
+
+export async function ladeStellungnahmen(filter?: Stellungnahmenfilter) {
+  const wo = stellungnahmenBedingungen(filter)
   return db
     .select({
       id: stellungnahme.id,
@@ -123,8 +193,25 @@ export async function ladeStellungnahmen() {
     })
     .from(stellungnahme)
     .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
+    .where(wo.length > 0 ? and(...wo) : undefined)
     .orderBy(desc(stellungnahme.erstelltAm))
     .limit(100)
+}
+
+/**
+ * Wie viele Schreiben der Filter trifft.
+ *
+ * Eigene Zählung, weil die Liste bei hundert abschneidet — dieselbe
+ * Begründung wie bei den Fällen.
+ */
+export async function zaehleStellungnahmen(filter?: Stellungnahmenfilter): Promise<number> {
+  const wo = stellungnahmenBedingungen(filter)
+  const zeilen = await db
+    .select({ anzahl: sql<number>`count(*)`.mapWith(Number) })
+    .from(stellungnahme)
+    .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
+    .where(wo.length > 0 ? and(...wo) : undefined)
+  return zeilen[0]?.anzahl ?? 0
 }
 
 /**

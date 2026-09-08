@@ -332,7 +332,9 @@ a:hover {
   font-weight: 400;
   color: var(--ink);
   font-size: 1.0625rem;
-  flex: 1;
+  /* Nicht mehr wachsend: sonst schöbe der Bereichsname das Suchfeld an den
+     rechten Rand, und dort läse es sich als ein Schalter mehr. */
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3340,8 +3342,8 @@ body {
    Klick zurück — das ist eine Nebenhandlung, keine Hauptsache. */
 .filtermarke:hover,
 .filtermarke:focus-visible {
-  color: var(--akzent-stark);
-  background: var(--akzent-soft);
+  color: var(--accent-stark);
+  background: var(--accent-soft);
 }
 
 .filter-zuruecksetzen {
@@ -3414,7 +3416,7 @@ body {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--akzent);
+  accent-color: var(--accent);
 }
 
 .korb-tabelle {
@@ -3447,7 +3449,7 @@ body {
   width: 16px;
   height: 16px;
   margin: 2px 0 0;
-  accent-color: var(--akzent);
+  accent-color: var(--accent);
 }
 
 /*
@@ -3459,7 +3461,7 @@ body {
  * hier hilft nur dem Blick über die Spalte.
  */
 .korb-tabelle tbody tr.gewaehlt {
-  background: var(--akzent-soft);
+  background: var(--accent-soft);
 }
 
 /* Eine Spaltenüberschrift, die sortiert. Sie sieht aus wie Text und
@@ -3475,7 +3477,7 @@ body {
 }
 
 .spaltenkopf:hover {
-  color: var(--akzent-stark);
+  color: var(--accent-stark);
 }
 
 .korb-fuss {
@@ -3487,4 +3489,132 @@ body {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line-soft);
+}
+
+/* ---------- Suche in der Kopfleiste ---------- */
+
+/*
+ * Das Feld steht zwischen Bereichsnamen und Schaltern.
+ *
+ * `flex: 0 1 360px` statt einer festen Breite: auf einem schmalen Schirm
+ * schrumpft es, statt die Kopfleiste umzubrechen. Unter 200px ist ein
+ * Suchfeld nicht mehr zu gebrauchen — dort verschwindet es lieber ganz
+ * (siehe unten), und die Bereichslisten haben ja ihre eigenen Filter.
+ */
+.kopfsuche {
+  position: relative;
+  flex: 0 1 360px;
+  min-width: 200px;
+  /* Mittig statt rechts aussen: rechts stünde sie zwischen Glocke und
+     Benutzerzeichen und läse sich als ein Schalter mehr. */
+  margin: 0 auto;
+}
+
+.kopfsuche input[type='search'] {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--surface-alt);
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+}
+
+/* Erst beim Tippen bekommt das Feld eine Kante — vorher soll es die flache
+   Leiste nicht in zwei Hälften teilen. */
+.kopfsuche input[type='search']:focus {
+  background: var(--surface);
+  border-color: var(--accent);
+  outline: none;
+}
+
+/*
+ * Die Trefferliste hängt unter dem Feld.
+ *
+ * `position: absolute` und ein eigener Schatten: sie liegt über dem Inhalt
+ * und darf ihn nicht verschieben — wer sucht, will die Seite darunter
+ * wiederfinden, wenn er Escape drückt.
+ */
+.kopfsuche-liste {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue, var(--schatten));
+  z-index: 950;
+}
+
+.kopfsuche-gruppe {
+  padding: 8px 8px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.kopfsuche-treffer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  max-width: 100%;
+  padding: 7px 8px;
+  /* `align-items` gehört dazu: die Knöpfe der Anwendung zentrieren ihren
+     Inhalt, und ohne das stand jede Trefferzeile mittig — eine Liste, die
+     man von oben nach unten überfliegt, braucht eine gemeinsame linke
+     Kante. */
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+}
+
+/* Eine Zeile, nicht zwei: die Markierung folgt Maus *und* Pfeiltasten, und
+   zwei verschiedene Hervorhebungen nebeneinander wären eine zu viel. */
+.kopfsuche-treffer.markiert {
+  background: var(--accent-soft);
+}
+
+.kopfsuche-titel {
+  max-width: 100%;
+  font-size: 0.875rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kopfsuche-unterzeile {
+  max-width: 100%;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kopfsuche-leer {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* Auf dem Telefon hat die Kopfleiste keinen Platz für ein Suchfeld neben
+   Bereichsnamen, Glocke und Benutzer. */
+@media (max-width: 720px) {
+  .kopfsuche {
+    display: none;
+  }
 }
