@@ -392,6 +392,60 @@ function kennzeichnung(eintrag: Record<string, unknown>): string {
   return kennung || JSON.stringify(eintrag).slice(0, 200)
 }
 
+/**
+ * Das Beschaffungsprotokoll aus einer Rohdatei, sofern eines darin steht.
+ *
+ * Es belegt im Report, über welchen Weg ein Portal abgefragt wurde und ob
+ * dabei ein kostenpflichtiger Dienst getragen hat. Beim Zusammenfassen der
+ * Zyklen muss es mitwandern, sonst fehlt es im Gesamtreport.
+ */
+async function leseBeschaffungsprotokoll(pfad: string): Promise<unknown> {
+  try {
+    const roh = JSON.parse(await readFile(pfad, 'utf8')) as { beschaffungsprotokoll?: unknown }
+    return Array.isArray(roh) ? null : (roh.beschaffungsprotokoll ?? null)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Vereint die Rohtreffer zweier Zyklen desselben Portals.
+ *
+ * **Warum das nötig ist.** Der Gesamtkorb entsteht aus `run-report.js`, und
+ * das Skript legt seine Quellen nach Portalnamen ab:
+ *
+ *     rawBySource[src] = loadItems(file);
+ *
+ * Zwei Zyklen desselben Portals sind zweimal `kleinanzeigen` — der zweite
+ * überschreibt den ersten. Im Lauf vom 08.09.2026 holte Zyklus 1 fünfzehn
+ * Treffer bei AutoScout24 und vierzig bei Kleinanzeigen, Zyklus 2 weitere
+ * vierzig bei Kleinanzeigen. Geprüft wurden 94 Inserate, in die Auswertung
+ * gingen 55: ein vollständiger Kleinanzeigen-Zyklus fiel weg, und keine Zahl
+ * im Protokoll verriet es.
+ *
+ * Je Portal geht deshalb nur noch **eine** Datei hinaus, und diese Funktion
+ * baut sie. Dubletten fallen dabei über dieselbe Kennung heraus, mit der auch
+ * die Urteile zugeordnet werden — sonst stünde ein Fahrzeug, das zwei Zyklen
+ * gefunden haben, zweimal im Median.
+ *
+ * Beim ersten Vorkommen bleibt es: der frühere Zyklus hat die engeren
+ * Toleranzen gesucht, sein Datensatz ist der belastbarere.
+ */
+export function vereineRohtreffer(
+  bisher: Record<string, unknown>[],
+  neu: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const vereint = [...bisher]
+  const gesehen = new Set(bisher.map(kennzeichnung))
+  for (const eintrag of neu) {
+    const kennung = kennzeichnung(eintrag)
+    if (gesehen.has(kennung)) continue
+    gesehen.add(kennung)
+    vereint.push(eintrag)
+  }
+  return vereint
+}
+
 /** Übersetzt einen Rohtreffer in das, was die Prüfung braucht. */
 function alsAngabe(eintrag: Record<string, unknown>, portal: Portal): Inseratsangabe {
   const text = (wert: unknown) => (typeof wert === 'string' && wert.trim() ? wert : null)
@@ -428,10 +482,15 @@ function alsAngabe(eintrag: Record<string, unknown>, portal: Portal): Inseratsan
  * und danach die Prüfung der neu hinzugekommenen Fahrzeuge. Sind genug
  * brauchbare beisammen, hört es auf.
  *
- * **Der Gesamtkorb entsteht zum Schluss** aus allen Rohdateien aller
+ * **Der Gesamtkorb entsteht zum Schluss** aus den Rohtreffern aller
  * gelaufenen Zyklen, mit den Toleranzen des **letzten** Zyklus: mit denen des
  * ersten würde die Auswertung genau die Fahrzeuge wieder wegwerfen, für die
  * geweitet wurde.
+ *
+ * Dabei geht **eine Datei je Portal** hinaus, nicht eine je Zyklus und
+ * Portal. `run-report.js` legt seine Quellen nach Portalnamen ab, und zwei
+ * Zyklen desselben Portals überschrieben einander — siehe
+ * `vereineRohtreffer`.
  */
 export async function fuehreLaufAus(
   eingabe: WbwEingabe,
@@ -455,7 +514,14 @@ export async function fuehreLaufAus(
 
   const markenfremd: WbwErgebnis['markenfremd'] = []
   const zyklen: Zyklusbericht[] = []
-  const quellenGesamt: string[] = []
+  /*
+    Die Rohtreffer **je Portal**, über alle Zyklen vereint. Eine Liste je
+    Zyklus ginge verloren: `run-report.js` legt seine Quellen nach Portalnamen
+    ab, und zwei Zyklen desselben Portals überschreiben einander (siehe
+    `vereineRohtreffer`).
+  */
+  const rohProPortal = new Map<Portal, Record<string, unknown>[]>()
+  const protokollProPortal = new Map<Portal, unknown>()
   const urteile = new Map<string, Pruefurteil>()
   const gesehen = new Set<string>()
   let letzteParameter = 'params-eng.json'
@@ -523,6 +589,10 @@ export async function fuehreLaufAus(
       }
 
       const gefunden = await leseTreffer(join(ordner, datei))
+      // Vor dem Markenfilter lesen: der schreibt die Datei neu, und das
+      // Beschaffungsprotokoll stünde danach nicht mehr darin.
+      const beschaffung = await leseBeschaffungsprotokoll(join(ordner, datei))
+      if (beschaffung) protokollProPortal.set(portal, beschaffung)
       if (gefunden.length === 0) {
         berichte.push({ portal, modell, gefunden: 0, behalten: 0, reportordner: null })
         halteFest({ name: schrittname, stand: 'leer', text: 'keine Treffer' })
@@ -539,7 +609,15 @@ export async function fuehreLaufAus(
             anzahl: gefiltert.entfernt.length,
             erkannt: gefiltert.entfernt.map((e) => e.erkannt),
           })
-          await writeFile(join(ordner, datei), JSON.stringify({ items: behalten }, null, 2), 'utf8')
+          await writeFile(
+            join(ordner, datei),
+            JSON.stringify(
+              { items: behalten, ...(beschaffung ? { beschaffungsprotokoll: beschaffung } : {}) },
+              null,
+              2,
+            ),
+            'utf8',
+          )
         }
       }
 
@@ -570,7 +648,7 @@ export async function fuehreLaufAus(
         neueAngaben.push(alsAngabe(eintrag, portal))
       }
 
-      quellenGesamt.push(`${portal}=${datei}`)
+      rohProPortal.set(portal, vereineRohtreffer(rohProPortal.get(portal) ?? [], behalten))
       berichte.push({
         portal,
         modell,
@@ -639,11 +717,29 @@ export async function fuehreLaufAus(
     }
   }
 
-  if (quellenGesamt.length === 0) {
+  if (rohProPortal.size === 0) {
     throw new Error('Kein Portal hat Treffer geliefert. Der Lauf wurde abgebrochen.')
   }
 
   // --- Gesamtkorb ----------------------------------------------------------
+  // Eine Datei je Portal, nicht eine je Zyklus und Portal: gleiche Namen
+  // verdrängen sich in `run-report.js` gegenseitig.
+  const quellenGesamt: string[] = []
+  for (const [portal, eintraege] of rohProPortal) {
+    const datei = `${ROHDATEI[portal].replace(/\.json$/, '')}-gesamt.json`
+    const beschaffung = protokollProPortal.get(portal)
+    await writeFile(
+      join(ordner, datei),
+      JSON.stringify(
+        { items: eintraege, ...(beschaffung ? { beschaffungsprotokoll: beschaffung } : {}) },
+        null,
+        2,
+      ),
+      'utf8',
+    )
+    quellenGesamt.push(`${portal}=${datei}`)
+  }
+
   halteFest({ name: 'Gesamtkorb auswerten', stand: 'laeuft' })
   await rufeSkript('run-report.js', [letzteParameter, './out', ...quellenGesamt], {
     cwd: ordner,
