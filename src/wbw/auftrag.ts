@@ -8,6 +8,8 @@ import { notiere } from '@/melden/ablage'
 import { leseErgebnis } from './ergebnis'
 import { fehlendeLaufangaben, type LaufEingaben } from './lauf-eingaben'
 import { protokolliereFehler, protokolliereWarnung } from '@/protokoll'
+import { gespeicherteAuswahl } from './korb'
+import type { Pruefurteil } from './pruefung'
 
 export type { LaufEingaben } from './lauf-eingaben'
 export { fehlendeLaufangaben } from './lauf-eingaben'
@@ -45,6 +47,12 @@ export interface Laufstand {
   protokoll: Schritt[]
   ergebnis: unknown
   markenfremd: unknown
+  /** Was jeder gelaufene Zyklus ergeben hat. */
+  zyklen: unknown
+  /** Das Urteil der Prüfung je Fahrzeug, nach seiner Kennzeichnung. */
+  urteile: Record<string, Pruefurteil>
+  /** Die Auswahl des Sachverständigen — `null`, solange er nicht entschieden hat. */
+  auswahl: string[] | null
   fehler: string | null
   begonnenAm: string
   beendetAm: string | null
@@ -85,6 +93,12 @@ function zuStand(zeile: typeof wbwLauf.$inferSelect): Laufstand {
     protokoll: (zeile.protokoll as Schritt[]) ?? [],
     ergebnis: zeile.ergebnis,
     markenfremd: zeile.markenfremd,
+    zyklen: zeile.zyklen,
+    urteile:
+      zeile.urteile && typeof zeile.urteile === 'object'
+        ? (zeile.urteile as Record<string, Pruefurteil>)
+        : {},
+    auswahl: gespeicherteAuswahl(zeile.auswahl),
     fehler: zeile.fehler,
     begonnenAm: zeile.begonnenAm.toISOString(),
     beendetAm: zeile.beendetAm?.toISOString() ?? null,

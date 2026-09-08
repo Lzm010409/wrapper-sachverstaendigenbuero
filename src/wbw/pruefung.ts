@@ -1,4 +1,11 @@
 import { z } from 'zod'
+import {
+  AUFFAELLIGKEITEN,
+  ungeprueft,
+  type Auffaelligkeit,
+  type Inseratsangabe,
+  type Pruefurteil,
+} from './urteil'
 import { MODELLE, rufeMitWerkzeugAuf } from '@/ki/client'
 import { protokolliereWarnung } from '@/protokoll'
 
@@ -27,59 +34,6 @@ import { protokolliereWarnung } from '@/protokoll'
 
 /** Wie viele Inserate in einem Aufruf. */
 export const PAKETGROESSE = 25
-
-export type Auffaelligkeit =
-  | 'export'
-  | 'bastler'
-  | 'unfall'
-  | 'preisausreisser'
-  | 'tachostand'
-  | 'ohne_bilder'
-  | 'gewerblich'
-  | 'dublette'
-  | 'falsches_modell'
-
-export const AUFFAELLIGKEITEN: Record<Auffaelligkeit, string> = {
-  export: 'Als Exportfahrzeug angeboten',
-  bastler: 'Bastler- oder Teileträgerfahrzeug',
-  unfall: 'Unfallschaden genannt',
-  preisausreisser: 'Preis passt nicht zu den übrigen Angaben',
-  tachostand: 'Laufleistung unstimmig oder nicht bestätigt',
-  ohne_bilder: 'Kein Bild im Inserat',
-  gewerblich: 'Händlerangebot',
-  dublette: 'Dasselbe Fahrzeug wie ein anderes Inserat',
-  falsches_modell: 'Anderes Modell als gesucht',
-}
-
-/** Was von einem Inserat an das Modell geht. */
-export interface Inseratsangabe {
-  id: string
-  quelle: string
-  titel: string | null
-  beschreibung: string | null
-  ausstattung: string[]
-  preis: number | null
-  kilometerstand: number | null
-  erstzulassung: string | null
-  leistungKw: number | null
-  anzahlBilder: number
-}
-
-export interface Pruefurteil {
-  id: string
-  /** Aus der Soll-Ausstattung, im Inserat belegt. */
-  erkannteAusstattung: string[]
-  /** Aus der Soll-Ausstattung, im Inserat nicht belegt. */
-  fehlendeAusstattung: string[]
-  /** 0 bis 100 — fachliche Nähe zum Subjektfahrzeug. */
-  vergleichbarkeit: number
-  /** Ein Satz, warum. Steht in der Tabelle neben dem Fahrzeug. */
-  begruendung: string
-  auffaelligkeiten: Auffaelligkeit[]
-  empfehlung: 'aufnehmen' | 'pruefen' | 'verwerfen'
-  /** Gesetzt, wenn kein Urteil zustande kam — dann ist es ein Platzhalter. */
-  ungeprueft?: boolean
-}
 
 const urteilSchema = z.object({
   id: z.string(),
@@ -184,20 +138,6 @@ export function inPakete<T>(liste: T[], groesse = PAKETGROESSE): T[][] {
     pakete.push(liste.slice(i, i + Math.max(1, groesse)))
   }
   return pakete
-}
-
-/** Der Platzhalter für ein Inserat, zu dem kein Urteil kam. */
-export function ungeprueft(id: string, grund: string): Pruefurteil {
-  return {
-    id,
-    erkannteAusstattung: [],
-    fehlendeAusstattung: [],
-    vergleichbarkeit: 50,
-    begruendung: grund,
-    auffaelligkeiten: [],
-    empfehlung: 'pruefen',
-    ungeprueft: true,
-  }
 }
 
 /**
@@ -317,20 +257,18 @@ export async function pruefeInserate(
   return urteile
 }
 
-/**
- * Ob ein Fahrzeug nach dem Urteil in den Korb gehört.
- *
- * Das ist die **Vorbelegung des Hakens**, nicht die Entscheidung: `pruefen`
- * ist angehakt, weil der Sachverständige sonst jedes unsichere Fahrzeug von
- * Hand suchen müsste. Nur `verwerfen` beginnt ohne Haken.
+/*
+ * Weitergereicht: die Typen und die Vorbelegungsregel stehen in `urteil.ts`,
+ * weil die Korbtabelle im Browser sie braucht und dieses Modul über den
+ * KI-Zugang `server-only` ist. Wer von hier importiert, bekommt sie
+ * trotzdem — der Umzug soll keine Aufrufstelle kosten.
  */
-export function vorbelegt(urteil: Pruefurteil | undefined): boolean {
-  return urteil?.empfehlung !== 'verwerfen'
-}
-
-/** Wie viele Fahrzeuge die Zyklus-Prüfung als brauchbar ansieht. */
-export function brauchbare(urteile: Iterable<Pruefurteil>): number {
-  let anzahl = 0
-  for (const urteil of urteile) if (urteil.empfehlung === 'aufnehmen') anzahl += 1
-  return anzahl
-}
+export {
+  AUFFAELLIGKEITEN,
+  brauchbare,
+  ungeprueft,
+  vorbelegt,
+  type Auffaelligkeit,
+  type Inseratsangabe,
+  type Pruefurteil,
+} from './urteil'

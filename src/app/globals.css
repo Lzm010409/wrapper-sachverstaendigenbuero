@@ -3366,3 +3366,125 @@ body {
     min-width: 0;
   }
 }
+
+/* ---------- Vergleichskorb ---------- */
+
+/*
+ * Die Filterzeile über dem Korb.
+ *
+ * Bewusst keine `.filterleiste`: die schickt ein Formular an den Server, und
+ * genau das soll hier nicht passieren. Die Zeilen sind schon geladen — ein
+ * Serverabruf je Klick auf eine Spaltenüberschrift wäre Wartezeit für eine
+ * Sortierung, die bereits dasteht.
+ */
+.korb-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.korb-filter select,
+.korb-filter input[type='text'] {
+  width: auto;
+  min-width: 130px;
+}
+
+.korb-filter .treffer-zahl {
+  margin-left: auto;
+  align-self: center;
+}
+
+/* Ein Schalter mit Beschriftung. Das ganze Etikett ist anklickbar — ein
+   Kästchen von 13 Pixeln allein trifft auf einem Zeigegerät niemand. */
+.korb-schalter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.korb-schalter input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--akzent);
+}
+
+.korb-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.korb-tabelle thead th {
+  padding: 4px 10px 6px 0;
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.korb-tabelle tbody td {
+  padding: 7px 10px 7px 0;
+  border-top: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.korb-tabelle td.zahl {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.korb-tabelle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--akzent);
+}
+
+/*
+ * Die gewählte Zeile.
+ *
+ * Nur ein Hauch Fläche: die Farbe trägt sonst der Punkt, und eine Tabelle,
+ * in der zwei Drittel der Zeilen blau hinterlegt sind, hat keine Betonung
+ * mehr, sondern einen Hintergrund. Der Haken selbst sagt es ohnehin — das
+ * hier hilft nur dem Blick über die Spalte.
+ */
+.korb-tabelle tbody tr.gewaehlt {
+  background: var(--akzent-soft);
+}
+
+/* Eine Spaltenüberschrift, die sortiert. Sie sieht aus wie Text und
+   verhält sich wie ein Knopf — deshalb der Zeiger und der Fokusrahmen. */
+.spaltenkopf {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.spaltenkopf:hover {
+  color: var(--akzent-stark);
+}
+
+.korb-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}

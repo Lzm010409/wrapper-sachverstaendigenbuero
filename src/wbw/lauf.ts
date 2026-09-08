@@ -15,6 +15,7 @@ import {
   type Zyklusstufe,
 } from './zyklus'
 import { brauchbare, pruefeInserate, type Inseratsangabe, type Pruefurteil } from './pruefung'
+import { fahrzeugKennung } from './ergebnis'
 import { protokolliereWarnung } from '@/protokoll'
 
 const fuehreAus = promisify(execFile)
@@ -150,7 +151,7 @@ function pluginPfad(): string {
  * Ruft ein Plugin-Skript auf. Die Ausgabe wird als JSON gelesen, wo das
  * Skript JSON schreibt — sonst zählt nur, dass es durchlief.
  */
-async function rufeSkript(
+export async function rufeSkript(
   skript: string,
   argumente: string[],
   optionen: { cwd?: string; timeoutMs?: number; umgebung?: Record<string, string> } = {},
@@ -367,12 +368,19 @@ async function leseTreffer(pfad: string): Promise<Record<string, unknown>[]> {
   return Array.isArray(roh) ? roh : (roh.items ?? [])
 }
 
-/** Woran ein Fahrzeug über Zyklen hinweg wiedererkannt wird. */
+/**
+ * Woran ein Fahrzeug über Zyklen hinweg wiedererkannt wird.
+ *
+ * Dieselbe Regel wie in der Anzeige (`fahrzeugKennung`) — sonst fänden die
+ * Tabelle und die Urteile nicht zueinander.
+ */
 function kennzeichnung(eintrag: Record<string, unknown>): string {
   const url = typeof eintrag.url === 'string' ? eintrag.url : null
-  if (url) return url.split('?')[0] ?? url
-  const id = eintrag.id ?? eintrag.adid ?? eintrag.guid
-  return id != null ? String(id) : JSON.stringify(eintrag).slice(0, 200)
+  const ersatz = eintrag.id ?? eintrag.adid ?? eintrag.guid
+  const kennung = fahrzeugKennung(url, ersatz as string | number | null)
+  // Ohne Adresse und ohne id bleibt nur der Inhalt selbst — besser als eine
+  // leere Kennung, unter der alle Fahrzeuge dasselbe Urteil bekämen.
+  return kennung || JSON.stringify(eintrag).slice(0, 200)
 }
 
 /** Übersetzt einen Rohtreffer in das, was die Prüfung braucht. */

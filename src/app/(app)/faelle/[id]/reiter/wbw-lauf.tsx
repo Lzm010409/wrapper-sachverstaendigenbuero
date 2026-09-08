@@ -5,6 +5,8 @@ import { frageStandAb, starteRecherche } from '@/wbw/aktionen'
 import type { LaufEingaben, Laufstand } from '@/wbw/auftrag'
 import type { Portal, Schritt } from '@/wbw/lauf'
 import { leseErgebnis, trichterzeilen, type Korbeintrag, type Laufergebnis } from '@/wbw/ergebnis'
+import type { Pruefurteil } from '@/wbw/urteil'
+import { Korbtabelle } from './korbtabelle'
 import { Meldung } from '@/app/teile/meldung'
 import { useMelder } from '@/app/teile/melder'
 import { fehler as alsFehler, info } from '@/melden/typen'
@@ -141,7 +143,14 @@ export function WbwLauf({
         ) : null}
 
         {stand ? <Fortschritt stand={stand} /> : null}
-        {ergebnis ? <Ergebnis ergebnis={ergebnis} /> : null}
+        {ergebnis && stand ? (
+          <Ergebnis
+            ergebnis={ergebnis}
+            laufId={stand.id}
+            urteile={stand.urteile}
+            auswahl={stand.auswahl}
+          />
+        ) : null}
       </div>
     </div>
   )
@@ -259,7 +268,17 @@ function betrag(wert: number | null): string {
   return wert === null ? '—' : euro.format(wert)
 }
 
-function Ergebnis({ ergebnis }: { ergebnis: Laufergebnis }) {
+function Ergebnis({
+  ergebnis,
+  laufId,
+  urteile,
+  auswahl,
+}: {
+  ergebnis: Laufergebnis
+  laufId: string
+  urteile: Record<string, Pruefurteil>
+  auswahl: string[] | null
+}) {
   const zeilen = trichterzeilen(ergebnis.trichter)
 
   return (
@@ -323,70 +342,12 @@ function Ergebnis({ ergebnis }: { ergebnis: Laufergebnis }) {
             Vergleichsfahrzeuge
           </div>
           <OhneLeistung korb={ergebnis.korb} />
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--ink-soft)' }}>
-                  <th style={{ padding: '4px 8px 4px 0' }}>#</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>Fahrzeug</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>Preis</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>km</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>EZ</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>kW</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>Ort</th>
-                  <th style={{ padding: '4px 8px 4px 0' }}>Quelle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ergebnis.korb.map((f) => (
-                  <tr key={`${f.rang}-${f.url ?? f.titel ?? ''}`} style={{ borderTop: '1px solid var(--linie)' }}>
-                    <td style={{ padding: '5px 8px 5px 0' }}>{f.rang}</td>
-                    <td style={{ padding: '5px 8px 5px 0' }}>
-                      {f.url ? (
-                        <a href={f.url} target="_blank" rel="noopener noreferrer">
-                          {f.titel ?? 'ohne Titel'}
-                        </a>
-                      ) : (
-                        (f.titel ?? 'ohne Titel')
-                      )}
-                      {f.fehlend.length > 0 ? (
-                        <span className="unterzeile" style={{ display: 'block' }}>
-                          ohne Angabe zu: {f.fehlend.join(', ')}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td style={{ padding: '5px 8px 5px 0', whiteSpace: 'nowrap' }}>
-                      {betrag(f.preis)}
-                    </td>
-                    <td style={{ padding: '5px 8px 5px 0', whiteSpace: 'nowrap' }}>
-                      {f.kilometerstand ? f.kilometerstand.toLocaleString('de-DE') : '—'}
-                    </td>
-                    <td style={{ padding: '5px 8px 5px 0', whiteSpace: 'nowrap' }}>
-                      {f.erstzulassung ?? '—'}
-                    </td>
-                    {/*
-                      Die Leistung steht bewusst mit in der Tabelle. Die
-                      Toleranzprüfung des Plugins lässt unbekannte Werte
-                      durch — richtig so, sonst verlöre man belastbare
-                      Fahrzeuge wegen einer Lücke im Inserat. Nur fällt ein
-                      Fahrzeug ohne kW-Angabe dann nicht mehr auf. Hier fällt
-                      es auf.
-                    */}
-                    <td style={{ padding: '5px 8px 5px 0', whiteSpace: 'nowrap' }}>
-                      {f.leistungKw ?? <span style={{ color: 'var(--ink-soft)' }}>ohne Angabe</span>}
-                    </td>
-                    <td style={{ padding: '5px 8px 5px 0' }}>
-                      {f.ort ?? '—'}
-                      {f.entfernungKm !== null ? (
-                        <span className="unterzeile"> · {Math.round(f.entfernungKm)} km</span>
-                      ) : null}
-                    </td>
-                    <td style={{ padding: '5px 8px 5px 0' }}>{f.quelle ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Korbtabelle
+            laufId={laufId}
+            korb={ergebnis.korb}
+            urteile={urteile}
+            auswahl={auswahl}
+          />
         </>
       ) : null}
     </div>

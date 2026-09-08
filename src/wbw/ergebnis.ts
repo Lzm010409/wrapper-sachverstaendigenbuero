@@ -159,3 +159,25 @@ export function trichterzeilen(t: Trichter): { name: string; wert: number }[] {
     .filter((z): z is { name: string; wert: number } => z.wert !== null)
     .filter((z) => z.wert > 0 || z.name === 'im Korb')
 }
+
+/**
+ * Woran ein Fahrzeug wiedererkannt wird — über Zyklen, Portale und Tabellen
+ * hinweg.
+ *
+ * Es muss **eine** Regel sein: der Lauf legt die Urteile der KI-Prüfung
+ * unter dieser Kennung ab, und die Tabelle sucht sie darunter wieder. Zwei
+ * Regeln, die sich um ein Fragezeichen unterscheiden, ergäben eine Tabelle,
+ * in der neben jedem Fahrzeug „kein Urteil" steht.
+ *
+ * Die Adresse ohne ihren Fragezeichenteil ist der beste Anker, den die
+ * Portale hergeben: dieselbe Anzeige trägt je nach Suchweg unterschiedliche
+ * Anhängsel (`?ref=srp`, `?searchId=…`), der Pfad davor bleibt gleich.
+ */
+export function fahrzeugKennung(
+  url: string | null | undefined,
+  ersatz?: string | number | null,
+): string {
+  const geputzt = url?.trim()
+  if (geputzt) return geputzt.split('?')[0] ?? geputzt
+  return ersatz != null ? String(ersatz) : ''
+}
