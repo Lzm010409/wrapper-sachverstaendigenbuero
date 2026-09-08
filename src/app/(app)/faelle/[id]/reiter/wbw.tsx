@@ -366,7 +366,7 @@ export function WbwReiter({
                   id="wbw-kmtol"
                   type="number"
                   step={1000}
-                  value={eingaben.kmToleranz ?? 25000}
+                  value={eingaben.kmToleranz ?? params.kmToleranz}
                   onChange={(e) => setze('kmToleranz', Number(e.target.value))}
                 />
               </div>
