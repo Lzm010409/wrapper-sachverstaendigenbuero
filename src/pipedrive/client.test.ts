@@ -20,6 +20,15 @@ function antwortMitDaten(data: unknown): Response {
   return { ok: true, status: 200, json: async () => ({ data }) } as Response
 }
 
+/** Wie `antwortMitDaten`, zusätzlich mit dem Blätter-Cursor von `GET /deals`. */
+function antwortMitSeite(data: unknown, naechsterCursor: string | null = null): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ data, additional_data: { next_cursor: naechsterCursor } }),
+  } as Response
+}
+
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
@@ -167,6 +176,65 @@ describe('pipedrive Notizen und Mails', () => {
     expect(await pipedrive.listeNotizen(1166)).toEqual([])
     expect(await pipedrive.listeMails(1166)).toEqual([])
     expect(await pipedrive.holeMailBody(1)).toBeUndefined()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('pipedrive.listeOffeneDeals', () => {
+  beforeEach(() => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    vi.stubEnv('PIPEDRIVE_BASE_URL', 'https://api.pipedrive.com/api/v2')
+  })
+
+  it('holt alle offenen Deals der Pipeline "Auftrag" in einem Aufruf, wenn eine Seite reicht', async () => {
+    const fetchMock = vi.fn(async (url: URL) => {
+      expect(url.pathname).toBe('/api/v2/deals')
+      expect(url.searchParams.get('pipeline_id')).toBe(String(PIPELINE_AUFTRAG_ID))
+      expect(url.searchParams.get('status')).toBe('open')
+      return antwortMitSeite([
+        { id: 1166, title: '0926/2081TG', stage_id: 8 },
+        { id: 25, title: '1024/1368TG', stage_id: 8 },
+      ])
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const deals = await pipedrive.listeOffeneDeals()
+    expect(deals).toHaveLength(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('blättert weiter, solange next_cursor gesetzt ist', async () => {
+    let aufrufe = 0
+    const fetchMock = vi.fn(async (url: URL) => {
+      aufrufe++
+      if (aufrufe === 1) {
+        expect(url.searchParams.has('cursor')).toBe(false)
+        return antwortMitSeite([{ id: 1, stage_id: 6 }], 'seite2')
+      }
+      expect(url.searchParams.get('cursor')).toBe('seite2')
+      return antwortMitSeite([{ id: 2, stage_id: 7 }], null)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const deals = await pipedrive.listeOffeneDeals()
+    expect(deals.map((d) => d.id)).toEqual([1, 2])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('bricht nach einer Obergrenze an Seiten ab, statt endlos zu blättern', async () => {
+    const fetchMock = vi.fn(async () => antwortMitSeite([{ id: 1 }], 'immer-weiter'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await pipedrive.listeOffeneDeals()
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(5)
+  })
+
+  it('fragt ohne Token gar nicht erst an', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', '')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await pipedrive.listeOffeneDeals()).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -541,6 +541,10 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
       <dd style={{ textAlign: 'left' }}>
         <span className="marke-pille m-akzent">{d.phase}</span>
       </dd>
+      <dt>Status</dt>
+      <dd style={{ textAlign: 'left' }}>
+        <span className={`marke-pille ${d.dealStatusKlasse}`}>{d.dealStatus}</span>
+      </dd>
       <Zeile label="Deal" wert={d.titel} />
       <Zeile label="Schadenhöhe brutto" wert={euro(d.schadenhoeheBrutto)} />
       <Zeile label="Ausgebuchter Betrag" wert={euro(d.ausgebuchterBetrag)} />

@@ -1,4 +1,4 @@
-import { dealFelder, monetaerWert, phasenNamen, pipedrive } from '@/pipedrive/client'
+import { dealFelder, monetaerWert, phasenNamen, pipedrive, statusMarken, statusNamen } from '@/pipedrive/client'
 import { protokolliereFehler } from '@/protokoll'
 
 /**
@@ -32,6 +32,10 @@ export interface VorgangAnsicht {
     dealId: number
     titel: string | null
     phase: string
+    /** Der Lebenszyklus-Status (Offen/Gewonnen/Verloren/Gelöscht) — unabhängig von der Phase. */
+    dealStatus: string
+    /** CSS-Modifikator für die Statuspille, siehe `statusMarken`. */
+    dealStatusKlasse: string
     schadenhoeheBrutto: number | undefined
     ausgebuchterBetrag: number | undefined
     sevdeskRechnungId: string | null
@@ -74,6 +78,8 @@ export async function ladeVorgang(aktenzeichen: string | null): Promise<VorgangA
       dealId: deal.id,
       titel: deal.title ?? null,
       phase: phasenNamen[deal.stage_id ?? -1] ?? 'unbekannt',
+      dealStatus: statusNamen[deal.status ?? ''] ?? 'unbekannt',
+      dealStatusKlasse: statusMarken[deal.status ?? ''] ?? 'm-entwurf',
       schadenhoeheBrutto: monetaerWert(felder[dealFelder.schadenhoeheBrutto]),
       ausgebuchterBetrag: monetaerWert(felder[dealFelder.ausgebuchterBetrag]),
       sevdeskRechnungId: textOderNull(felder[dealFelder.sevdeskRechnungId]),
@@ -83,4 +89,59 @@ export async function ladeVorgang(aktenzeichen: string | null): Promise<VorgangA
 
 function textOderNull(wert: unknown): string | null {
   return typeof wert === 'string' && wert.trim() ? wert : null
+}
+
+/**
+ * Die Pipedrive-Phase zu vielen Fällen auf einmal — für die Fälle-Liste.
+ *
+ * **Ein Aufruf statt einem pro Zeile.** `ladeVorgang` sucht gezielt einen
+ * Deal und holt ihn danach einzeln — richtig für einen Fall, aber hundert
+ * Zeilen wären hundert Suchen plus hundert Einzelabrufe. Hier läuft es
+ * umgekehrt: `pipedrive.listeOffeneDeals()` holt alle offenen Deals der
+ * Pipeline einmal, und die Zuordnung zum Aktenzeichen passiert lokal.
+ *
+ * **Mehrdeutigkeit fällt hier still unter den Tisch.** Im Vorgang-Reiter
+ * bekommt ein doppelt vergebenes Aktenzeichen einen eigenen Zustand mit
+ * Erklärung — in der Liste ist dafür kein Platz, und eine Pille mit
+ * geratener Phase wäre schlimmer als gar keine.
+ */
+export async function ladePhasenFuerListe(
+  aktenzeichen: (string | null | undefined)[],
+): Promise<Map<string, string>> {
+  const leer = new Map<string, string>()
+  if (!process.env.PIPEDRIVE_API_TOKEN) return leer
+
+  const gesucht = new Set(
+    aktenzeichen.map((a) => a?.trim()).filter((a): a is string => Boolean(a)),
+  )
+  if (gesucht.size === 0) return leer
+
+  let alle
+  try {
+    alle = await pipedrive.listeOffeneDeals()
+  } catch (fehler) {
+    protokolliereFehler(
+      'pipedrive.listeOffeneDeals',
+      'Die Pipedrive-Phasen fuer die Faelle-Liste liessen sich nicht laden.',
+      fehler,
+      { dienst: 'pipedrive' },
+    )
+    return leer
+  }
+
+  const nachTitel = new Map<string, number[]>()
+  for (const deal of alle) {
+    const titel = deal.title?.trim()
+    if (!titel || !gesucht.has(titel)) continue
+    const stufen = nachTitel.get(titel) ?? []
+    stufen.push(deal.stage_id ?? -1)
+    nachTitel.set(titel, stufen)
+  }
+
+  const ergebnis = new Map<string, string>()
+  for (const [titel, stufen] of nachTitel) {
+    if (stufen.length !== 1) continue
+    ergebnis.set(titel, phasenNamen[stufen[0]!] ?? 'unbekannt')
+  }
+  return ergebnis
 }

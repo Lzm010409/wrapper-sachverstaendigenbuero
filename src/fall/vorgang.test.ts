@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const findeDeal = vi.fn()
+const listeOffeneDeals = vi.fn()
 
 vi.mock('@/pipedrive/client', async () => {
   const echt = await vi.importActual<typeof import('@/pipedrive/client')>('@/pipedrive/client')
-  return { ...echt, pipedrive: { findeDeal } }
+  return { ...echt, pipedrive: { findeDeal, listeOffeneDeals } }
 })
 
-const { ladeVorgang } = await import('./vorgang')
+const { ladePhasenFuerListe, ladeVorgang } = await import('./vorgang')
 
 /*
   Die Umgebung wird gestellt, nicht vorausgesetzt.
@@ -23,6 +24,7 @@ beforeEach(() => {
 
 afterEach(() => {
   findeDeal.mockReset()
+  listeOffeneDeals.mockReset()
   vi.unstubAllEnvs()
 })
 
@@ -66,6 +68,7 @@ describe('ladeVorgang', () => {
         id: 1,
         title: 'Beispiel GmbH',
         stage_id: 8,
+        status: 'open',
         custom_fields: {
           adb0956f0161f534c04d43a1627acb23e692fea6: { value: 8490.71, currency: 'EUR' },
           c4ae5d687eacc0bbe5c05a1d70ec447644d4eb3f: 120,
@@ -80,6 +83,8 @@ describe('ladeVorgang', () => {
       dealId: 1,
       titel: 'Beispiel GmbH',
       phase: 'Versendet',
+      dealStatus: 'Offen',
+      dealStatusKlasse: 'm-entwurf',
       schadenhoeheBrutto: 8490.71,
       ausgebuchterBetrag: 120,
       sevdeskRechnungId: 'RE-2026-0042',
@@ -90,6 +95,28 @@ describe('ladeVorgang', () => {
     vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
     findeDeal.mockResolvedValueOnce({ art: 'gefunden', deal: { id: 2, stage_id: 999 } })
     expect((await ladeVorgang('0926/2081TG')).deal?.phase).toBe('unbekannt')
+  })
+
+  it('bildet den Deal-Status unabhängig von der Phase ab', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+
+    findeDeal.mockResolvedValueOnce({ art: 'gefunden', deal: { id: 4, status: 'won' } })
+    expect((await ladeVorgang('0926/2081TG')).deal).toMatchObject({
+      dealStatus: 'Gewonnen',
+      dealStatusKlasse: 'm-freigegeben',
+    })
+
+    findeDeal.mockResolvedValueOnce({ art: 'gefunden', deal: { id: 5, status: 'lost' } })
+    expect((await ladeVorgang('0926/2081TG')).deal).toMatchObject({
+      dealStatus: 'Verloren',
+      dealStatusKlasse: 'm-zurueckgezogen',
+    })
+
+    findeDeal.mockResolvedValueOnce({ art: 'gefunden', deal: { id: 6 } })
+    expect((await ladeVorgang('0926/2081TG')).deal).toMatchObject({
+      dealStatus: 'unbekannt',
+      dealStatusKlasse: 'm-entwurf',
+    })
   })
 
   it('macht aus einem leeren Rechnungsfeld nichts, nicht einen leeren Text', async () => {
@@ -113,5 +140,48 @@ describe('ladeVorgang', () => {
     const ergebnis = await ladeVorgang('0926/2081TG')
     expect(ergebnis.stand).toBe('mehrdeutig')
     expect(ergebnis.treffer).toHaveLength(2)
+  })
+})
+
+describe('ladePhasenFuerListe', () => {
+  it('fragt ohne Zugang oder ohne Aktenzeichen gar nicht erst an', async () => {
+    expect(await ladePhasenFuerListe(['0926/2081TG'])).toEqual(new Map())
+    expect(listeOffeneDeals).not.toHaveBeenCalled()
+
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    expect(await ladePhasenFuerListe([null, undefined, '  '])).toEqual(new Map())
+    expect(listeOffeneDeals).not.toHaveBeenCalled()
+  })
+
+  it('ordnet die Phase über den Titel zu, nur für gesuchte Aktenzeichen', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    listeOffeneDeals.mockResolvedValueOnce([
+      { id: 1, title: '0926/2081TG', stage_id: 8 },
+      { id: 2, title: 'nicht gesucht', stage_id: 6 },
+    ])
+
+    const phasen = await ladePhasenFuerListe(['0926/2081TG', '0926/9999XX'])
+    expect(phasen.get('0926/2081TG')).toBe('Versendet')
+    expect(phasen.has('0926/9999XX')).toBe(false)
+    expect(phasen.has('nicht gesucht')).toBe(false)
+  })
+
+  it('lässt ein doppelt vergebenes Aktenzeichen ohne Phase, statt eine zu raten', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    listeOffeneDeals.mockResolvedValueOnce([
+      { id: 1, title: '0926/2081TG', stage_id: 7 },
+      { id: 2, title: '0926/2081TG', stage_id: 8 },
+    ])
+
+    const phasen = await ladePhasenFuerListe(['0926/2081TG'])
+    expect(phasen.has('0926/2081TG')).toBe(false)
+  })
+
+  it('gibt eine leere Zuordnung zurück, wenn der Abruf scheitert, statt zu werfen', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    listeOffeneDeals.mockRejectedValueOnce(new Error('Pipedrive antwortete mit 502'))
+
+    const phasen = await ladePhasenFuerListe(['0926/2081TG'])
+    expect(phasen).toEqual(new Map())
   })
 })

@@ -61,6 +61,27 @@ export const phasenNamen: Record<number, string> = {
  */
 export const PIPELINE_AUFTRAG_ID = 2
 
+/**
+ * Der Lebenszyklus-Status eines Deals — unabhängig von der Phase. Ein Deal
+ * kann in Phase „Versendet" stehen und trotzdem `lost` sein (Auftrag storniert,
+ * Rechtsanwalt abgesagt), ohne dass sich die Phase ändert. Werte laut
+ * `GET /dealFields` (Feld „Status"), abgefragt am 08.09.2026.
+ */
+export const statusNamen: Record<string, string> = {
+  open: 'Offen',
+  won: 'Gewonnen',
+  lost: 'Verloren',
+  deleted: 'Gelöscht',
+}
+
+/** CSS-Modifikator für die Statuspille — die Farbe trägt der Punkt, siehe `.marke-pille::before`. */
+export const statusMarken: Record<string, string> = {
+  open: 'm-entwurf',
+  won: 'm-freigegeben',
+  lost: 'm-zurueckgezogen',
+  deleted: 'm-zurueckgezogen',
+}
+
 export interface Deal {
   id: number
   title?: string
@@ -84,6 +105,16 @@ export type DealErgebnis =
   | { art: 'ohne_treffer' }
   | { art: 'mehrdeutig'; treffer: { id: number; title: string | null }[] }
   | { art: 'gefunden'; deal: Deal }
+
+/**
+ * Ein Deal, wie ihn `GET /deals` (Listenendpunkt) liefert — feldrichtig wie
+ * `Deal`, aber ohne die Felder, die die Fälle-Liste nicht braucht.
+ */
+export interface DealUebersicht {
+  id: number
+  title?: string
+  stage_id?: number
+}
 
 /** Eine Notiz zu einem Deal. `content` ist HTML — siehe `dealFelder`-Kommentar oben. */
 export interface Notiz {
@@ -171,11 +202,24 @@ function basisUrlMailbox(): string {
  */
 const ZEITLIMIT_MS = 10_000
 
-async function anfrage<T>(
+/**
+ * Obergrenze für `listeOffeneDeals`: 5 Seiten à 500 sind 2500 offene Deals —
+ * weit über dem heutigen Bestand (121, Stand 08.09.2026). Eine Grenze
+ * überhaupt, damit ein Fehler in `naechsterCursor` nicht zur Endlosschleife
+ * gegen die Pipedrive-API wird.
+ */
+const MAX_SEITEN_OFFENE_DEALS = 5
+
+interface Rumpf<T> {
+  data?: T
+  additional_data?: { next_cursor?: string | null }
+}
+
+async function anfrageRoh<T>(
   pfad: string,
-  suche: Record<string, string | number | boolean> = {},
-  basis: string = basisUrl(),
-) {
+  suche: Record<string, string | number | boolean>,
+  basis: string,
+): Promise<Rumpf<T>> {
   const url = new URL(basis + pfad)
   for (const [schluessel, wert] of Object.entries(suche)) {
     url.searchParams.set(schluessel, String(wert))
@@ -200,8 +244,30 @@ async function anfrage<T>(
   if (!antwort.ok) {
     throw new Error(`Pipedrive antwortete mit ${antwort.status} auf ${pfad}.`)
   }
-  const rumpf = (await antwort.json()) as { data?: T }
+  return (await antwort.json()) as Rumpf<T>
+}
+
+async function anfrage<T>(
+  pfad: string,
+  suche: Record<string, string | number | boolean> = {},
+  basis: string = basisUrl(),
+) {
+  const rumpf = await anfrageRoh<T>(pfad, suche, basis)
   return rumpf.data
+}
+
+/**
+ * Wie `anfrage`, gibt aber zusätzlich den Blätter-Cursor zurück. Nur die
+ * Listenendpunkte (`GET /deals`) brauchen ihn — die übrigen Aufrufe hier
+ * fragen genau ein Objekt ab und ignorieren `additional_data`.
+ */
+async function anfrageSeite<T>(
+  pfad: string,
+  suche: Record<string, string | number | boolean>,
+  basis: string = basisUrl(),
+): Promise<{ daten: T | undefined; naechsterCursor: string | null }> {
+  const rumpf = await anfrageRoh<T>(pfad, suche, basis)
+  return { daten: rumpf.data, naechsterCursor: rumpf.additional_data?.next_cursor ?? null }
 }
 
 export const pipedrive = {
@@ -249,6 +315,40 @@ export const pipedrive = {
     const deal = await anfrage<Deal>(`/deals/${treffer[0]!.id}`)
     if (!deal) return { art: 'ohne_treffer' }
     return { art: 'gefunden', deal }
+  },
+
+  /**
+   * Alle offenen Deals der Pipeline „Auftrag" — für die Fälle-Liste, die
+   * die Pipedrive-Phase zu bis zu hundert Fällen auf einen Blick zeigt.
+   *
+   * **Ein Aufruf statt einem pro Zeile.** `GET /deals` liefert bis zu 500
+   * Deals je Seite feldrichtig (kein zweiter Aufruf nötig wie bei
+   * `findeDeal`); am 08.09.2026 lagen alle 121 offenen Deals der Pipeline
+   * in einer einzigen Seite. Die Fälle-Liste ordnet die Treffer danach
+   * selbst dem angezeigten Aktenzeichen zu — hundert einzelne Suchen wären
+   * hundert Aufrufe für etwas, das dieser eine schon mitbringt.
+   *
+   * Geblättert wird trotzdem, für den Tag, an dem es mehr als 500 offene
+   * Deals gibt — mit einer Obergrenze an Seiten, damit ein Fehler in der
+   * Abbruchbedingung nicht zu einer Endlosschleife wird.
+   */
+  async listeOffeneDeals(): Promise<DealUebersicht[]> {
+    if (!token()) return []
+
+    const alle: DealUebersicht[] = []
+    let cursor: string | undefined
+    for (let seite = 0; seite < MAX_SEITEN_OFFENE_DEALS; seite++) {
+      const { daten, naechsterCursor } = await anfrageSeite<DealUebersicht[]>('/deals', {
+        pipeline_id: PIPELINE_AUFTRAG_ID,
+        status: 'open',
+        limit: 500,
+        ...(cursor ? { cursor } : {}),
+      })
+      alle.push(...(daten ?? []))
+      if (!naechsterCursor) break
+      cursor = naechsterCursor
+    }
+    return alle
   },
 
   /**
