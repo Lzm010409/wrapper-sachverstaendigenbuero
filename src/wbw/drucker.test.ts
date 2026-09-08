@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 
-const { druckeHtml, druckerVorhanden, druckfehlerMeldung } = await import('./drucker')
+const { druckeHtml, druckerVorhanden, druckfehlerMeldung, grundAusFehler } =
+  await import('./drucker')
 import type { Druckversuch } from './drucker'
 const { belegseite } = await import('./belegseite')
 import type { Belegfahrzeug } from './belegseite'
@@ -155,4 +156,97 @@ describe('Die Meldung eines Druckfehlers', () => {
   it('kommt ohne Versuche zurecht', () => {
     expect(druckfehlerMeldung([])).toContain('kein Browser')
   })
+})
+
+describe('Der Grund eines gescheiterten Aufrufs', () => {
+  /*
+    Am 08.09.2026, 17:36 stand im Protokoll:
+
+        Das PDF liess sich nicht drucken: /usr/bin/chromium: Command failed:
+        /usr/bin/chromium --headless=new … --no-sandbox file:///
+
+    Abgeschnitten bei genau 200 Zeichen — und die 200 Zeichen sind restlos von
+    der Kommandozeile belegt. Node baut seine Meldung als
+    „Command failed: <Kommandozeile>\n<stderr>"; der Grund steht dahinter und
+    fiel damit jedes Mal der Kuerzung zum Opfer. Der Browser war da, er
+    scheiterte, und warum blieb wieder unsichtbar.
+  */
+  const alsFehler = (stderr: string) =>
+    Object.assign(new Error(`Command failed: /usr/bin/chromium --headless=new …\n${stderr}`), {
+      stderr,
+    })
+
+  it('nimmt die Fehlerausgabe statt der Kommandozeile', () => {
+    const grund = grundAusFehler(alsFehler('[123:456:...] FATAL:zygote_host_impl_linux.cc(207)\n'))
+    expect(grund).toContain('FATAL')
+    expect(grund).not.toContain('Command failed')
+    expect(grund).not.toContain('--headless')
+  })
+
+  it('uebergeht das Geschwaetz des D-Bus', () => {
+    // Chromium schreibt in jedem Container ein Dutzend dieser Zeilen. Sie
+    // sagen nichts und verdraengten sonst die eine Zeile, die etwas sagt.
+    const stderr = [
+      '[1:2:0908/1] ERROR:dbus/bus.cc:408] Failed to connect to the bus: …',
+      '[1:2:0908/1] ERROR:dbus/object_proxy.cc:573] Failed to call method: …',
+      '[1:3:0908/1] ERROR:headless/command_handler.cc:265] Failed to write file /tmp/a.pdf: Permission denied (13)',
+    ].join('\n')
+    const grund = grundAusFehler(alsFehler(stderr))
+    expect(grund).toContain('Permission denied')
+    expect(grund).not.toContain('dbus')
+  })
+
+  it('nennt Rueckgabewert oder Signal, wenn es gar keine Ausgabe gibt', () => {
+    // Die Kommandozeile noch einmal hinzuschreiben half niemandem — Signal und
+    // Rueckgabewert sind dann die einzige Auskunft, die es gibt.
+    const ohneAusgabe = Object.assign(
+      new Error('Command failed: /usr/bin/chromium --headless=new …'),
+      { stderr: '', code: 21 },
+    )
+    expect(grundAusFehler(ohneAusgabe)).toBe('abgebrochen mit Rückgabewert 21, ohne Ausgabe')
+
+    const abgelaufen = Object.assign(new Error('Command failed: /usr/bin/chromium …'), {
+      stderr: '',
+      killed: true,
+      signal: 'SIGTERM',
+    })
+    expect(grundAusFehler(abgelaufen)).toContain('Zeitüberschreitung')
+  })
+
+  it('kommt mit einem Fehler ohne Ausgabe zurecht', () => {
+    expect(grundAusFehler(new Error('spawn ENOENT'))).toBe('spawn ENOENT')
+    expect(grundAusFehler('kaputt')).toBe('kaputt')
+  })
+
+  it('laesst den Grund lang genug, um brauchbar zu sein', () => {
+    const lang = 'ERROR:etwas.cc(1)] ' + 'x'.repeat(500)
+    expect(grundAusFehler(alsFehler(lang)).length).toBeGreaterThan(200)
+  })
+})
+
+describe('Die Kandidatenliste', () => {
+  it('probiert denselben Pfad nicht zweimal', async () => {
+    /*
+      Im Protokoll vom 08.09.2026 stand `/usr/bin/chromium` zweimal: einmal
+      ueber WBW_CHROME, einmal als fester Eintrag der Liste. Zwei Aufrufe,
+      zwei Fehlschlaege, zweimal dieselbe Meldung — und im Abbild ist beides
+      derselbe Browser.
+    */
+    const ordner = await mkdtemp(join(tmpdir(), 'druck-'))
+    const html = join(ordner, 'beleg.html')
+    await writeFile(html, belegseite(KOPF, [FAHRZEUG], 'Paket'), 'utf8')
+
+    let meldung = ''
+    try {
+      await druckeHtml(html, join(ordner, 'beleg.pdf'))
+    } catch (fehler) {
+      meldung = (fehler as Error).message
+    }
+    if (!meldung) return // mit Browser gedruckt — dann gibt es nichts zu pruefen
+
+    // Wortgenau: `/usr/bin/chromium-browser` enthaelt denselben Anfang und
+    // darf nicht als Dublette zaehlen.
+    const pfade = meldung.match(/\/usr\/bin\/chromium(?![\w-])/g) ?? []
+    expect(pfade.length).toBeLessThanOrEqual(1)
+  }, 120_000)
 })

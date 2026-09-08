@@ -23,7 +23,7 @@ const fuehreAus = promisify(execFile)
 
 /** Wo Chromium liegt. `WBW_CHROME` gewinnt — im Abbild ist es gesetzt. */
 function kandidaten(): string[] {
-  return [
+  const alle = [
     process.env.WBW_CHROME,
     process.env.CHROME_PATH,
     process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -38,6 +38,72 @@ function kandidaten(): string[] {
     'google-chrome',
     'google-chrome-stable',
   ].filter((p): p is string => Boolean(p))
+
+  // `WBW_CHROME` zeigt im Abbild auf `/usr/bin/chromium`, das gleich darunter
+  // noch einmal steht. Zweimal derselbe Aufruf heisst zweimal dieselbe
+  // Wartezeit und zweimal dieselbe Meldung — im Protokoll vom 08.09.2026 gut
+  // zu sehen.
+  return [...new Set(alle)]
+}
+
+/**
+ * Zeilen, die Chromium in jedem Container schreibt und die nichts erklären.
+ *
+ * Ohne diesen Filter verdrängen ein Dutzend D-Bus-Meldungen die eine Zeile,
+ * die den Abbruch begründet.
+ */
+const GESCHWAETZ = /dbus|Failed to connect to the bus|NameHasOwner|Fontconfig|GLES|libva/i
+
+/**
+ * Der Grund eines gescheiterten Aufrufs — aus der Fehlerausgabe, nicht aus
+ * der Kommandozeile.
+ *
+ * **Warum das nötig ist.** Node baut die Meldung eines gescheiterten
+ * `execFile` als `Command failed: <ganze Kommandozeile>\n<stderr>`. Die
+ * Kommandozeile von Chromium ist über 200 Zeichen lang — jede Kürzung behält
+ * damit genau sie und wirft den Grund weg. Am 08.09.2026 stand deshalb im
+ * Protokoll:
+ *
+ *     Das PDF liess sich nicht drucken: /usr/bin/chromium: Command failed:
+ *     /usr/bin/chromium --headless=new … --no-sandbox file:///
+ *
+ * Der Browser war da, er scheiterte, und warum blieb wieder unsichtbar —
+ * dieselbe Blindheit wie zuvor, nur eine Ebene tiefer.
+ */
+export function grundAusFehler(fehler: unknown): string {
+  if (typeof fehler === 'string') return fehler.slice(0, 400)
+
+  const f = fehler as { stderr?: unknown; message?: unknown }
+  const stderr = typeof f.stderr === 'string' ? f.stderr : ''
+  const zeilen = stderr
+    .split('\n')
+    .map((z) => z.trim())
+    .filter(Boolean)
+    .filter((z) => !GESCHWAETZ.test(z))
+
+  if (zeilen.length > 0) {
+    // Die letzten Zeilen tragen den Abbruch; davor steht der Anlauf.
+    return zeilen.slice(-3).join(' | ').slice(0, 400)
+  }
+
+  const meldung = typeof f.message === 'string' ? f.message : String(fehler)
+  // Die Kommandozeile weglassen: sie sagt nichts über den Abbruch und frisst
+  // sonst den ganzen Platz.
+  const ohneBefehl = meldung.replace(/^Command failed: [^\n]*/, '').trim()
+  if (ohneBefehl) return ohneBefehl.slice(0, 400)
+
+  /*
+    Bleibt nur die Kommandozeile, ist die Ausgabe leer — dann tragen Signal und
+    Rückgabewert die einzige Auskunft, die es gibt. Die Kommandozeile noch
+    einmal hinzuschreiben half niemandem.
+  */
+  const lage = fehler as { code?: unknown; signal?: unknown; killed?: unknown }
+  if (lage.killed && lage.signal) {
+    return `nach Zeitüberschreitung abgebrochen (${String(lage.signal)}), ohne Ausgabe`
+  }
+  if (lage.signal) return `durch ${String(lage.signal)} beendet, ohne Ausgabe`
+  if (lage.code !== undefined) return `abgebrochen mit Rückgabewert ${String(lage.code)}, ohne Ausgabe`
+  return 'abgebrochen ohne Ausgabe'
 }
 
 /** Ein einzelner Versuch, einen Browser zu benutzen. */
@@ -152,9 +218,24 @@ export async function druckeHtml(htmlPfad: string, pdfPfad: string): Promise<voi
     throw new Error(`Das PDF liess sich nicht drucken: ${htmlPfad} ist keine brauchbare Vorlage.`)
   }
 
+  /*
+    Ein eigenes Profilverzeichnis neben dem PDF.
+    
+    Chromium legt sonst eines unter `$HOME` an. Im Abbild läuft der Dienst als
+    `werkbank`, ein Systembenutzer ohne angelegtes Heimatverzeichnis — dann
+    schlägt der Start je nach Fassung fehl, und die Meldung landete bis zum
+    08.09.2026 hinter der Kürzung.
+  */
+  const profil = `${pdfPfad}.profil`
+
   const argumente = [
     '--headless=new',
     '--disable-gpu',
+    // Im Container sind `/dev/shm` standardmässig 64 MB. Reicht das dem
+    // Renderer nicht, stirbt er mitten im Druck — der häufigste Grund dafür,
+    // dass Chromium zwar `--version` beantwortet und trotzdem nichts druckt.
+    '--disable-dev-shm-usage',
+    `--user-data-dir=${profil}`,
     '--no-pdf-header-footer',
     `--print-to-pdf=${pdfPfad}`,
     // Gibt den eingebetteten Bildern Zeit, sich aufzubauen. Ohne das kam ein
@@ -181,7 +262,7 @@ export async function druckeHtml(htmlPfad: string, pdfPfad: string): Promise<voi
         if (groesse > 8000) return
         grund = `schrieb nur ${groesse} Byte`
       } catch (fehler) {
-        grund = fehler instanceof Error ? fehler.message.slice(0, 200) : String(fehler)
+        grund = grundAusFehler(fehler)
       }
     }
 
