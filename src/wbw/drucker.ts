@@ -1,6 +1,7 @@
 import 'server-only'
 import { execFile } from 'node:child_process'
-import { stat } from 'node:fs/promises'
+import { access, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { promisify } from 'node:util'
 
 const fuehreAus = promisify(execFile)
@@ -27,6 +28,11 @@ function kandidaten(): string[] {
     process.env.CHROME_PATH,
     process.env.PUPPETEER_EXECUTABLE_PATH,
     '/usr/bin/chromium',
+    // Dorthin zeigt der Symlink des Debian-Pakets. Ist `/usr/bin/chromium`
+    // beschädigt, liegt das Programm trotzdem hier.
+    '/usr/lib/chromium/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
     'chromium',
     'chromium-browser',
     'google-chrome',
@@ -34,17 +40,101 @@ function kandidaten(): string[] {
   ].filter((p): p is string => Boolean(p))
 }
 
+/** Ein einzelner Versuch, einen Browser zu benutzen. */
+export interface Druckversuch {
+  pfad: string
+  /** Ob unter diesem Pfad überhaupt etwas Ausführbares liegt. */
+  vorhanden: boolean
+  /** Woran es scheiterte — `null`, wenn es geklappt hat. */
+  grund: string | null
+}
+
+/** Ob unter einem Pfad etwas Ausführbares liegt. Namen ohne `/` sagen nichts. */
+async function istVorhanden(pfad: string): Promise<boolean> {
+  if (!pfad.includes('/')) return false
+  try {
+    await access(pfad, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Formt aus allen Versuchen eine Meldung, die den Grund nennt.
+ *
+ * **Warum das eine eigene Funktion ist.** Bis zum 08.09.2026 merkte sich der
+ * Drucker nur den *letzten* Fehlschlag. Der letzte Kandidat der Liste heisst
+ * `google-chrome-stable` und ist von niemandem eingerichtet — seine
+ * ENOENT-Meldung überschrieb jeden echten Grund. Im Protokoll stand dann
+ *
+ *     Das PDF liess sich nicht drucken: spawn google-chrome-stable ENOENT
+ *
+ * und zwar unabhängig davon, was wirklich los war. Wer das liest, sucht nach
+ * einem Browser, den er nie konfiguriert hat.
+ *
+ * Unterschieden wird deshalb zweierlei: **kein Browser im Abbild** — dann ist
+ * die Einrichtung schuld — und **Browser da, Druck gescheitert** — dann sagt
+ * sein eigener Grund, was zu tun ist.
+ */
+export function druckfehlerMeldung(versuche: Druckversuch[]): string {
+  const vorhandene = versuche.filter((v) => v.vorhanden)
+
+  if (vorhandene.length === 0) {
+    const gesucht = versuche.map((v) => v.pfad).join(', ')
+    return (
+      'Das PDF liess sich nicht drucken: im Abbild ist kein Browser installiert. ' +
+      `Gesucht wurde unter ${gesucht || '— keine Kandidaten —'}. ` +
+      'Erwartet wird Chromium unter dem Pfad aus WBW_CHROME.'
+    )
+  }
+
+  // Der erste vorhandene führt: das ist der konfigurierte, und sein Grund ist
+  // der, der zählt. Die übrigen stehen dahinter, damit nichts verlorengeht.
+  const zeilen = vorhandene.map((v) => `${v.pfad}: ${v.grund ?? 'ohne Grund'}`)
+  return `Das PDF liess sich nicht drucken: ${zeilen.join(' — ')}`
+}
+
 /** Ob überhaupt gedruckt werden kann — für eine Meldung vor der Arbeit. */
 export async function druckerVorhanden(): Promise<boolean> {
+  return (await sucheDrucker()) !== null
+}
+
+/**
+ * Das Ergebnis der Suche, einmal gemerkt.
+ *
+ * `/api/gesundheit` wird alle 30 Sekunden abgefragt. Ohne diesen Speicher
+ * startete jede Abfrage bis zu elf Prozesse, nur um dieselbe Antwort zu
+ * bekommen — ein Browser wandert nicht zur Laufzeit ins Abbild.
+ */
+let gemerkterDrucker: { pfad: string | null } | null = null
+
+/**
+ * Der erste Browser, der sich starten lässt — oder `null`.
+ *
+ * Wird beim Start, vor dem Erzeugen der Belege und von der Zustandsauskunft
+ * gefragt, damit ein fehlender Browser auffällt, bevor jemand eine Recherche
+ * darauf verwendet.
+ */
+export async function sucheDrucker(): Promise<string | null> {
+  if (gemerkterDrucker) return gemerkterDrucker.pfad
+
   for (const bin of kandidaten()) {
     try {
       await fuehreAus(bin, ['--version'], { timeout: 15_000 })
-      return true
+      gemerkterDrucker = { pfad: bin }
+      return bin
     } catch {
       // nächster
     }
   }
-  return false
+  gemerkterDrucker = { pfad: null }
+  return null
+}
+
+/** Für Tests: die gemerkte Antwort verwerfen. */
+export function vergissDrucker(): void {
+  gemerkterDrucker = null
 }
 
 export async function druckeHtml(htmlPfad: string, pdfPfad: string): Promise<void> {
@@ -73,9 +163,12 @@ export async function druckeHtml(htmlPfad: string, pdfPfad: string): Promise<voi
     '--virtual-time-budget=20000',
   ]
   const adresse = `file://${encodeURI(htmlPfad)}`
-  let letzterGrund = 'kein Browser gefunden'
+  const versuche: Druckversuch[] = []
 
   for (const bin of kandidaten()) {
+    const vorhanden = await istVorhanden(bin)
+    let grund: string | null = null
+
     // Zweiter Anlauf ohne Sandbox: Chromium verweigert den Start als root,
     // und genau so läuft es in manchen Containern.
     for (const zusatz of [[], ['--no-sandbox']]) {
@@ -86,12 +179,20 @@ export async function druckeHtml(htmlPfad: string, pdfPfad: string): Promise<voi
         // Datei — leer oder ein paar hundert Byte gross. Sie sähe im Ordner
         // aus wie ein Beleg und wäre keiner.
         if (groesse > 8000) return
-        letzterGrund = `${bin} schrieb nur ${groesse} Byte`
+        grund = `schrieb nur ${groesse} Byte`
       } catch (fehler) {
-        letzterGrund = fehler instanceof Error ? fehler.message.slice(0, 200) : String(fehler)
+        grund = fehler instanceof Error ? fehler.message.slice(0, 200) : String(fehler)
       }
     }
+
+    /*
+      Ein Aufruf, der mit ENOENT scheitert, sagt dasselbe wie eine fehlende
+      Datei — auch für einen blossen Namen ohne Pfad, den `istVorhanden` nicht
+      beurteilen kann. Beides gehört zusammen, damit die Meldung „kein Browser
+      im Abbild" nicht an einem Namen scheitert, der nie einer war.
+    */
+    versuche.push({ pfad: bin, vorhanden: vorhanden && !/ENOENT/.test(grund ?? ''), grund })
   }
 
-  throw new Error(`Das PDF liess sich nicht drucken: ${letzterGrund}`)
+  throw new Error(druckfehlerMeldung(versuche))
 }
