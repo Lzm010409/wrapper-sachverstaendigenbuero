@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Meldung } from '@/app/teile/meldung'
+import {
+  ausErgebnis,
+  erfolg,
+  fehler,
+  warnung,
+  type Meldung as Meldungsdaten,
+} from '@/melden/typen'
 import { EditorContent, useEditor } from '@tiptap/react'
 import {
   EREIGNIS_KOPF,
@@ -120,7 +128,14 @@ export function Schreibtisch({
   const [pruefung, setzePruefung] = useState<Pruefergebnis | null>(null)
   const [ausgabe, setzeAusgabe] = useState<FertigeAusgabe | null>(null)
   const [ausgabestand, setzeAusgabestand] = useState<Fortschrittsstand | null>(null)
-  const [meldung, setzeMeldung] = useState<string | null>(null)
+  /*
+    Die Art steht an der Meldung, nicht in ihrem Wortlaut. Vorher war das ein
+    `string` und die Farbe wurde am Text erraten:
+    `meldung.match(/sperr|gescheitert|nicht /i) ? 'fehler' : ''`. Das ging
+    meistens gut und war jedes Mal Glück — wer eine Meldung umformuliert,
+    hätte ihre Farbe geändert.
+  */
+  const [meldung, setzeMeldung] = useState<Meldungsdaten | null>(null)
   const [bildLaeuft, setzeBildLaeuft] = useState(0)
   const [fokus, setzeFokus] = useState(false)
   const [laeuft, starte] = useTransition()
@@ -239,7 +254,9 @@ export function Schreibtisch({
         )
         if (!treffer) {
           setzeMeldung(
-            'Ein Baustein gehört in einen Positionsabschnitt — nicht in Betreff, Ergebnis oder Signatur.',
+            warnung(
+              'Ein Baustein gehört in einen Positionsabschnitt — nicht in Betreff, Ergebnis oder Signatur.',
+            ),
           )
         }
         return true
@@ -314,7 +331,7 @@ export function Schreibtisch({
     }
 
     setzeZustand('konflikt' in e ? 'konflikt' : 'fehler')
-    setzeMeldung(e.fehler)
+    setzeMeldung(e.fehler ? fehler(e.fehler) : null)
   }, [editor, stellungnahmeId])
 
   const planeSpeichern = useCallback(() => {
@@ -435,7 +452,7 @@ export function Schreibtisch({
 
       if (geaendert) {
         editor.view.dispatch(tr)
-        setzeMeldung('Anrede und Einleitungssatz im Brief nachgetragen.')
+        setzeMeldung(erfolg('Anrede und Einleitungssatz im Brief nachgetragen.'))
         /*
           Und sofort sichern, nicht erst nach der Schreibruhe.
 
@@ -530,7 +547,7 @@ export function Schreibtisch({
         }
 
         if (!antwort.ok || !ergebnis.id) {
-          setzeMeldung(ergebnis.fehler ?? 'Das Bild liess sich nicht hochladen.')
+          setzeMeldung(fehler(ergebnis.fehler ?? 'Das Bild liess sich nicht hochladen.'))
           return
         }
 
@@ -546,7 +563,7 @@ export function Schreibtisch({
           koordinaten,
         )
       } catch {
-        setzeMeldung('Das Bild liess sich nicht hochladen — die Verbindung ist abgerissen.')
+        setzeMeldung(fehler('Das Bild liess sich nicht hochladen — die Verbindung ist abgerissen.'))
       } finally {
         setzeBildLaeuft((n) => n - 1)
       }
@@ -603,7 +620,7 @@ export function Schreibtisch({
       const text = abschnittsText(editor, positionId)
       const e = await formuliereAbschnitt(stellungnahmeId, positionId, text)
       if (e.fehler || !e.text) {
-        setzeMeldung(e.fehler ?? 'Das Ausformulieren hat nichts geliefert.')
+        setzeMeldung(fehler(e.fehler ?? 'Das Ausformulieren hat nichts geliefert.'))
         return
       }
       const herkunft = ersteHerkunft(editor, positionId)
@@ -619,7 +636,7 @@ export function Schreibtisch({
           }),
         ]) as never,
       )
-      setzeMeldung('Abschnitt ausformuliert. Rückgängig mit Strg+Z.')
+      setzeMeldung(erfolg('Abschnitt ausformuliert. Rückgängig mit Strg+Z.'))
     })
 
   const herausnehmen = (positionId: string) =>
@@ -669,7 +686,7 @@ export function Schreibtisch({
       await speichereJetzt()
       const e = await entfernePosition(positionId)
       if (e.fehler) {
-        setzeMeldung(e.fehler)
+        setzeMeldung(fehler(e.fehler))
         return
       }
       setzeAktiv(null)
@@ -685,13 +702,13 @@ export function Schreibtisch({
         positionId,
         dokumentJson(editor),
       )
-      setzeMeldung(e.fehler ?? e.hinweis ?? null)
+      setzeMeldung(ausErgebnis(e))
     })
 
   const springeZu = (b: Befund) => {
     if (!editor || !b.fundstelle) return
     if (!zeigeFundstelle(editor, b.positionId, b.fundstelle)) {
-      setzeMeldung('Diese Stelle steht so nicht mehr im Brief.')
+      setzeMeldung(warnung('Diese Stelle steht so nicht mehr im Brief.'))
     }
   }
 
@@ -724,7 +741,7 @@ export function Schreibtisch({
       })
     } catch {
       setzeAusgabestand(null)
-      setzeMeldung('Die Verbindung ist abgerissen.')
+      setzeMeldung(fehler('Die Verbindung ist abgerissen.'))
       return
     }
 
@@ -741,7 +758,7 @@ export function Schreibtisch({
 
       if (ereignis.art === 'fehler') {
         setzeAusgabestand(null)
-        setzeMeldung(ereignis.fehler)
+        setzeMeldung(fehler(ereignis.fehler))
         if (ereignis.befunde) {
           /**
            * Die erste sperrende Stelle aufschlagen.
@@ -781,7 +798,7 @@ export function Schreibtisch({
     }
 
     setzeAusgabestand(null)
-    setzeMeldung('Der Vorgang ist unterwegs abgebrochen.')
+    setzeMeldung(fehler('Der Vorgang ist unterwegs abgebrochen.'))
   }
 
   const lade = (name: string, inhalt: BlobPart, typ: string) => {
@@ -1019,7 +1036,7 @@ export function Schreibtisch({
               onClick={() =>
                 starte(async () => {
                   const e = await markiereVersendet(stellungnahmeId)
-                  setzeMeldung(e.hinweis ?? null)
+                  setzeMeldung(e.hinweis ? erfolg(e.hinweis) : null)
                   router.refresh()
                 })
               }
@@ -1039,7 +1056,7 @@ export function Schreibtisch({
               onClick={() =>
                 starte(async () => {
                   const e = await nimmVersandZurueck(stellungnahmeId)
-                  setzeMeldung(e.hinweis ?? null)
+                  setzeMeldung(e.hinweis ? erfolg(e.hinweis) : null)
                   router.refresh()
                 })
               }
@@ -1051,12 +1068,8 @@ export function Schreibtisch({
       </div>
 
       {meldung ? (
-        <div
-          className={`hinweis ${meldung.match(/sperr|gescheitert|nicht |Konflikt/i) ? 'fehler' : ''}`}
-          role="status"
-          style={{ marginBottom: 12 }}
-        >
-          {meldung}
+        <Meldung art={meldung.art} style={{ marginBottom: 12 }}>
+          {meldung.text}
           {zustand === 'konflikt' ? (
             <>
               {' '}
@@ -1065,7 +1078,7 @@ export function Schreibtisch({
               </button>
             </>
           ) : null}
-        </div>
+        </Meldung>
       ) : null}
 
       {ausgabestand ? (

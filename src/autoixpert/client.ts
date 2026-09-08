@@ -1,6 +1,9 @@
 import {
   einzelAntwortSchema,
+  fotolisteSchema,
   listenAntwortSchema,
+  type Fotodaten,
+  type Fotoformat,
   type Gutachten,
 } from './typen'
 import {
@@ -9,6 +12,7 @@ import {
   pflichtfilter,
   pruefeGutachten,
   type Abrufregel,
+  pruefeSchreibzugriff,
 } from './abrufregel'
 import { abrufreihenfolge } from './aktenzeichen'
 
@@ -299,7 +303,128 @@ export class AutoixpertClient {
       404,
     )
   }
+
+  /* ---------------- Fotos ---------------- */
+
+  /**
+   * Die Bild-Metadaten eines Gutachtens.
+   *
+   * Nur die Angaben, nicht die Dateien: ein Fall mit 67 Fotos wäre sonst ein
+   * Abruf von rund 200 MB. Die Dateien holt `holeFotoDatei`, und zwar einzeln
+   * und in der Grösse, die gerade gebraucht wird.
+   */
+  async holeFotos(reportId: string): Promise<Fotodaten[]> {
+    const ergebnis = await this.anfrage(`/reports/${encodeURIComponent(reportId)}/photos`)
+    const geprueft = fotolisteSchema.safeParse(ergebnis)
+    if (!geprueft.success) {
+      throw new AutoixpertFehler(
+        `Die Fotoliste von autoiXpert hat eine unerwartete Form: ${geprueft.error.issues
+          .slice(0, 3)
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ')}`,
+      )
+    }
+    return geprueft.data.photos
+  }
+
+  /**
+   * Eine Bilddatei — als **Strom**, nicht als Puffer.
+   *
+   * Der Unterschied ist der Speicherbedarf: `arrayBuffer()` hielte ein
+   * 3-MB-Foto vollständig im Arbeitsspeicher des Servers, und bei mehreren
+   * Abrufen zugleich vervielfacht sich das. Weitergereicht wird stattdessen
+   * der Körper der Antwort; der Server hält immer nur den gerade laufenden
+   * Abschnitt.
+   *
+   * @param format `thumbnail` (400×300, ~50 KB), `rendered` (mit Formen) oder
+   *   `original`. Am echten Fall gemessen: Vorschaubild 50 KB, Original 3 MB.
+   */
+  async holeFotoDatei(
+    reportId: string,
+    fotoId: string,
+    format: Fotoformat = 'thumbnail',
+  ): Promise<{ koerper: ReadableStream<Uint8Array> | null; typ: string; laenge: string | null }> {
+    const url = new URL(
+      `${this.basisUrl}/reports/${encodeURIComponent(reportId)}/photos/${encodeURIComponent(fotoId)}/download`,
+    )
+    url.searchParams.set('format', format)
+
+    let antwort: Response
+    try {
+      antwort = await this.hole(url.toString(), {
+        headers: { authorization: `Bearer ${this.token}` },
+      })
+    } catch (fehler) {
+      throw new AutoixpertFehler(
+        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
+      )
+    }
+
+    if (!antwort.ok) {
+      throw new AutoixpertFehler(
+        `Das Foto liess sich nicht laden (HTTP ${antwort.status}).`,
+        antwort.status,
+      )
+    }
+
+    return {
+      koerper: antwort.body,
+      // autoiXpert schickt beim Original `binary/octet-stream`; der Browser
+      // zeigt das als Download an statt als Bild. Der Typ steht in den
+      // Metadaten und wird von dort gesetzt.
+      typ: antwort.headers.get('content-type') ?? 'application/octet-stream',
+      laenge: antwort.headers.get('content-length'),
+    }
+  }
+
+  /**
+   * Ändert die Angaben zu einem Foto.
+   *
+   * Schreibender Zugriff — die Sperre der Abrufregel gilt. Ohne
+   * `AUTOIXPERT_SCHREIBEN=erlaubt` wirft das hier, bevor irgendetwas das Haus
+   * verlässt.
+   */
+  async aendereFoto(
+    reportId: string,
+    fotoId: string,
+    aenderung: Partial<{
+      title: string
+      description: string
+      included_in_report: boolean
+      included_in_residual_value_exchange: boolean
+      included_in_repair_confirmation: boolean
+      included_in_expert_statement: boolean
+    }>,
+  ): Promise<void> {
+    pruefeSchreibzugriff(`Foto ${fotoId} beschriften`, this.regel)
+
+    const url = `${this.basisUrl}/reports/${encodeURIComponent(reportId)}/photos/${encodeURIComponent(fotoId)}`
+    let antwort: Response
+    try {
+      antwort = await this.hole(url, {
+        method: 'PATCH',
+        headers: {
+          authorization: `Bearer ${this.token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(aenderung),
+      })
+    } catch (fehler) {
+      throw new AutoixpertFehler(
+        `autoiXpert ist nicht erreichbar: ${fehler instanceof Error ? fehler.message : String(fehler)}`,
+      )
+    }
+
+    if (!antwort.ok) {
+      const text = await antwort.text().catch(() => '')
+      throw new AutoixpertFehler(
+        `Die Änderung wurde abgelehnt (HTTP ${antwort.status}). ${text.slice(0, 200)}`,
+        antwort.status,
+      )
+    }
+  }
 }
+
 
 /** Vergleichsform für Aktenzeichen: ohne Leerraum, klein geschrieben. */
 export function normalisiere(wert: string): string {

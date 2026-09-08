@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { formatiereDatum } from '@/autoixpert/felder'
@@ -13,11 +14,13 @@ import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
+import { FotoReiter } from './reiter/fotos'
 import { KalkulationReiter } from './reiter/kalkulation'
 import { WbwReiterMitVorschlag } from './reiter/wbw-laden'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
 import { Reichtext } from './reiter/reichtext'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
 
 const HERKUNFT: Record<string, string> = {
   anwalt: 'Rechtsanwalt aus dem Gutachten',
@@ -103,16 +106,48 @@ export default async function FallSeite({
         autoiXpert. Wer hier landet, weil ein Import schiefging, kommt trotzdem
         an sein Schreiben.
       */}
-      {aktiv === 'stellungnahmen' ? <StellungnahmenReiter fall={fall} /> : null}
+      {aktiv === 'stellungnahmen' ? (
+        <Suspense fallback={<SkelettReiter was="Die Stellungnahmen" />}>
+          <StellungnahmenReiter fall={fall} />
+        </Suspense>
+      ) : null}
 
       {fall.daten && fall.gutachten ? (
         <>
+          {/*
+            „Unfall & Beteiligte" und „Fahrzeug" stehen sofort da — ihre
+            Angaben liegen bereits in `fall.daten`.
+          */}
           {aktiv === 'beteiligte' ? <BeteiligteReiter d={fall.daten} /> : null}
           {aktiv === 'fahrzeug' ? <FahrzeugReiter d={fall.daten} /> : null}
-          {aktiv === 'kalkulation' ? <KalkulationReiter gutachten={fall.gutachten} /> : null}
-          {aktiv === 'wbw' ? <WbwReiterMitVorschlag gutachten={fall.gutachten} fallId={fall.id} /> : null}
+
+          {/*
+            Die drei übrigen holen etwas über das Netz: die DAT-Kalkulation
+            aus autoiXpert, den Deal aus Pipedrive. Ohne die Grenze hier
+            wartete die **ganze** Seite darauf — Kopf, Reiterleiste und alles
+            —, und der Klick auf den Reiter sah aus, als wäre nichts passiert.
+            Mit ihr steht der Rahmen sofort, und nur der Inhalt hat einen
+            Platzhalter.
+          */}
+          {aktiv === 'fotos' ? (
+            <Suspense fallback={<SkelettRaster />}>
+              <FotoReiter gutachten={fall.gutachten} fallId={fall.id} />
+            </Suspense>
+          ) : null}
+          {aktiv === 'kalkulation' ? (
+            <Suspense fallback={<SkelettReiter was="Die Kalkulation" />}>
+              <KalkulationReiter gutachten={fall.gutachten} />
+            </Suspense>
+          ) : null}
+          {aktiv === 'wbw' ? (
+            <Suspense fallback={<SkelettReiter was="Der Wiederbeschaffungswert" />}>
+              <WbwReiterMitVorschlag gutachten={fall.gutachten} fallId={fall.id} />
+            </Suspense>
+          ) : null}
           {aktiv === 'vorgang' ? (
-            <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
+            <Suspense fallback={<SkelettReiter was="Der Vorgang" />}>
+              <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
+            </Suspense>
           ) : null}
         </>
       ) : null}

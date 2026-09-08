@@ -4,6 +4,8 @@ import { db } from '@/db'
 import { wbwLauf } from '@/db/schema'
 import { loeseModellAuf } from './modell'
 import { ermittleModelle, fuehreLaufAus, type Schritt, type WbwEingabe } from './lauf'
+import { notiere } from '@/melden/ablage'
+import { leseErgebnis } from './ergebnis'
 import { fehlendeLaufangaben, type LaufEingaben } from './lauf-eingaben'
 
 export type { LaufEingaben } from './lauf-eingaben'
@@ -96,6 +98,8 @@ function zuStand(zeile: typeof wbwLauf.$inferSelect): Laufstand {
 export async function starteLauf(
   fallId: string,
   eingaben: LaufEingaben,
+  /** Wer ihn angestossen hat — er bekommt die Meldung, wenn er fertig ist. */
+  benutzerId: string | null = null,
 ): Promise<{ id: string } | { fehler: string }> {
   const fehlt = fehlendeLaufangaben(eingaben)
   if (fehlt.length > 0) {
@@ -113,7 +117,7 @@ export async function starteLauf(
 
   const [angelegt] = await db
     .insert(wbwLauf)
-    .values({ fallId, eingabe: eingaben, protokoll: [] })
+    .values({ fallId, eingabe: eingaben, protokoll: [], angestossenVon: benutzerId })
     .returning({ id: wbwLauf.id })
 
   if (!angelegt) return { fehler: 'Der Lauf liess sich nicht anlegen.' }
@@ -122,7 +126,7 @@ export async function starteLauf(
   // im selben Prozess weiter. `fuehreAus` fängt jeden Fehler ab und schreibt
   // ihn in die Zeile — eine unbehandelte Zusage darf den Server nicht
   // mitnehmen.
-  void fuehreAus(angelegt.id, eingaben)
+  void fuehreAus(angelegt.id, fallId, eingaben, benutzerId)
 
   return { id: angelegt.id }
 }
@@ -141,7 +145,12 @@ async function schreibeSchritt(id: string, schritte: Schritt[]): Promise<void> {
  * Der eigentliche Lauf. Läuft abgekoppelt und schreibt seinen Stand in die
  * Zeile — hier wird nichts geworfen, was niemand fangen würde.
  */
-async function fuehreAus(id: string, eingaben: LaufEingaben): Promise<void> {
+async function fuehreAus(
+  id: string,
+  fallId: string,
+  eingaben: LaufEingaben,
+  benutzerId: string | null,
+): Promise<void> {
   const schritte: Schritt[] = []
   const melde = (schritt: Schritt) => {
     // Ein Schritt mit gleichem Namen ersetzt seinen Vorgänger: aus „läuft"
@@ -198,6 +207,23 @@ async function fuehreAus(id: string, eingaben: LaufEingaben): Promise<void> {
         beendetAm: new Date(),
       })
       .where(eq(wbwLauf.id, id))
+
+    // Der Lauf dauert Minuten. Wer ihn angestossen hat, ist längst woanders —
+    // ohne diese Meldung endete er lautlos.
+    const gelesen = leseErgebnis(ergebnis.ergebnis)
+    const korb = gelesen?.wert.anzahl ?? 0
+    await notiere({
+      benutzerId,
+      art: korb > 0 ? 'erfolg' : 'warnung',
+      titel: 'Vergleichsfahrzeuge gefunden',
+      text:
+        korb > 0
+          ? `${korb} Fahrzeuge im Korb, Vorschlag ${betragText(gelesen?.wert.vorschlagBrutto)}.`
+          : 'Der Lauf ist durchgelaufen, aber kein Fahrzeug hat es in den Korb geschafft. ' +
+            'Die Toleranzen sind vermutlich zu eng.',
+      verweis: `/faelle/${fallId}?reiter=wbw`,
+      quelle: 'wbw',
+    })
   } catch (fehler) {
     const meldung = fehler instanceof Error ? fehler.message : String(fehler)
     console.error(`WBW-Lauf ${id} fehlgeschlagen:`, fehler)
@@ -214,7 +240,25 @@ async function fuehreAus(id: string, eingaben: LaufEingaben): Promise<void> {
     } catch (schreibfehler) {
       console.error(`WBW-Lauf ${id}: Fehler liess sich nicht festhalten:`, schreibfehler)
     }
+    await notiere({
+      benutzerId,
+      art: 'fehler',
+      titel: 'Recherche abgebrochen',
+      text: meldung.slice(0, 300),
+      verweis: `/faelle/${fallId}?reiter=wbw`,
+      quelle: 'wbw',
+    })
   }
+}
+
+/** Für die Meldung: ein Betrag in Euro, oder „ohne Wert". */
+function betragText(wert: number | null | undefined): string {
+  if (wert == null) return 'ohne Wert'
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(wert)
 }
 
 /**

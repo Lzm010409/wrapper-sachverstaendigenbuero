@@ -41,6 +41,9 @@ export const eintragStatusEnum = pgEnum('eintrag_status', [
 /** Der Stand eines WBW-Recherchelaufs. */
 export const wbwZustandEnum = pgEnum('wbw_zustand', ['laeuft', 'fertig', 'fehler'])
 
+/** Die Art einer Meldung — sie entscheidet über Farbe, Vorlesen und Verweildauer. */
+export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfolg', 'info'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -380,10 +383,49 @@ export const wbwLauf = pgTable(
     fehler: text(),
     /** Wo die erzeugten Dateien liegen. Überlebt keinen Neustart des Containers. */
     ordner: text(),
+    /** Wer ihn angestossen hat — bekommt die Meldung, wenn er fertig ist. */
+    angestossenVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
     begonnenAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
     beendetAm: timestamp({ withTimezone: true }),
   },
   (t) => [index('wbw_lauf_fall_idx').on(t.fallId), index('wbw_lauf_zustand_idx').on(t.zustand)],
+)
+
+/**
+ * Eine Meldung, die den Blick überdauern muss.
+ *
+ * Was am Bildschirm passiert, sagt die Oberfläche selbst. Was **im
+ * Hintergrund** passiert, sagt niemand: Ein WBW-Recherchelauf braucht
+ * Minuten, und wer ihn angestossen hat, ist längst in einem anderen Reiter
+ * oder hat den Rechner zugeklappt. Bis hierher endete so ein Lauf lautlos.
+ *
+ * Deshalb: fertig oder gescheitert wird hier festgehalten, an den Benutzer
+ * gebunden, der ihn angestossen hat. Die Oberfläche fragt danach und zeigt
+ * sie als Einblendung und im Verlauf hinter der Glocke.
+ *
+ * Was hier **nicht** hineingehört: Formularfehler und alles andere, was
+ * unmittelbar auf eine Eingabe folgt. Das steht am Feld, nicht in einer
+ * Liste.
+ */
+export const meldung = pgTable(
+  'meldung',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    benutzerId: uuid()
+      .notNull()
+      .references(() => benutzer.id, { onDelete: 'cascade' }),
+    art: meldungsartEnum().notNull(),
+    titel: text().notNull(),
+    text: text().notNull(),
+    /** Wohin die Meldung führt, z. B. `/faelle/…?reiter=wbw`. */
+    verweis: text(),
+    /** Woher sie kommt, z. B. `wbw` — für die Anzeige und zum Aufräumen. */
+    quelle: text(),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Gesetzt, sobald der Verlauf geöffnet wurde. */
+    gelesenAm: timestamp({ withTimezone: true }),
+  },
+  (t) => [index('meldung_benutzer_idx').on(t.benutzerId, t.erstelltAm)],
 )
 
 export const stellungnahme = pgTable(
@@ -651,3 +693,4 @@ export type Vorbedingung = typeof eintragVorbedingung.$inferSelect
 export type Beleg = typeof beleg.$inferSelect
 export type Benutzer = typeof benutzer.$inferSelect
 export type WbwLauf = typeof wbwLauf.$inferSelect
+export type Gemeldetes = typeof meldung.$inferSelect

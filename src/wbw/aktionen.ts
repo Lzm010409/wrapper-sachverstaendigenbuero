@@ -21,8 +21,8 @@ export async function starteRecherche(
   fallId: string,
   eingaben: LaufEingaben,
 ): Promise<Startantwort> {
-  await verlangeBenutzer()
-  const ergebnis = await starteLauf(fallId, eingaben)
+  const benutzer = await verlangeBenutzer()
+  const ergebnis = await starteLauf(fallId, eingaben, benutzer.id)
   return 'id' in ergebnis ? { id: ergebnis.id } : { fehler: ergebnis.fehler }
 }
 

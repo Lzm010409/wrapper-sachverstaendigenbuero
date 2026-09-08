@@ -129,3 +129,36 @@ export const ZUSTAENDE: Record<string, string> = {
   locked: 'abgeschlossen',
   deleted: 'gelöscht',
 }
+
+/**
+ * Ein Gutachten-Foto, wie autoiXpert es führt.
+ *
+ * `.loose()` wie überall: kommen Felder dazu, fällt der Abruf nicht um.
+ * `size`, `height` und `width` sind ausdrücklich `nullish` — die
+ * Dokumentation empfiehlt, sie beim Anlegen mitzugeben, aber ältere Bilder
+ * haben sie nicht, und ein Raster darf daran nicht scheitern.
+ */
+export const fotoSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().nullish(),
+    description: z.string().nullish(),
+    original_name: z.string().nullish(),
+    mimetype: z.string().nullish(),
+    size: z.number().nullish(),
+    height: z.number().nullish(),
+    width: z.number().nullish(),
+    included_in_report: z.boolean().nullish(),
+    included_in_residual_value_exchange: z.boolean().nullish(),
+    included_in_repair_confirmation: z.boolean().nullish(),
+    included_in_expert_statement: z.boolean().nullish(),
+    lease_return_item_id: z.string().nullish(),
+  })
+  .loose()
+
+export type Fotodaten = z.infer<typeof fotoSchema>
+
+export const fotolisteSchema = z.object({ photos: z.array(fotoSchema) })
+
+/** In welcher Grösse ein Foto geholt wird. */
+export type Fotoformat = 'thumbnail' | 'rendered' | 'original'

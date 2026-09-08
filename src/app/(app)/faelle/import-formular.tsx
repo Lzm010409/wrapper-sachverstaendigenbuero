@@ -4,12 +4,17 @@ import { useActionState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import { importiereFall, type ImportZustand } from '@/autoixpert/aktionen'
+import { Kreisel } from '@/app/teile/anzeigen'
+import { Meldung } from '@/app/teile/meldung'
 
 function Absenden({ aktiv }: { aktiv: boolean }) {
   const { pending } = useFormStatus()
   return (
     <button type="submit" className="haupt" disabled={pending || !aktiv}>
-      {pending ? 'Wird geladen …' : 'Fall laden'}
+      {/* Der Abruf geht über das Netz zu autoiXpert und kann Sekunden
+          dauern; ein Knopf, der nur seine Beschriftung wechselt, sieht dabei
+          aus wie ein Knopf, der nichts tut. */}
+      {pending ? <Kreisel text="Wird geladen …" /> : 'Fall laden'}
     </button>
   )
 }
@@ -40,14 +45,14 @@ export function ImportFormular({ aktiv }: { aktiv: boolean }) {
       </form>
 
       {zustand.fehler ? (
-        <div className="hinweis fehler" style={{ marginBottom: 18 }} role="alert">
+        <Meldung art="fehler" style={{ marginBottom: 18 }}>
           {zustand.fehler}
-        </div>
+        </Meldung>
       ) : null}
       {zustand.hinweis ? (
-        <div className="hinweis" style={{ marginBottom: 18 }} role="status">
+        <Meldung art="erfolg" style={{ marginBottom: 18 }}>
           {zustand.hinweis}
-        </div>
+        </Meldung>
       ) : null}
     </>
   )

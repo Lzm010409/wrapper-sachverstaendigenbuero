@@ -20,6 +20,7 @@ import Link from 'next/link'
 export const REITER = [
   { schluessel: 'beteiligte', name: 'Unfall & Beteiligte' },
   { schluessel: 'fahrzeug', name: 'Fahrzeug' },
+  { schluessel: 'fotos', name: 'Fotos' },
   { schluessel: 'kalkulation', name: 'Kalkulation' },
   { schluessel: 'wbw', name: 'Wiederbeschaffungswert' },
   { schluessel: 'stellungnahmen', name: 'Stellungnahmen' },

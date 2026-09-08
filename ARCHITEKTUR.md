@@ -255,6 +255,99 @@ Serienmerkmale stehen daneben und lassen sich zuschalten — bei Kleinanzeigen,
 wo über die ganze Baureihe gesucht wird, unterscheidet Allrad einen E 53 AMG
 sehr wohl von einem E 220 d.
 
+## Meldewesen: eine Art, drei Orte
+
+Vorgefunden waren **neun Muster für dieselbe Sache**: ein rohes
+`<div class="hinweis fehler">` hier, ein `role="status"` an einer
+Fehlermeldung dort, ein Erfolg in Blau (die Farbe `--good` gab es von Anfang
+an, eine Meldungsklasse dazu nicht), zwei Tokens in `wbw-lauf.tsx`, die es
+nicht gibt — und an einer Stelle wurde die Art **am Text erraten**:
+
+    className={`hinweis ${meldung.match(/sperr|gescheitert|nicht |Konflikt/i) ? 'fehler' : ''}`}
+
+Das ging meistens gut. „Das Bild liess sich **nicht** hochladen" wurde als
+Fehler erkannt, „Diese Stelle steht so **nicht** mehr im Brief" auch — und
+das war schon Glück. Wer eine Meldung umformuliert, hätte ihre Farbe
+geändert.
+
+**Die Regel jetzt:** die Art steht an der Meldung (`src/melden/typen.ts`),
+nicht in ihrem Wortlaut. Sie entscheidet über Farbe, über die Rolle für
+Hilfsmittel (`alert` bei Fehler und Warnung, sonst `status`) und darüber, ob
+eine Einblendung von selbst verschwindet.
+
+**Drei Orte, nach einer Frage sortiert: kann der Benutzer weggesehen haben?**
+
+| Fall | Wo | Warum |
+| --- | --- | --- |
+| Eingabefehler im Formular | am Feld | Der Fehler gehört dorthin, wo er entstand |
+| Ergebnis eines Klicks | dort, wo geklickt wurde | Man sieht ja hin |
+| Etwas aus dem Hintergrund | Einblendung oben rechts | Der Blick ist woanders |
+| Etwas, das lief, während man weg war | Verlauf hinter der Glocke | Der Blick war ganz woanders |
+
+Fehler und Warnungen bleiben stehen, bis sie weggeklickt werden. Erfolg und
+Auskunft verschwinden nach sechs Sekunden — sie sind eine Bestätigung, keine
+Aufgabe.
+
+**Warum eine Tabelle für den Hintergrund.** Ein WBW-Lauf braucht Minuten. Wer
+ihn angestossen hat, ist längst in einem anderen Reiter oder hat den Rechner
+zugeklappt; bis hierher endete so ein Lauf lautlos. `meldung` hält fest, was
+fertig oder gescheitert ist, gebunden an den Benutzer, der es angestossen
+hat. Die Oberfläche fragt alle zwanzig Sekunden danach — aber nur, solange
+der Reiter sichtbar ist.
+
+## Ladeanzeigen: drei Stufen nach Wartegrund
+
+Vorgefunden: **keine einzige `loading.tsx`, kein einziges `<Suspense>`.** Der
+Reiter „Vorgang" wartete auf Pipedrive, der Reiter „Kalkulation" auf
+autoiXpert — und zwar die **ganze Seite**, Kopf und Reiterleiste
+eingeschlossen. Der Klick sah aus, als wäre er ins Leere gegangen.
+
+| Wartezeit auf … | Anzeige | Wo |
+| --- | --- | --- |
+| eine andere Seite | Platzhalter in der Form der Seite | `loading.tsx` je Bereich |
+| einen langsamen Teil der Seite | Platzhalter des Teils | `<Suspense>` um den Teil |
+| das Ergebnis eines Klicks | Kreisel im Knopf | `Kreisel` aus `anzeigen.tsx` |
+
+Ein Kreisel sagt „es passiert etwas". Ein Platzhalter sagt zusätzlich „und
+zwar hier, und es wird ungefähr so aussehen". Beim Klick auf einen Knopf
+reicht das erste — man sieht, wo man geklickt hat. Beim Seiten- oder
+Reiterwechsel zählt das zweite.
+
+Die Platzhalter bilden die endgültige Form nach (Kopf, Reiterleiste,
+zweispaltiger Reiter; Kacheln mit festem Seitenverhältnis), damit beim
+Erscheinen des Inhalts nichts springt.
+
+## Fotos: Vorschaubilder, Lazy Loading, Durchreichen
+
+Am echten Fall 0926/2081TG gemessen (08.09.2026): **67 Fotos**, das Original
+je 3,0 MB bei 3000 × 2250, das Vorschaubild 50 KB bei 400 × 300. Alle
+Originale wären **200 MB** — für ein Raster, in dem jedes Bild 220 Pixel
+breit ist.
+
+Drei Regeln, jede mit einer gemessenen Wirkung:
+
+1. **Im Raster nur Vorschaubilder.** 3,4 MB statt 200 MB.
+2. **`loading="lazy"` mit fester Kachelhöhe.** Beim Öffnen wurden **36 von
+   67** geholt, 1,5 MB — der Rest erst beim Scrollen. Die feste Höhe
+   verhindert, dass das Raster bei jedem eintreffenden Bild springt.
+3. **Das Original erst in der Grossansicht**, eines zur Zeit, mit genau einem
+   vorgeladenen Nachbarn.
+
+**Speicherbedarf des Servers:** Die Route reicht den Antwortkörper durch,
+statt ihn zu puffern. `await antwort.arrayBuffer()` hielte ein 3-MB-Original
+vollständig im Arbeitsspeicher; bei zehn gleichzeitigen Abrufen wären das
+30 MB, die nur durchlaufen.
+
+**Zwischenspeicher auf der Platte, sieben Tage.** autoiXpert schickt keine
+brauchbaren Cache-Angaben (`etag: original` steht an **jedem** Bild, ist also
+wertlos; `cache-control` fehlt ganz). Beim zweiten Öffnen des Reiters kamen
+alle 36 Vorschaubilder aus dem Speicher und **kein einziger** Abruf ging an
+autoiXpert. Abgelegt werden nur Vorschaubilder — Originale füllen jede
+Platte, und man sieht sie einzeln an.
+
+**Die Route nimmt die Fall-ID, nicht die autoiXpert-ID.** Sonst wäre sie ein
+Fenster zu jedem Gutachten des Büros für jeden Angemeldeten.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,
@@ -264,4 +357,9 @@ sehr wohl von einem E 220 d.
 - Kürzungscockpit aus dem vorhandenen Projekt integrieren
 - Extraktion der Kalkulationszahlen aus dem gerenderten Gutachten-Dokument
 - Anmeldung, Datenbank, Änderungsprotokoll
-- Fotos-Reiter und Dokumenten-/Versandcockpit
+- Dokumenten- und Versandcockpit
+- Die rund vierzig verbliebenen rohen `<div class="hinweis">` auf die
+  gemeinsame `Meldung`-Komponente umstellen — sie funktionieren unverändert
+  weiter, tragen aber ihre Rolle noch von Hand
+- Fotos hochladen (zweistufig über S3-URLs); bisher nur ansehen und
+  beschriften

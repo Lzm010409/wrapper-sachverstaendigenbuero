@@ -1138,6 +1138,20 @@ button.haupt:disabled:hover {
   color: var(--crit);
 }
 
+/* Erfolg. Die Farbe --good gab es von Anfang an, eine Meldungsklasse dazu
+   nicht — Erfolg war deshalb visuell nicht von einem beliebigen Hinweis zu
+   unterscheiden und wurde in Blau angezeigt. */
+.hinweis.erfolg {
+  border-left-color: var(--good);
+  background: var(--good-soft);
+}
+
+.hinweis-titel {
+  display: block;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
 .leer {
   text-align: center;
   padding: 48px 20px;
@@ -2745,4 +2759,462 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Meldewesen: Einblendungen, Glocke, Verlauf
+ *
+ * Im Ton der übrigen Oberfläche: weisse Karte mit Schatten statt Rand, und
+ * die Farbe trägt der Punkt, nicht die Fläche — dieselbe Regel wie bei den
+ * Statuspillen. Eine vollflächig rote Einblendung wäre lauter als alles
+ * andere auf dem Bildschirm; das steht einer Fehlermeldung nicht zu, die
+ * meistens nur sagt, dass ein Portal gerade nicht antwortet.
+ * ------------------------------------------------------------------ */
+
+.einblendstapel {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.einblendung {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue);
+  font-size: 13.5px;
+  line-height: 1.45;
+  /* Nur transform und opacity — beides ohne Layout-Neuberechnung. */
+  animation: einblendung-herein 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.einblendung-punkt {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.einblendung.e-fehler .einblendung-punkt { background: var(--crit); }
+.einblendung.e-warnung .einblendung-punkt { background: var(--warn); }
+.einblendung.e-erfolg .einblendung-punkt { background: var(--good); }
+
+.einblendung-inhalt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.einblendung-inhalt strong { font-weight: 600; }
+
+.einblendung-schliessen {
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.2;
+  /* Die Trefferfläche ist grösser als das Zeichen. */
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.einblendung-schliessen:hover { color: var(--ink); }
+
+@keyframes einblendung-herein {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Glocke in der Kopfleiste */
+.glocke-halter {
+  position: relative;
+  display: inline-flex;
+}
+
+.glocke {
+  position: relative;
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: var(--radius);
+  min-width: 30px;
+  min-height: 30px;
+}
+
+.glocke:hover { background: var(--surface-alt); }
+
+.glocke-zahl {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--crit);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.verlauf {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  width: min(380px, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue);
+  animation: einblendung-herein 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.verlauf-kopf {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.verlauf-leer {
+  margin: 0;
+  padding: 18px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.verlauf-liste { list-style: none; margin: 0; padding: 0; }
+
+.verlauf-eintrag {
+  display: flex;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+
+.verlauf-eintrag:last-child { border-bottom: 0; }
+
+.verlauf-punkt {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.verlauf-eintrag.v-fehler .verlauf-punkt { background: var(--crit); }
+.verlauf-eintrag.v-warnung .verlauf-punkt { background: var(--warn); }
+.verlauf-eintrag.v-erfolg .verlauf-punkt { background: var(--good); }
+
+.verlauf-titel { font-weight: 600; }
+.verlauf-text { color: var(--ink-mid); margin-top: 1px; }
+.verlauf-zeit { color: var(--ink-soft); font-size: 11.5px; margin-top: 3px; }
+
+@media (max-width: 700px) {
+  .einblendstapel { top: 60px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Platzhalter (Skelette)
+ *
+ * Ein wanderndes Glanzlicht statt eines Pulsierens: es zeigt eine Richtung
+ * und wirkt dadurch weniger nervös. Animiert wird nur `background-position`
+ * auf einem Verlauf — kein Layout, kein Neuzeichnen des Textflusses.
+ * ------------------------------------------------------------------ */
+
+.skelett {
+  display: block;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-alt) 25%,
+    var(--line-soft) 50%,
+    var(--surface-alt) 75%
+  );
+  background-size: 200% 100%;
+  animation: skelett-glanz 1.4s ease-in-out infinite;
+}
+
+@keyframes skelett-glanz {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.skelett-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.skelett-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.skelett-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.skelett-reiterleiste {
+  display: flex;
+  gap: 18px;
+  padding: 0 4px 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.skelett-reiterleiste .skelett { width: 76px; }
+
+.skelett-kachel {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  border-radius: var(--radius);
+}
+
+/* Ohne Bewegung bleibt ein ruhiger Grauton — die Fläche muss trotzdem
+   sichtbar sein, sonst wäre die Seite währenddessen leer. */
+@media (prefers-reduced-motion: reduce) {
+  .skelett {
+    background: var(--surface-alt);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Fotos
+ *
+ * Kacheln mit festem Seitenverhältnis: der Platz steht, bevor das Bild da
+ * ist. Ohne das springt das Raster bei jedem eintreffenden Vorschaubild —
+ * bei 67 Fotos 67 Mal.
+ * ------------------------------------------------------------------ */
+
+.foto-leiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.foto-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.foto-filterknopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-mid);
+  font-size: 12.5px;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.foto-filterknopf:hover { border-color: var(--accent-rand); }
+
+/*
+  Die Schrift bleibt `--ink`. Naheliegend wäre `--accent-ink` gewesen — das
+  ist aber die Farbe **auf dem vollen Blau** (im Hellen weiss), und auf dem
+  blassen `--accent-soft` ergäbe das weiss auf hellblau: 1,13:1, also
+  unlesbar. `--accent-stark` käme auf 4,24:1 und verfehlte die Schwelle von
+  4,5:1 für Fliesstext knapp. `--ink` schafft 8,5:1 im Hellen und 16,8:1 im Dunklen; den aktiven Zustand
+  tragen Rand und Fläche.
+*/
+.foto-filterknopf.aktiv {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.foto-filterzahl { color: var(--ink-soft); font-size: 11.5px; }
+.foto-filterknopf.aktiv .foto-filterzahl { color: inherit; opacity: 0.75; }
+
+/* Nicht gesetzte Verwendungen: sichtbar, aber zurückgenommen — sonst sehen
+   die vier Pillen alle gleich wichtig aus. */
+.foto-haekchen .marke-pille { opacity: 0.5; }
+.foto-haekchen .marke-pille.m-akzent { opacity: 1; }
+
+.foto-raster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.foto-kachel {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.foto-kachel:hover { box-shadow: var(--schatten-menue); transform: translateY(-1px); }
+
+.foto-kachel img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-alt);
+}
+
+.foto-kachel-titel {
+  display: block;
+  padding: 7px 9px;
+  font-size: 12px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Grossansicht */
+.foto-buehne {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.72);
+  animation: buehne-auf 0.15s ease;
+}
+
+@keyframes buehne-auf {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.foto-buehne-inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(1100px, 100%);
+  max-height: 100%;
+}
+
+.foto-buehne-bild {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.foto-buehne-bild img {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+  transition: opacity 0.2s ease;
+}
+
+.foto-buehne-platzhalter {
+  position: absolute;
+  width: min(760px, 90%);
+  height: 50vh;
+  border-radius: var(--radius);
+}
+
+.foto-buehne-leiste,
+.foto-beschriftung {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.foto-buehne-titel { font-weight: 600; flex: 1 1 auto; min-width: 0; }
+.foto-buehne-position { color: var(--ink-soft); font-size: 12px; }
+
+.foto-buehne-leiste button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.foto-buehne-leiste button:hover { border-color: var(--accent-rand); }
+
+.foto-beschriftung { align-items: flex-end; }
+.foto-beschriftung .feld { flex: 1 1 260px; }
+
+.foto-haekchen {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.foto-haekchen label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .foto-buehne { padding: 10px; }
+  .foto-buehne-bild img { max-height: 58vh; }
 }

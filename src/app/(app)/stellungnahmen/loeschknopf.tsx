@@ -65,7 +65,7 @@ export function Loeschknopf({
         {laeuft ? <Kreisel text="Löschen" /> : (beschriftung ?? '🗑')}
       </button>
       {fehler ? (
-        <span className="hinweis fehler" role="status">
+        <span className="hinweis fehler" role="alert">
           {fehler}
         </span>
       ) : null}

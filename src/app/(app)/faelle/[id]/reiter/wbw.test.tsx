@@ -1,12 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-// Die Serveraktionen ziehen die Datenbankverbindung nach sich. Im Browser ist
-// davon nur ein Verweis; im Test wuerde das echte Modul geladen. Fuer einen
-// Rauchtest der Darstellung braucht es beides nicht.
+// Die Serveraktionen sind im Browser nur ein Verweis; im Test wuerde das
+// echte Modul geladen und Netzaufrufe absetzen. Fuer einen Rauchtest der
+// Darstellung braucht es das nicht.
 vi.mock('@/wbw/aktionen', () => ({
   starteRecherche: async () => ({ id: 'test' }),
   frageStandAb: async () => null,
+}))
+vi.mock('@/melden/aktionen', () => ({
+  frageMeldungenAb: async () => [],
+  markiereGelesen: async () => {},
 }))
 
 const { WbwReiter } = await import('./wbw')

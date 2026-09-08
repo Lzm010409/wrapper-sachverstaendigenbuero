@@ -57,6 +57,13 @@
       "when": 1788813226589,
       "tag": "0007_bitter_talos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788845959441,
+      "tag": "0008_rich_boomer",
+      "breakpoints": true
     }
   ]
 }

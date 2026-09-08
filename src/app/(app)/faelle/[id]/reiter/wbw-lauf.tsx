@@ -5,6 +5,9 @@ import { frageStandAb, starteRecherche } from '@/wbw/aktionen'
 import type { LaufEingaben, Laufstand } from '@/wbw/auftrag'
 import type { Portal, Schritt } from '@/wbw/lauf'
 import { leseErgebnis, trichterzeilen, type Korbeintrag, type Laufergebnis } from '@/wbw/ergebnis'
+import { Meldung } from '@/app/teile/meldung'
+import { useMelder } from '@/app/teile/melder'
+import { fehler as alsFehler, info } from '@/melden/typen'
 
 /**
  * Der Knopf, der die Recherche anstösst — und alles, was danach kommt.
@@ -40,6 +43,7 @@ export function WbwLauf({
   const [stand, setzeStand] = useState<Laufstand | null>(vorheriger)
   const [fehler, setzeFehler] = useState<string | null>(null)
   const [startet, setzeStartet] = useState(false)
+  const { melde } = useMelder()
   const laeuft = stand?.zustand === 'laeuft'
 
   // Solange gefragt wird, bis der Lauf zu Ende ist. Der Verweis auf die
@@ -82,9 +86,21 @@ export function WbwLauf({
         const frisch = await frageStandAb(antwort.id)
         aktuelleId.current = antwort.id
         setzeStand(frisch)
+        // Der Lauf dauert Minuten, und man darf inzwischen weggehen. Die
+        // Einblendung sagt das, statt es den Benutzer herausfinden zu lassen.
+        melde(
+          info(
+            'Der Lauf dauert einige Minuten. Du kannst weiterarbeiten — ' +
+              'wenn er fertig ist, meldet sich das Cockpit.',
+            'Recherche gestartet',
+          ),
+        )
       }
     } catch (ausnahme) {
-      setzeFehler(ausnahme instanceof Error ? ausnahme.message : 'Der Lauf liess sich nicht starten.')
+      const text =
+        ausnahme instanceof Error ? ausnahme.message : 'Der Lauf liess sich nicht starten.'
+      setzeFehler(text)
+      melde(alsFehler(text, 'Recherche nicht gestartet'))
     } finally {
       setzeStartet(false)
     }
@@ -97,10 +113,10 @@ export function WbwLauf({
       <div className="block-label">Vergleichsfahrzeuge suchen</div>
       <div className="karte">
         {fehlt.length > 0 ? (
-          <div className="hinweis warn" style={{ marginBottom: 12 }}>
+          <Meldung art="warnung" style={{ marginBottom: 12 }}>
             Es fehlt noch: {fehlt.join(', ')}. Ohne diese Angaben wird der Vergleichskorb
             beliebig.
-          </div>
+          </Meldung>
         ) : null}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -119,9 +135,9 @@ export function WbwLauf({
         </div>
 
         {fehler ? (
-          <div className="hinweis fehler" style={{ marginTop: 12 }} role="alert">
+          <Meldung art="fehler" style={{ marginTop: 12 }}>
             {fehler}
-          </div>
+          </Meldung>
         ) : null}
 
         {stand ? <Fortschritt stand={stand} /> : null}
@@ -138,9 +154,15 @@ const ZEICHEN: Record<Schritt['stand'], string> = {
   fehler: '✕',
 }
 
+/*
+  Die Tokens heissen `--good` und `--accent`. Hier stand `var(--ok,
+  var(--akzent))` — beide Namen gibt es nicht, der Haken erbte deshalb
+  stillschweigend die Textfarbe statt grün zu sein. Ein Fehler, den man nur
+  sieht, wenn man weiss, wie er aussehen sollte.
+*/
 const FARBE: Record<Schritt['stand'], string> = {
   laeuft: 'var(--ink-soft)',
-  fertig: 'var(--ok, var(--akzent))',
+  fertig: 'var(--good)',
   leer: 'var(--ink-soft)',
   fehler: 'var(--crit)',
 }
@@ -194,9 +216,9 @@ function Fortschritt({ stand }: { stand: Laufstand }) {
       )}
 
       {stand.zustand === 'fehler' && stand.fehler ? (
-        <div className="hinweis fehler" style={{ marginTop: 10 }}>
+        <Meldung art="fehler" style={{ marginTop: 10 }}>
           {stand.fehler}
-        </div>
+        </Meldung>
       ) : null}
     </div>
   )
@@ -217,13 +239,13 @@ function OhneLeistung({ korb }: { korb: Korbeintrag[] }) {
   const betroffen = korb.filter((f) => f.leistungKw === null)
   if (betroffen.length === 0) return null
   return (
-    <div className="hinweis warn" style={{ marginBottom: 8 }}>
+    <Meldung art="warnung" style={{ marginBottom: 8 }}>
       {betroffen.length === 1
         ? 'Ein Fahrzeug im Korb macht keine Angabe zur Leistung'
         : `${betroffen.length} Fahrzeuge im Korb machen keine Angabe zur Leistung`}{' '}
       (Rang {betroffen.map((f) => f.rang).join(', ')}). Die Toleranzprüfung lässt unbekannte
       Werte bewusst durch — bitte prüfen, ob sie zum Subjektfahrzeug passen.
-    </div>
+    </Meldung>
   )
 }
 

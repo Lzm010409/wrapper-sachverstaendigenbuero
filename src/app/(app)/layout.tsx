@@ -4,6 +4,7 @@ import { aktuellerBenutzer } from '@/auth/sitzung'
 import { meldeAb } from '@/auth/aktionen'
 import { Kopfleiste } from '@/app/teile/kopfleiste'
 import { Menuepunkte } from '@/app/teile/menue'
+import { Melder } from '@/app/teile/melder'
 
 const ROLLENNAMEN: Record<string, string> = {
   ersteller: 'Ersteller',
@@ -35,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!benutzer) redirect('/anmelden')
 
   return (
-    <>
+    <Melder>
       <div className="schiene">
         <Link href="/faelle" className="schiene-zeichen" aria-label="Zur Fallübersicht">
           ✕
@@ -66,6 +67,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         />
         <main>{children}</main>
       </div>
-    </>
+    </Melder>
   )
 }

@@ -158,6 +158,13 @@ sich beim Start ein eigenes Zugangswort:
 | `KA_API_USER` / `KA_API_PASS` | Zugangsdaten dazu. Ohne `KA_API_BASE` werden sie beim Start erzeugt. |
 | `KLEINANZEIGEN_ABSTAND_MS` | Mindestabstand zwischen zwei Abrufen bei Kleinanzeigen, Standard `1500`. |
 
+**Fotos** — auch hier muss nichts gesetzt werden:
+
+| Variable | Wirkung |
+| --- | --- |
+| `FOTO_SPEICHER` | Verzeichnis für die Vorschaubilder. Ohne Angabe unter `/tmp`. Vorschaubilder gelten 7 Tage und werden nach einem Neustart neu geholt — sie sind abgeleitete Daten. |
+| `AUTOIXPERT_SCHREIBEN=erlaubt` | Ohne das lassen sich Fotos nur ansehen, nicht beschriften. Die Oberfläche sagt das an Ort und Stelle. |
+
 **Anmeldung über Microsoft Entra** (fehlt eine der drei, blendet die
 Anmeldemaske den Microsoft-Knopf aus und bietet nur Passwortanmeldung):
 
@@ -408,3 +415,21 @@ Art Einstellung, die irgendwann niemand mehr sieht.
 Linkliste in ein Verzeichnis unter `/tmp`. Der Pfad steht in der Zeile; die
 Dateien überleben aber keinen Neustart des Containers. Die Zahlen selbst
 (`result.json`) liegen in der Datenbank und bleiben.
+
+## Meldungen, Ladeanzeigen und Fotos
+
+Drei Dinge, die im Betrieb auffallen:
+
+**Die Glocke in der Kopfleiste** zeigt, was im Hintergrund passiert ist —
+fertige und gescheiterte WBW-Läufe. Die Oberfläche fragt alle zwanzig
+Sekunden nach, aber nur solange der Reiter sichtbar ist. Gelesene Meldungen
+verfallen nach 30 Tagen; ungelesene bleiben stehen, egal wie alt.
+
+**Ein Deployment während eines WBW-Laufs kostet den Lauf** — er lebt im
+Prozess der Anwendung. Beim Hochfahren wird er als abgebrochen vermerkt, und
+der Benutzer bekommt eine Meldung darüber.
+
+**Die Vorschaubilder liegen im Container** unter `/tmp` (oder wo
+`FOTO_SPEICHER` hinzeigt). Ein Fall mit 67 Fotos belegt dort rund 1,8 MB.
+Nach einem Neustart ist der Speicher leer und füllt sich beim nächsten
+Öffnen wieder; das kostet einmal etwa anderthalb Sekunden je Reiteraufruf.

@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { Erscheinungsschalter } from './erscheinung'
+import { Meldungsglocke } from './melder'
 
 /**
  * Die Kopfleiste über dem Inhalt, nach dem Vorbild von autoiXpert: flach,
@@ -29,6 +30,7 @@ export function Kopfleiste({ rechts }: { rechts?: React.ReactNode }) {
       <span className="topbar-titel">{bereich}</span>
       <div className="topbar-rechts">
         {rechts}
+        <Meldungsglocke />
         <Erscheinungsschalter />
       </div>
     </header>

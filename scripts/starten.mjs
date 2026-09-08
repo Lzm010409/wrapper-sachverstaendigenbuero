@@ -264,6 +264,19 @@ async function raeumeWbwLaeufeAuf(sql) {
   }
 }
 
+async function raeumeMeldungenAuf(sql) {
+  // Gelesenes verfaellt nach 30 Tagen. Ungelesenes bleibt stehen, egal wie
+  // alt: wer drei Wochen weg war, soll beim Wiederkommen sehen, was in der
+  // Zeit gescheitert ist.
+  const weg = await sql`
+    delete from meldung
+     where gelesen_am is not null
+       and erstellt_am < now() - interval '30 days'
+    returning id
+  `
+  if (weg.length > 0) melde(`${weg.length} gelesene Meldungen aelter als 30 Tage entfernt.`)
+}
+
 function richteKleinanzeigenEin() {
   if (process.env.KA_API_BASE) {
     melde(`Kleinanzeigen-Beschaffung über ${process.env.KA_API_BASE}.`)
@@ -293,6 +306,7 @@ async function main() {
     await befuelleBibliothek(sql)
     await legeErstenZugangAn(sql)
     await raeumeWbwLaeufeAuf(sql)
+    await raeumeMeldungenAuf(sql)
   } catch (fehler) {
     console.error('[start] Einrichtung fehlgeschlagen:', fehler)
     process.exit(1)
