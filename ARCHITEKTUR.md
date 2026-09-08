@@ -529,6 +529,76 @@ Browserpaket.** Zweimal an einem Tag gemessen (`wbw/urteil.ts`,
 — sobald eine Client-Komponente einen *Wert* braucht, gehört er in eine
 Datei ohne Serverabhängigkeiten.
 
+## Belege: was in den Gutachtenordner geht
+
+Der Korb im Cockpit ist eine Arbeitsfläche. Was die Akte braucht, sind
+Dokumente — und zwar zwei Arten, die verschiedene Fragen beantworten:
+
+| Art | Wann | Was drinsteht |
+|---|---|---|
+| **Einzelbeleg** je Fahrzeug | WBW-Vorschlag unter 10.000 € | Das Inserat als Ausdruck: Titel, Preis, km, EZ, Leistung, Getriebe, Kraftstoff, Standort, Ausstattung, Beschreibung, Bilder, Fundstelle, Abrufzeitpunkt |
+| **Portalpaket** je Quelle | immer | Dieselben Ausdrucke, nach Portal gebündelt, je Fahrzeug eine Seite |
+
+In beiden stehen **nur die angehakten Fahrzeuge**. Was der Sachverständige
+verworfen hat, müsste im Gutachtenordner erklärt werden, und die Erklärung
+wäre „das habe ich ausgeschlossen".
+
+**Der Beleg ist ein Beleg, keine Bewertung.** Vergleichbarkeit, Abstand zum
+Subjektfahrzeug und das Urteil der Prüfung stehen im Report — ein
+Inseratsausdruck, der schon eine Wertung enthält, ist als Beleg weniger
+wert. Der Fusszeilensatz („Inseratspreise sind Angebots-, keine
+Transaktionspreise") gehört dazu: ohne ihn liest sich das Dokument wie ein
+Nachweis über einen erzielten Preis.
+
+**Die Dateinamen werden gelesen, nicht angeklickt.**
+
+    WBW-konkret-130tkm-ez19-panoramadach.pdf
+    WBW-autoscout24.pdf
+
+`WBW-konkret` steht wörtlich davor. Danach die drei Angaben, die ein
+Fahrzeug im Korb unterscheiden. **Was fehlt, fällt weg** statt durch einen
+Platzhalter ersetzt zu werden: `WBW-konkret-ez19.pdf` ist ehrlicher als
+`WBW-konkret-0tkm-ez19.pdf`, denn null Kilometer stünden da als Angabe. Zwei
+gleiche Namen bekommen `-2`, `-3` — sonst überschriebe der zweite Beleg den
+ersten, und im Ordner läge einer weniger als im Korb.
+
+**Gedruckt wird mit Chromium**, nicht mit einer PDF-Bibliothek: der Beleg
+soll aussehen wie das, was am Bildschirm steht. Bis zum 08.09.2026 lag im
+Abbild gar kein Browser — die PDF-Stufe des Plugins suchte `chrome`,
+`chromium` und `msedge`, fand nichts und gab still auf. Zwei Fallen dabei:
+
+1. **Chromium druckt auch, was es nicht findet.** Für eine fehlende Datei
+   rendert es seine eigene Fehlerseite, und die ergibt rund 20 KB PDF —
+   gross genug, um jede Grössenprüfung zu bestehen. Der Drucker prüft
+   deshalb die Vorlage, bevor er startet.
+2. **Ein leeres PDF ist keins.** Bricht Chromium den Druck ab, bleibt
+   trotzdem eine Datei liegen. Unter 8 KB gilt sie als misslungen.
+
+**Der Weg in den Ordner führt über n8n.** Die Ordnerstruktur — Jahr, Monat,
+Aktenzeichen — kennt bereits ein Workflow, den mehrere Anwendungen benutzen
+(`Search_Gutachtenordner_OneDrive`). Sie im Cockpit nachzubilden hiesse, sie
+an zwei Stellen zu pflegen, und die OneDrive-Zugangsdaten lägen dann auch
+hier. Der neue Workflow `WBW_Belege_Upload_OneDrive` nimmt Aktenzeichen und
+Dateien, sucht den Ordner und legt sie ab.
+
+Drei Riegel im Workflow, jeder gegen einen Fehler, den man erst hinterher
+bemerkt:
+
+- **Findet sich kein Ordner, kommt eine 404 mit Begründung** statt einer
+  Zeitüberschreitung. Ohne den eigenen Zweig lieferte der Unterworkflow null
+  Elemente, und der Webhook antwortete nie.
+- **Jede Datei muss mit `%PDF-` beginnen.** Was das nicht tut, ist kein
+  Beleg und soll nicht als einer im Ordner landen.
+- **4 MB je Datei** — mehr nimmt OneDrive über diesen Weg nicht, und die
+  Meldung des Fehlschlags sagt nichts über die Ursache. Geprüft wird
+  deshalb dort, wo der Dateiname noch bekannt ist.
+
+**Hochgeladen wird auf Knopfdruck, nicht beim Übernehmen.** Der Upload wirkt
+nach draussen und in ein System, aus dem das Cockpit nichts zurücknehmen
+kann; jede Korrektur an der Auswahl würde sonst erneut hochladen, und im
+Ordner sammelten sich Zwischenstände. Er verlangt `versand.vermerken` —
+dasselbe Recht wie jede andere Handlung, die das Haus verlässt.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,

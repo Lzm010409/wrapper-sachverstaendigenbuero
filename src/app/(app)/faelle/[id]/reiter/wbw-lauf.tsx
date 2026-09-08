@@ -347,6 +347,7 @@ function Ergebnis({
             korb={ergebnis.korb}
             urteile={urteile}
             auswahl={auswahl}
+            wbwVorschlag={ergebnis.wert.vorschlagBrutto}
           />
         </>
       ) : null}

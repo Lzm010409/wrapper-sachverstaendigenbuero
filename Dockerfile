@@ -62,9 +62,22 @@ WORKDIR /app
 # (Migrationen gelaufen, Bibliothek auf Stand, Next bereit). Die Alternative
 # wäre gewesen, den Healthcheck abzuschalten; dann merkt niemand mehr, wenn
 # der Container steht, aber nicht antwortet.
+#
+# `chromium` druckt die Reports und die Inseratsbelege. Bis zum 08.09.2026
+# fehlte es: die PDF-Stufe des Plugins sucht `chrome`/`chromium`/`msedge`,
+# fand nichts und gab still auf — im Ordner lagen HTML und Linkliste, aber
+# nie ein PDF, und niemand bekam davon etwas zu sehen. Es ist das grösste
+# einzelne Paket in diesem Abbild; ein PDF ohne Browser zu bauen hiesse
+# jedoch, die Darstellung des Reports ein zweites Mal zu schreiben.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends poppler-utils ca-certificates curl && \
+    apt-get install -y --no-install-recommends \
+        poppler-utils ca-certificates curl chromium && \
     rm -rf /var/lib/apt/lists/*
+
+# Der ausdrücklich gesetzte Pfad gewinnt in `chromeKandidaten()`. Ohne ihn
+# suchte das Plugin die Liste durch und fände `chromium` zwar auch über den
+# Pfad — aber nur, solange das Paket den Namen behält.
+ENV WBW_CHROME=/usr/bin/chromium
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

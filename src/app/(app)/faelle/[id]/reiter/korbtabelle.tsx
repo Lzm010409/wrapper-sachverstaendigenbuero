@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { uebernimmKorb } from '@/wbw/aktionen'
+import { ladeBelegeInGutachtenordner, uebernimmKorb } from '@/wbw/aktionen'
 import { fahrzeugKennung, type Korbeintrag } from '@/wbw/ergebnis'
 import { AUFFAELLIGKEITEN, vorbelegt, type Auffaelligkeit, type Pruefurteil } from '@/wbw/urteil'
 import { Kreisel } from '@/app/teile/anzeigen'
@@ -57,14 +57,21 @@ export function Korbtabelle({
   korb,
   urteile,
   auswahl,
+  wbwVorschlag,
 }: {
   laufId: string
   korb: Korbeintrag[]
   urteile: Record<string, Pruefurteil>
   auswahl: string[] | null
+  /** Der Vorschlag des Laufs — entscheidet über die Einzelbelege. */
+  wbwVorschlag: number | null
 }) {
   const { melde } = useMelder()
   const [laeuft, starte] = useTransition()
+  const [laedtHoch, starteUpload] = useTransition()
+  // Erst übernehmen, dann hochladen: die Belege entstehen aus dem
+  // gespeicherten Korb, nicht aus den Haken im Browser.
+  const [uebernommen, setzeUebernommen] = useState(auswahl !== null)
 
   const zeilen = useMemo(
     () =>
@@ -361,12 +368,52 @@ export function Korbtabelle({
               const ergebnis = await uebernimmKorb(laufId, [...gewaehlt])
               const meldung = ausErgebnis(ergebnis)
               if (meldung) melde(meldung)
+              if (!ergebnis.fehler) setzeUebernommen(true)
             })
           }
         >
           {laeuft ? <Kreisel text="Korb übernehmen" /> : 'Korb übernehmen'}
         </button>
+
+        {/*
+          Ein zweiter, bewusster Handgriff. Der Upload wirkt nach draussen
+          und in ein System, aus dem das Cockpit nichts zurücknehmen kann —
+          das soll kein Nebeneffekt des Übernehmens sein.
+        */}
+        <button
+          type="button"
+          disabled={laedtHoch || !uebernommen}
+          title={
+            uebernommen
+              ? undefined
+              : 'Erst den Korb übernehmen — die Belege entstehen aus der gespeicherten Auswahl.'
+          }
+          onClick={() =>
+            starteUpload(async () => {
+              const ergebnis = await ladeBelegeInGutachtenordner(laufId)
+              const meldung = ausErgebnis(ergebnis)
+              if (meldung) melde(meldung)
+            })
+          }
+        >
+          {laedtHoch ? (
+            <Kreisel text="In den Gutachtenordner laden" />
+          ) : (
+            'In den Gutachtenordner laden'
+          )}
+        </button>
       </div>
+
+      {/*
+        Was hochgeladen wird, steht vorher da — nicht erst in der Meldung
+        danach. Die Grenze von 10.000 EUR ist eine Regel des Hauses und
+        sollte nicht wie eine Überraschung wirken.
+      */}
+      <p className="unterzeile" style={{ marginTop: 6 }}>
+        {wbwVorschlag !== null && wbwVorschlag >= 10000
+          ? `Beim Vorschlag von ${betrag(wbwVorschlag)} gehen die Portalpakete in den Ordner — Einzelbelege erst unter 10.000 €.`
+          : 'Es gehen Einzelbelege je Fahrzeug und die Portalpakete in den Ordner.'}
+      </p>
     </>
   )
 }

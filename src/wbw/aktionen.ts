@@ -4,6 +4,7 @@ import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { holeLauf, starteLauf, type LaufEingaben, type Laufstand } from './auftrag'
 import { uebernimmAuswahl } from './korb'
+import { ladeBelegeHoch } from './hochladen'
 
 /**
  * Die beiden Handgriffe der Oberfläche: einen Lauf anstossen und nach seinem
@@ -94,4 +95,44 @@ export async function uebernimmKorb(
         ? 'Ein Fahrzeug im Korb — die Anlage ist erzeugt.'
         : `${ergebnis.anzahl} Fahrzeuge im Korb — die Anlage ist erzeugt.`,
   }
+}
+
+export interface Uploadantwort {
+  hinweis?: string
+  fehler?: string
+}
+
+/**
+ * Legt die Belege des übernommenen Korbs im Gutachtenordner ab.
+ *
+ * Ein eigener Handgriff, kein Nebeneffekt des Übernehmens: der Upload wirkt
+ * nach draussen und in ein System, aus dem das Cockpit nichts zurücknehmen
+ * kann. Er verlangt das Recht `versand.vermerken` — dasselbe wie jede andere
+ * Handlung, die das Haus verlässt.
+ */
+export async function ladeBelegeInGutachtenordner(laufId: string): Promise<Uploadantwort> {
+  const benutzer = await verlangeBenutzer()
+  try {
+    await verlangeRecht('versand.vermerken')
+  } catch (fehler) {
+    return { fehler: fehler instanceof Error ? fehler.message : 'Keine Berechtigung.' }
+  }
+
+  const ergebnis = await ladeBelegeHoch(laufId, benutzer.id)
+  if (ergebnis.fehler) return { fehler: ergebnis.fehler }
+
+  const teile = [
+    `${ergebnis.hochgeladen} von ${ergebnis.gesamt} Dateien im Gutachtenordner`,
+    ergebnis.einzelbelege > 0
+      ? `${ergebnis.einzelbelege} ${ergebnis.einzelbelege === 1 ? 'Einzelbeleg' : 'Einzelbelege'}`
+      : null,
+    ergebnis.portalpakete > 0
+      ? `${ergebnis.portalpakete} ${ergebnis.portalpakete === 1 ? 'Portalpaket' : 'Portalpakete'}`
+      : null,
+  ].filter(Boolean)
+
+  // Ein Hinweis ist kein Fehler, darf aber nicht untergehen: er sagt, dass
+  // etwas fehlt, obwohl der Vorgang durchlief.
+  const meldung = [teile.join(' · '), ...ergebnis.hinweise].join('. ')
+  return ergebnis.hinweise.length > 0 ? { fehler: meldung } : { hinweis: meldung }
 }

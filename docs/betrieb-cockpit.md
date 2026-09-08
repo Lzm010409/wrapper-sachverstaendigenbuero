@@ -531,3 +531,52 @@ Meldung — dann bitte in der Anlage nachsehen, bevor sie ins Gutachten geht.
 - **Die Trefferzahl** über der Liste ist die vollständige; gezeigt werden
   höchstens hundert Zeilen, und steht die Liste an dieser Grenze, sagt es
   die Leiste („12 von 340 gezeigt").
+
+## Belege in den Gutachtenordner laden
+
+Im Reiter **Wiederbeschaffungswert** steht unter dem Korb neben „Korb
+übernehmen" der Knopf **In den Gutachtenordner laden**. Er ist erst aktiv,
+wenn ein Korb übernommen ist — die Belege entstehen aus der gespeicherten
+Auswahl, nicht aus den Haken im Browser.
+
+Was entsteht:
+
+- **Portalpakete** immer: je Portal ein PDF mit allen angehakten Fahrzeugen
+  dieses Portals, ein Fahrzeug je Seite. `WBW-autoscout24.pdf`.
+- **Einzelbelege** nur, wenn der WBW-Vorschlag des Laufs unter 10.000 €
+  liegt: je Fahrzeug ein PDF.
+  `WBW-konkret-130tkm-ez19-panoramadach.pdf`. Steht kein Vorschlag fest,
+  entstehen sie ebenfalls — sie zu haben und nicht zu brauchen ist
+  harmloser als umgekehrt.
+
+Die Zeile unter den Knöpfen sagt vorher, welcher Fall vorliegt.
+
+### Was dafür eingerichtet sein muss
+
+| Variable | Wert |
+|---|---|
+| `N8N_BELEGE_URL` | `https://n8n-coolify.gollenstede.app/webhook/wbw-belege` |
+| `N8N_BELEGE_TOKEN` | Der Wert der n8n-Zugangsdaten **Header Auth account** — er geht als `Authorization`-Kopfzeile mit |
+
+Ohne `N8N_BELEGE_URL` sagt der Knopf das beim Klick und tut nichts. Der
+Workflow heisst **WBW_Belege_Upload_OneDrive** und ist veröffentlicht; er
+ruft intern `Search_Gutachtenordner_OneDrive` für den Ordner auf.
+
+### Wenn etwas nicht ankommt
+
+Die Meldung nach dem Hochladen nennt, was durchkam und was nicht. Die
+häufigsten Gründe:
+
+- **„Zum Aktenzeichen … wurde kein Gutachtenordner gefunden."** Der Ordner
+  heisst in OneDrive nicht so wie das Aktenzeichen im Gutachten — dort steht
+  er als `MMJJ_NNNTG`, mit Unterstrich. Der Workflow rechnet beide
+  Schreibweisen um; passt es trotzdem nicht, fehlt der Ordner.
+- **„… ist zu gross — OneDrive nimmt hier höchstens 4 MB."** Ein Inserat mit
+  sehr grossen Bildern. Der Beleg entsteht trotzdem, nur der Upload nicht.
+- **„Die Rohdaten dieses Laufs sind verlorengegangen."** Der Lauf liegt in
+  `/tmp` und überlebt kein Deployment. Dann hilft nur ein neuer Lauf.
+- **Bilder fehlen im Beleg.** Das Portal hat sie nicht mehr ausgeliefert.
+  Der Beleg entsteht ohne sie, und die Meldung sagt es.
+
+Jeder Fehlschlag steht mit Kennung im Fehlerprotokoll
+(**Verwaltung → Fehlerprotokoll**).
