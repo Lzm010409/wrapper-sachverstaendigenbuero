@@ -297,12 +297,33 @@ function Ergebnis({
         }}
       >
         <div>
-          <div style={{ fontSize: 26, fontWeight: 650 }}>
-            {betrag(ergebnis.wert.vorschlagBrutto)}
-          </div>
-          <span className="unterzeile">
-            Vorschlag brutto — Median der um Laufleistung und Alter bereinigten Preise
-          </span>
+          {/*
+            Kein Betrag aus zu wenigen Fahrzeugen. Am 08.09.2026 stand hier
+            „10.645 €", auf den Euro genau, gebildet aus einem einzigen
+            Fahrzeug — eine Zahl mit der Autorität einer Rechnung und dem
+            Gehalt eines Einzelpreises, unter der Unterschrift des
+            Sachverständigen.
+          */}
+          {ergebnis.wert.zuKleinerKorb ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 650 }}>kein Vorschlag</div>
+              <span className="unterzeile">
+                {ergebnis.wert.anzahl === 1
+                  ? 'Ein einzelnes Fahrzeug ergibt keinen Median.'
+                  : `${ergebnis.wert.anzahl ?? 0} Fahrzeuge tragen keinen Median.`}{' '}
+                Die Spanne steht daneben — den Wert setzt der Sachverständige.
+              </span>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 26, fontWeight: 650 }}>
+                {betrag(ergebnis.wert.vorschlagBrutto)}
+              </div>
+              <span className="unterzeile">
+                Vorschlag brutto — Median der um Laufleistung und Alter bereinigten Preise
+              </span>
+            </>
+          )}
         </div>
         <dl className="kv" style={{ gridTemplateColumns: 'auto 1fr', gap: '2px 12px', margin: 0 }}>
           <dt>Fahrzeuge im Korb</dt>
@@ -317,8 +338,12 @@ function Ergebnis({
       </div>
 
       <p className="unterzeile" style={{ margin: '10px 0 4px' }}>
-        Der Vorschlag ist eine Rechengrösse, kein Ergebnis: Zu- und Abschläge für Zustand,
-        Vorschäden und Marktlage bleiben Sache des Sachverständigen.
+        {ergebnis.wert.zuKleinerKorb
+          ? 'Ein Korb dieser Grösse trägt keinen Median. Die gefundenen Fahrzeuge stehen unten und ' +
+            'sind als Anhaltspunkt verwendbar — weiten Sie die Toleranzen oder den Radius, wenn ' +
+            'ein belastbarer Vorschlag gebraucht wird.'
+          : 'Der Vorschlag ist eine Rechengrösse, kein Ergebnis: Zu- und Abschläge für Zustand, ' +
+            'Vorschäden und Marktlage bleiben Sache des Sachverständigen.'}
       </p>
 
       {zeilen.length > 0 ? (

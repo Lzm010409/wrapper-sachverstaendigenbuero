@@ -3,6 +3,7 @@ import type { VxsDaten } from '@/autoixpert/vxs'
 import { baureiheAusVxs, modellVorschlagAusVxs } from '@/autoixpert/vxs'
 import { ausstattungAusVxs, linieAus, type Ausstattungsvorschlag } from './ausstattung'
 import { bauartAusShape, type Bauart } from './karosserie'
+import { trenneLinie } from './linie'
 import { toEzMonat } from './params'
 
 /**
@@ -106,12 +107,26 @@ export function vorschlagAusVxs(gutachten: Gutachten, daten: VxsDaten): WbwVorsc
 
   const untertyp = modellVorschlagAusVxs(daten)
   const getriebe = getriebeAusDat(daten.fahrzeug.getriebe)
+  const baureihe = baureiheAusVxs(daten)
+
+  /*
+    Die DAT liefert als Untertyp bisweilen die Ausstattungslinie statt des
+    Fahrzeugs — am 08.09.2026 stand dort „Highline BMT". Ein solcher Suchbegriff
+    kostet AutoScout24 komplett: das Portal kennt ihn nicht, lässt ihn
+    stillschweigend fallen und sucht über die ganze Marke. Die Linie wandert
+    deshalb ins Variantenfeld, und bleibt kein Modell übrig, tritt die Baureihe
+    an seine Stelle. Der Beleg zeigt weiter, was die DAT geschrieben hat.
+  */
+  const getrennt = trenneLinie(untertyp)
+  const modellwert = getrennt.modell || baureihe
 
   return {
     // Das Modell kommt bewusst **nur** aus der DAT: das Gutachten-Objekt
     // führt hier die Baureihe, und die ist als Suchbegriff zu grob.
-    modell: untertyp ? { wert: untertyp, quelle: 'dat', beleg: daten.fahrzeug.untertyp ?? untertyp } : null,
-    baureihe: baureiheAusVxs(daten),
+    modell: modellwert
+      ? { wert: modellwert, quelle: 'dat', beleg: daten.fahrzeug.untertyp ?? untertyp ?? modellwert }
+      : null,
+    baureihe,
     leistungKw: waehle(
       'Leistung',
       car.performance_kw ?? null,
@@ -140,7 +155,9 @@ export function vorschlagAusVxs(gutachten: Gutachten, daten: VxsDaten): WbwVorsc
       : null,
     bauart: bauartAusShape(car.shape),
     farbe: daten.fahrzeug.farbe,
-    linie: linieAus(daten),
+    // Die Linie aus dem Modellfeld ist die genauere: sie steht am Fahrzeug,
+    // nicht in einer Ausstattungszeile, die auch ein Paket meinen kann.
+    linie: getrennt.linie ?? linieAus(daten),
     ausstattung: ausstattungAusVxs(daten),
     abweichungen,
   }

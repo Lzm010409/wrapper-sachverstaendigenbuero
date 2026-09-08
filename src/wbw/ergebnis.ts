@@ -1,3 +1,4 @@
+import { MINDESTKORB } from './zyklus'
 /**
  * Liest das `result.json` des Plugins für die Anzeige.
  *
@@ -39,6 +40,15 @@ export interface Trichter {
 }
 
 export interface Wertermittlung {
+  /**
+   * Der Medianvorschlag — `null`, wenn der Korb zu klein dafür ist.
+   *
+   * Am 08.09.2026 wies die Oberfläche „10.645 €" aus, bereinigt auf den Euro,
+   * gebildet aus **einem** Fahrzeug. Eine solche Zahl trägt die Autorität
+   * einer Rechnung und den Gehalt eines Einzelpreises; sie steht unter der
+   * Unterschrift des Sachverständigen. Unterhalb von `MINDESTKORB` wird
+   * deshalb keine ausgewiesen — `zuKleinerKorb` sagt warum.
+   */
   vorschlagBrutto: number | null
   anzahl: number | null
   medianRoh: number | null
@@ -46,6 +56,8 @@ export interface Wertermittlung {
   getrimmt: number | null
   min: number | null
   max: number | null
+  /** Gesetzt, wenn der Korb für einen Median nicht ausreicht. */
+  zuKleinerKorb: boolean
 }
 
 export interface Laufergebnis {
@@ -96,15 +108,26 @@ export function leseErgebnis(roh: unknown): Laufergebnis | null {
   const rohWerte = objekt(wbw.roh)
   const st = objekt(daten.statistik)
 
+  /*
+    Die Zahl der Fahrzeuge, aus denen der Median gebildet wurde. `wbw.anzahl`
+    ist die belastbarere Angabe; steht sie nicht da, zählt der Korb.
+  */
+  const anzahl = zahl(wbw.anzahl) ?? zahl(st.imKorb)
+  const zuKleinerKorb = (anzahl ?? 0) < MINDESTKORB
+
   return {
     wert: {
-      vorschlagBrutto: zahl(wbw.vorschlagBrutto),
-      anzahl: zahl(wbw.anzahl),
+      // Kein Betrag unter der Mindestzahl: die Spanne und der rohe Median
+      // bleiben stehen, damit sichtbar ist, was gefunden wurde — aber nichts
+      // sieht mehr aus wie ein Ergebnis.
+      vorschlagBrutto: zuKleinerKorb ? null : zahl(wbw.vorschlagBrutto),
+      anzahl,
       medianRoh: zahl(rohWerte.median),
-      medianBereinigt: zahl(bereinigt.median),
+      medianBereinigt: zuKleinerKorb ? null : zahl(bereinigt.median),
       getrimmt: zahl(bereinigt.getrimmt),
       min: zahl(rohWerte.min),
       max: zahl(rohWerte.max),
+      zuKleinerKorb,
     },
     trichter: {
       gescraped: zahl(st.gescraped),

@@ -184,8 +184,15 @@ function Grossansicht({
           ein Effekt ihn von Hand zurücksetzen müsste — das wäre eine
           Kaskade aus zwei Renderdurchläufen für etwas, das React von selbst
           kann.
+
+          Vorangestelltes Präfix, weil `Beschriftung` weiter unten denselben
+          `foto.id` als Schlüssel trägt: beide sind Geschwister in
+          `.foto-buehne-inhalt`, und React verlangt eindeutige Schlüssel
+          unter Geschwistern — unabhängig vom Elementtyp. Mit demselben
+          Schlüssel für beide geriet die Zuordnung beim Blättern durcheinander,
+          und das alte Bild blieb neben dem neuen stehen, statt zu weichen.
         */}
-        <Buehnenbild key={foto.id} fallId={fallId} foto={foto} nachbar={nachbar} />
+        <Buehnenbild key={`bild-${foto.id}`} fallId={fallId} foto={foto} nachbar={nachbar} />
 
         <div className="foto-buehne-leiste">
           <button type="button" onClick={() => blaettere(-1)} aria-label="Vorheriges Foto">
@@ -213,7 +220,7 @@ function Grossansicht({
         </div>
 
         {/* Auch hier der Schlüssel statt eines zurücksetzenden Effekts. */}
-        <Beschriftung key={foto.id} fallId={fallId} foto={foto} erlaubt={schreibenErlaubt} />
+        <Beschriftung key={`beschriftung-${foto.id}`} fallId={fallId} foto={foto} erlaubt={schreibenErlaubt} />
       </div>
     </div>
   )

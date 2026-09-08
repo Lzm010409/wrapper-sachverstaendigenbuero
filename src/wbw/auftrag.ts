@@ -2,7 +2,7 @@ import 'server-only'
 import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { wbwLauf } from '@/db/schema'
-import { loeseModellAuf } from './modell'
+import { waehleSuchmodell } from './modell'
 import { ermittleModelle, fuehreLaufAus, type Schritt, type WbwEingabe } from './lauf'
 import { notiere } from '@/melden/ablage'
 import { leseErgebnis } from './ergebnis'
@@ -189,6 +189,7 @@ async function fuehreAus(
       subjekt: {
         marke: eingaben.marke,
         modell: eingaben.modell,
+        baureihe: eingaben.baureihe,
         variante: eingaben.variante,
         ez: eingaben.ez,
         mileage: eingaben.laufleistung,
@@ -323,22 +324,30 @@ async function ermittleModellProPortal(
   try {
     const liste = await ermittleModelle(eingaben.marke, eingaben.modell)
     as24Modelle = liste.modelle
-    const treffer = loeseModellAuf(eingaben.modell, liste.modelle)
+    const treffer = waehleSuchmodell(eingaben.modell, eingaben.baureihe, liste.modelle)
     if (treffer.modell) {
       proPortal.autoscout24 = treffer.modell
       melde({
         name,
         stand: 'fertig',
-        text: treffer.verworfen
-          ? `„${eingaben.modell}" → „${treffer.modell}" (ohne „${treffer.verworfen}")`
-          : `„${treffer.modell}" — genau so führt AutoScout24 es`,
+        // Der Weg über die Baureihe wird benannt, nicht verschwiegen: gesucht
+        // wurde dann gröber als der Untertyp es hergäbe, und das gehört ins
+        // Protokoll, weil es den Korb erklärt.
+        text:
+          treffer.quelle === 'baureihe'
+            ? `AutoScout24 kennt „${eingaben.modell}" nicht — gesucht wird über die ` +
+              `Baureihe „${treffer.modell}"`
+            : treffer.verworfen
+              ? `„${eingaben.modell}" → „${treffer.modell}" (ohne „${treffer.verworfen}")`
+              : `„${treffer.modell}" — genau so führt AutoScout24 es`,
       })
     } else {
       melde({
         name,
         stand: 'leer',
         text:
-          `AutoScout24 kennt „${eingaben.modell}" nicht unter ${liste.anzahl} Modellen ` +
+          `AutoScout24 kennt weder „${eingaben.modell}" noch die Baureihe ` +
+          `${eingaben.baureihe ? `„${eingaben.baureihe}" ` : ''}unter ${liste.anzahl} Modellen ` +
           `von ${eingaben.marke}. Gesucht wird über die ganze Marke.`,
       })
     }
