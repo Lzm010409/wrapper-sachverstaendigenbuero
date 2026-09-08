@@ -53,7 +53,20 @@ export function holeClient(): Anthropic {
 export interface WerkzeugDefinition {
   name: string
   description: string
-  input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[] }
+  input_schema: {
+    type: 'object'
+    properties: Record<string, unknown>
+    required?: string[]
+    additionalProperties?: boolean
+  }
+  /**
+   * Erzwingt, dass die Werkzeugeingabe dem Schema genügt.
+   *
+   * Verlangt `additionalProperties: false` und `required` im Schema. Ohne das
+   * ist die Rückgabe nur „meistens" schemakonform, und die Prüfung mit Zod
+   * an der Aufrufstelle wird zur Fehlerquelle statt zur Absicherung.
+   */
+  strict?: boolean
 }
 
 export interface InhaltsBlock {

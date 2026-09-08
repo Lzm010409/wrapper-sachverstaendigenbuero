@@ -417,6 +417,19 @@ export const wbwLauf = pgTable(
     ergebnis: jsonb(),
     /** Was der Markenfilter je Portal entfernt hat. */
     markenfremd: jsonb(),
+    /**
+     * Was jeder gelaufene Zyklus ergeben hat — Toleranzen, Modellnamen,
+     * Trefferzahlen und der Ordner seines eigenen Reports je Portal.
+     */
+    zyklen: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /** Das Urteil der KI-Prüfung je Fahrzeug, nach seiner Kennzeichnung. */
+    urteile: jsonb().notNull().default(sql`'{}'::jsonb`),
+    /**
+     * Die Kennzeichnungen der Fahrzeuge, die der Sachverständige in den Korb
+     * genommen hat. `null` heisst: er hat noch nicht entschieden, dann gilt
+     * die Vorbelegung aus den Urteilen.
+     */
+    auswahl: jsonb(),
     /** Nur bei `fehler`: die Meldung, unverändert. */
     fehler: text(),
     /** Wo die erzeugten Dateien liegen. Überlebt keinen Neustart des Containers. */

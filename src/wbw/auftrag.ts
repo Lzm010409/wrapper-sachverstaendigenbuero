@@ -166,7 +166,10 @@ async function fuehreAus(
   }
 
   try {
-    const modellProPortal = await ermittleModellProPortal(eingaben, melde)
+    const { proPortal: modellProPortal, as24Modelle } = await ermittleModellProPortal(
+      eingaben,
+      melde,
+    )
 
     const eingabe: WbwEingabe = {
       subjekt: {
@@ -179,6 +182,7 @@ async function fuehreAus(
         bauart: eingaben.bauart,
       },
       modellProPortal,
+      as24Modelle,
       plz: eingaben.plz,
       sollAusstattung: eingaben.sollAusstattung,
       ...(eingaben.getriebe ? { getriebe: eingaben.getriebe } : {}),
@@ -207,6 +211,8 @@ async function fuehreAus(
         // Plugin haengt jeden Schritt zweimal an (erst „laeuft", dann
         // „fertig"), und in der Anzeige stuende dann alles doppelt.
         protokoll: schritte,
+        zyklen: ergebnis.zyklen,
+        urteile: ergebnis.urteile,
         ordner: ergebnis.ordner,
         beendetAm: new Date(),
       })
@@ -288,17 +294,21 @@ function betragText(wert: number | null | undefined): string {
 async function ermittleModellProPortal(
   eingaben: LaufEingaben,
   melde: (schritt: Schritt) => void,
-): Promise<WbwEingabe['modellProPortal']> {
+): Promise<{ proPortal: WbwEingabe['modellProPortal']; as24Modelle: string[] }> {
   const proPortal: WbwEingabe['modellProPortal'] = {}
   if (eingaben.baureihe) proPortal.kleinanzeigen = eingaben.baureihe
   proPortal.mobilede = eingaben.modell
+  // Die Liste wandert mit: aus ihr wählen die späteren Zyklen ihre gröberen
+  // Namen, und ein zweiter Abruf dafür wäre eine zweite Wartezeit.
+  let as24Modelle: string[] = []
 
-  if (!eingaben.portale.includes('autoscout24')) return proPortal
+  if (!eingaben.portale.includes('autoscout24')) return { proPortal, as24Modelle }
 
   const name = 'Modell bei AutoScout24 auflösen'
   melde({ name, stand: 'laeuft' })
   try {
     const liste = await ermittleModelle(eingaben.marke, eingaben.modell)
+    as24Modelle = liste.modelle
     const treffer = loeseModellAuf(eingaben.modell, liste.modelle)
     if (treffer.modell) {
       proPortal.autoscout24 = treffer.modell
@@ -325,5 +335,5 @@ async function ermittleModellProPortal(
       text: fehler instanceof Error ? fehler.message.slice(0, 300) : String(fehler),
     })
   }
-  return proPortal
+  return { proPortal, as24Modelle }
 }

@@ -101,3 +101,105 @@ export function passendeModelle(
   })
   return (treffer.length > 0 ? treffer : modelle).slice(0, hoechstens)
 }
+
+/**
+ * Der Haupttyp einer Fahrzeugbezeichnung.
+ *
+ * `E 53 AMG 4Matic+` → `E 53`. Gesucht wird damit gröber, weil die Portale
+ * die Ausstattungslinie und den Antriebszusatz teils gar nicht führen und
+ * ein zu genauer Name dort stillschweigend fallengelassen wird.
+ *
+ * **Die Regel:** alles bis einschliesslich des ersten reinen Zahlworts. Nur
+ * Ziffern, höchstens vier — das ist die Typnummer (`53`, `300`, `911`).
+ * `2.0` trägt einen Punkt und ist der Hubraum, `4Matic+` und `320d` tragen
+ * Buchstaben; beide sind keine Typnummer und beenden die Bezeichnung nicht.
+ * Gibt es kein Zahlwort, bleibt das erste Wort stehen.
+ *
+ *     E 53 AMG 4Matic+      →  E 53
+ *     GLC 300 d             →  GLC 300
+ *     Superb Combi 2.0 TDI  →  Superb
+ *     3er 320d              →  3er
+ *     911 Carrera 4S        →  911
+ *
+ * Der Haupttyp ist ein **Vorschlag**, kein Portalname: ob das Portal ihn
+ * kennt, entscheidet `stufenFuer`.
+ */
+export function haupttyp(bezeichnung: string | null | undefined): string | null {
+  const geputzt = bezeichnung?.trim()
+  if (!geputzt) return null
+
+  const woerter = geputzt.split(/\s+/)
+  const zahlwort = woerter.findIndex((w) => /^\d{1,4}$/.test(w))
+  const bis = zahlwort >= 0 ? zahlwort + 1 : 1
+  if (bis >= woerter.length) return null
+
+  return woerter.slice(0, bis).join(' ')
+}
+
+/**
+ * Die Modellnamen eines Portals, von genau nach grob.
+ *
+ * Jede Stufe ist ein Name, den **das Portal selbst führt** — nichts wird
+ * erfunden. Wo das Portal nichts Gröberes kennt, fehlt die Stufe einfach,
+ * und der Zyklus weitet dann nur die Toleranzen.
+ *
+ * | Stufe | Woher | Beispiel (AutoScout24, Mercedes-Benz) |
+ * | --- | --- | --- |
+ * | genau | wie bisher, längster passender Wortpräfix | `E 53 AMG` |
+ * | haupttyp | `haupttyp()`, gegen die Liste geprüft | `E 53` |
+ * | baureihe | kürzester Portalname mit gleichem ersten Wort | `E-Klasse` |
+ *
+ * Die Baureihe wird nicht aus der Marke abgeleitet — `E` + `-Klasse` wäre
+ * eine Mercedes-Regel, die bei Skoda schon falsch ist. Stattdessen zählt,
+ * was in der Liste des Portals steht: der kürzeste Eintrag, der mit
+ * demselben Wort beginnt.
+ */
+export function stufenFuer(
+  bezeichnung: string | null | undefined,
+  modelle: string[],
+): { stufe: 'genau' | 'haupttyp' | 'baureihe'; modell: string }[] {
+  if (!bezeichnung?.trim() || modelle.length === 0) return []
+
+  const stufen: { stufe: 'genau' | 'haupttyp' | 'baureihe'; modell: string }[] = []
+  const gesehen = new Set<string>()
+  const nimm = (stufe: 'genau' | 'haupttyp' | 'baureihe', modell: string | null) => {
+    if (!modell || gesehen.has(norm(modell))) return
+    gesehen.add(norm(modell))
+    stufen.push({ stufe, modell })
+  }
+
+  nimm('genau', loeseModellAuf(bezeichnung, modelle).modell)
+
+  const grob = haupttyp(bezeichnung)
+  if (grob) nimm('haupttyp', loeseModellAuf(grob, modelle).modell)
+
+  /*
+   * Die Baureihe unter den Einträgen mit demselben ersten Wort.
+   *
+   * Was sie von einer Variante unterscheidet, ist **die fehlende
+   * Typnummer**: `E-Klasse` gegen `E 53 AMG`, `GLC-Klasse` gegen `GLC 300`.
+   * Nach der Zeichenlänge zu gehen wäre falsch — `GLC 300` ist kürzer als
+   * `GLC-Klasse` und trotzdem die engere Suche. Bei Porsche trägt die
+   * Baureihe selbst eine Zahl (`911`); dort haben alle Kandidaten eine, und
+   * es entscheidet die Wortzahl.
+   */
+  const erstesWort = norm(bezeichnung).split(' ')[0] ?? ''
+  if (erstesWort) {
+    const typnummern = (wert: string) =>
+      norm(wert)
+        .split(' ')
+        .filter((w) => /^\d{1,4}$/.test(w)).length
+
+    const verwandte = modelle
+      .filter((m) => norm(m).split(' ')[0] === erstesWort)
+      .sort((a, b) => {
+        const nummern = typnummern(a) - typnummern(b)
+        if (nummern !== 0) return nummern
+        const woerter = norm(a).split(' ').length - norm(b).split(' ').length
+        return woerter !== 0 ? woerter : a.length - b.length
+      })
+    nimm('baureihe', verwandte[0] ?? null)
+  }
+
+  return stufen
+}

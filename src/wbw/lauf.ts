@@ -6,6 +6,16 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { filtereNachMarke } from './markenfilter'
 import type { Bauart } from './karosserie'
+import {
+  ZYKLEN,
+  genugGefunden,
+  modelleFuerStufe,
+  toleranzenFuer,
+  type Zyklusname,
+  type Zyklusstufe,
+} from './zyklus'
+import { brauchbare, pruefeInserate, type Inseratsangabe, type Pruefurteil } from './pruefung'
+import { protokolliereWarnung } from '@/protokoll'
 
 const fuehreAus = promisify(execFile)
 
@@ -72,6 +82,17 @@ export interface WbwEingabe {
   /** Markenfremde Inserate aussortieren. Voreinstellung: ja. */
   markenfilter?: boolean
   /**
+   * Die Modellliste von AutoScout24 zu dieser Marke.
+   *
+   * Aus ihr werden die gröberen Stufen gewählt — ohne sie bleibt es über
+   * alle Zyklen bei dem einen Namen, und nur die Toleranzen weiten sich.
+   */
+  as24Modelle?: string[]
+  /** Ab wie vielen brauchbaren Fahrzeugen aufgehört wird. Vorgabe: 8. */
+  mindestzahl?: number
+  /** Die KI-Prüfung abschalten — dann bleibt der Korb ungeprüft. */
+  pruefen?: boolean
+  /**
    * Zusätzliche Umgebungsvariablen für die Skripte dieses einen Laufs.
    *
    * Damit wird `WBW_ALLOW_PAID` **pro Lauf** gesetzt statt dauerhaft im
@@ -95,6 +116,10 @@ export interface WbwErgebnis {
   /** Was der Markenfilter je Portal entfernt hat. */
   markenfremd: { portal: Portal; anzahl: number; erkannt: (string | null)[] }[]
   protokoll: Schritt[]
+  /** Was jeder gelaufene Zyklus ergeben hat. */
+  zyklen: Zyklusbericht[]
+  /** Das Urteil der KI-Prüfung je Fahrzeug, nach seiner Kennzeichnung. */
+  urteile: Record<string, Pruefurteil>
   dateien: { html?: string; pdf?: string; linkliste?: string }
 }
 
@@ -270,9 +295,126 @@ export function setzeModelle(
   return kopie
 }
 
+/** Was ein Zyklus je Portal ergeben hat — Grundlage der Zyklus-Reports. */
+export interface Portalbericht {
+  portal: Portal
+  /** Der Modellname, mit dem gesucht wurde. */
+  modell: string | null
+  gefunden: number
+  behalten: number
+  /** Ordner des eigenen Reports dieses Zyklus und Portals. */
+  reportordner: string | null
+  fehler?: string
+}
+
+export interface Zyklusbericht {
+  name: Zyklusname
+  beschriftung: string
+  toleranzen: ReturnType<typeof toleranzenFuer>
+  portale: Portalbericht[]
+  /** Fahrzeuge, die es in den vorherigen Zyklen noch nicht gab. */
+  neu: number
+  /** Davon nach der Prüfung als aufnehmbar beurteilt. */
+  brauchbar: number
+}
+
 /**
- * Führt den ganzen Lauf aus. `melde` bekommt nach jedem Schritt den Stand —
- * daran hängt die Fortschrittsanzeige.
+ * Schreibt die Parameterdatei eines Zyklus.
+ *
+ * **Die Soll-Ausstattung steht bewusst nicht mehr in der Suchanfrage.** Die
+ * Portale führen sie unvollständig — bei Kleinanzeigen stand sie am
+ * 07.09.2026 bei keinem einzigen Inserat in der Ausstattungsliste, sondern
+ * im Beschreibungstext. Wer danach filtert, wirft die halbe Trefferliste weg
+ * und behält die Händler, die ihre Häkchen pflegen. Gelesen wird sie jetzt
+ * von der KI-Prüfung, aus dem Fliesstext.
+ */
+function parameterFuer(
+  eingabe: WbwEingabe,
+  zentrum: { lat: number; lon: number },
+  stufe: Zyklusstufe,
+  modelle: ModellProPortal,
+): Record<string, unknown> {
+  const toleranzen = toleranzenFuer(eingabe, stufe)
+  return {
+    subject: {
+      marke: eingabe.subjekt.marke,
+      modell: modelle.kleinanzeigen ?? eingabe.subjekt.modell,
+      variante: eingabe.subjekt.variante,
+      ez: eingabe.subjekt.ez,
+      mileage: eingabe.subjekt.mileage,
+      power: eingabe.subjekt.power,
+    },
+    // Leer statt weggelassen: das Plugin erwartet das Feld, und eine leere
+    // Liste heisst dort „nicht danach filtern".
+    sollAusstattung: [],
+    plz: eingabe.plz,
+    zentrum,
+    ...(eingabe.subjekt.bauart ? { karosserie: eingabe.subjekt.bauart } : {}),
+    ...toleranzen,
+    ...(eingabe.getriebe ? { getriebe: eingabe.getriebe } : {}),
+    ...(eingabe.tueren ? { tueren: eingabe.tueren } : {}),
+    maxItemsProPortal: eingabe.maxItemsProPortal,
+    kleinanzeigenLocId: null,
+    wbwOpts: { eurProKm: 0.1, eurProEzMonat: 120 },
+  }
+}
+
+/** Die Rohtreffer einer Datei — die Form wechselt je nach Herkunft. */
+async function leseTreffer(pfad: string): Promise<Record<string, unknown>[]> {
+  const roh = JSON.parse(await readFile(pfad, 'utf8')) as
+    | { items?: Record<string, unknown>[] }
+    | Record<string, unknown>[]
+  return Array.isArray(roh) ? roh : (roh.items ?? [])
+}
+
+/** Woran ein Fahrzeug über Zyklen hinweg wiedererkannt wird. */
+function kennzeichnung(eintrag: Record<string, unknown>): string {
+  const url = typeof eintrag.url === 'string' ? eintrag.url : null
+  if (url) return url.split('?')[0] ?? url
+  const id = eintrag.id ?? eintrag.adid ?? eintrag.guid
+  return id != null ? String(id) : JSON.stringify(eintrag).slice(0, 200)
+}
+
+/** Übersetzt einen Rohtreffer in das, was die Prüfung braucht. */
+function alsAngabe(eintrag: Record<string, unknown>, portal: Portal): Inseratsangabe {
+  const text = (wert: unknown) => (typeof wert === 'string' && wert.trim() ? wert : null)
+  const zahl = (wert: unknown) => {
+    if (typeof wert === 'number' && Number.isFinite(wert)) return wert
+    const ziffern = String(wert ?? '').replace(/[^\d]/g, '')
+    return ziffern ? Number(ziffern) : null
+  }
+  const liste = (wert: unknown) =>
+    Array.isArray(wert) ? wert.filter((w): w is string => typeof w === 'string') : []
+
+  return {
+    id: kennzeichnung(eintrag),
+    quelle: portal,
+    titel: text(eintrag.titel) ?? text(eintrag.title),
+    beschreibung: text(eintrag.beschreibung) ?? text(eintrag.description),
+    ausstattung: liste(eintrag.ausstattung),
+    preis: zahl(eintrag.preis ?? eintrag.price),
+    kilometerstand: zahl(eintrag.kilometerstand ?? eintrag.mileage),
+    erstzulassung: text(eintrag.erstzulassung) ?? text(eintrag.ez),
+    leistungKw: zahl(eintrag.leistungKw ?? eintrag.power),
+    anzahlBilder: liste(eintrag.bilder).length,
+  }
+}
+
+/**
+ * Führt den ganzen Lauf aus — in Zyklen, von eng nach weit.
+ *
+ * `melde` bekommt nach jedem Schritt den Stand; daran hängt die
+ * Fortschrittsanzeige.
+ *
+ * **Der Ablauf je Zyklus:** Parameter mit den geweiteten Toleranzen, die
+ * Modellnamen der Stufe, ein Portaldurchlauf, ein eigener Report je Portal —
+ * und danach die Prüfung der neu hinzugekommenen Fahrzeuge. Sind genug
+ * brauchbare beisammen, hört es auf.
+ *
+ * **Der Gesamtkorb entsteht zum Schluss** aus allen Rohdateien aller
+ * gelaufenen Zyklen, mit den Toleranzen des **letzten** Zyklus: mit denen des
+ * ersten würde die Auswertung genau die Fahrzeuge wieder wegwerfen, für die
+ * geweitet wurde.
  */
 export async function fuehreLaufAus(
   eingabe: WbwEingabe,
@@ -294,132 +436,210 @@ export async function fuehreLaufAus(
     text: `PLZ ${eingabe.plz} → ${zentrum.lat.toFixed(4)}, ${zentrum.lon.toFixed(4)}`,
   })
 
-  // --- Parameter -----------------------------------------------------------
-  const params = {
-    subject: {
-      marke: eingabe.subjekt.marke,
-      // Fürs Protokoll der Name aus autoiXpert; gesucht wird je Portal mit
-      // dem gewählten Modellnamen (siehe `setzeModelle`).
-      modell: eingabe.modellProPortal.kleinanzeigen ?? eingabe.subjekt.modell,
-      variante: eingabe.subjekt.variante,
-      ez: eingabe.subjekt.ez,
-      mileage: eingabe.subjekt.mileage,
-      power: eingabe.subjekt.power,
-    },
-    sollAusstattung: eingabe.sollAusstattung,
-    plz: eingabe.plz,
-    zentrum,
-    // Die Bauart kommt aus `car.shape` und muss nicht mehr aus dem Korb
-    // erraten werden.
-    ...(eingabe.subjekt.bauart ? { karosserie: eingabe.subjekt.bauart } : {}),
-    radiusKm: eingabe.radiusKm,
-    kmToleranz: eingabe.kmToleranz,
-    ezToleranzJahre: eingabe.ezToleranzJahre,
-    leistungToleranzKw: eingabe.leistungToleranzKw,
-    ...(eingabe.getriebe ? { getriebe: eingabe.getriebe } : {}),
-    ...(eingabe.tueren ? { tueren: eingabe.tueren } : {}),
-    maxItemsProPortal: eingabe.maxItemsProPortal,
-    kleinanzeigenLocId: null,
-    wbwOpts: { eurProKm: 0.1, eurProEzMonat: 120 },
-  }
-  await writeFile(join(ordner, 'params.json'), JSON.stringify(params, null, 2), 'utf8')
-
-  // --- Such-Eingaben -------------------------------------------------------
-  halteFest({ name: 'Such-Eingaben erzeugen', stand: 'laeuft' })
-  await rufeSkript('build-search-urls.js', ['params.json', 'search-inputs.json'], {
-    cwd: ordner,
-    timeoutMs: 60_000,
-  })
-  const eingaben = JSON.parse(
-    await readFile(join(ordner, 'search-inputs.json'), 'utf8'),
-  ) as Record<string, unknown>
-  await writeFile(
-    join(ordner, 'search-inputs.json'),
-    JSON.stringify(setzeModelle(eingaben, eingabe.modellProPortal), null, 2),
-    'utf8',
-  )
-  halteFest({ name: 'Such-Eingaben erzeugen', stand: 'fertig' })
-
-  // --- Beschaffung je Portal ----------------------------------------------
   const markenfremd: WbwErgebnis['markenfremd'] = []
-  const quellen: string[] = []
+  const zyklen: Zyklusbericht[] = []
+  const quellenGesamt: string[] = []
+  const urteile = new Map<string, Pruefurteil>()
+  const gesehen = new Set<string>()
+  let letzteParameter = 'params-eng.json'
 
-  for (const portal of eingabe.portale) {
-    const datei = ROHDATEI[portal]
-    halteFest({ name: `${portal} durchsuchen`, stand: 'laeuft' })
-    try {
-      await rufeSkript('fetch-portal.js', [portal, 'search-inputs.json', datei], {
-        cwd: ordner,
-        umgebung: eingabe.umgebung,
-      })
-    } catch (fehler) {
-      halteFest({
-        name: `${portal} durchsuchen`,
-        stand: 'fehler',
-        text: fehler instanceof Error ? fehler.message.slice(0, 300) : String(fehler),
-      })
-      continue
-    }
+  for (const stufe of ZYKLEN) {
+    const modelle = modelleFuerStufe(
+      eingabe.modellProPortal,
+      eingabe.subjekt.modell,
+      eingabe.as24Modelle ?? [],
+      stufe,
+    )
+    const parameterdatei = `params-${stufe.name}.json`
+    const eingabedatei = `search-inputs-${stufe.name}.json`
+    letzteParameter = parameterdatei
 
-    const roh = JSON.parse(await readFile(join(ordner, datei), 'utf8')) as {
-      items?: Record<string, unknown>[]
-    }
-    const gefunden = roh.items ?? []
+    await writeFile(
+      join(ordner, parameterdatei),
+      JSON.stringify(parameterFuer(eingabe, zentrum, stufe, modelle), null, 2),
+      'utf8',
+    )
 
-    if (gefunden.length === 0) {
-      halteFest({ name: `${portal} durchsuchen`, stand: 'leer', text: 'keine Treffer' })
-      continue
-    }
-
-    // Markenfremdes hier aussortieren, nicht erst im Korb: der Trichter des
-    // Reports zeigt sonst Zahlen, die niemand nachvollziehen kann.
-    let behalten = gefunden
-    if (eingabe.markenfilter !== false) {
-      const gefiltert = filtereNachMarke(gefunden, eingabe.subjekt.marke)
-      behalten = gefiltert.behalten
-      if (gefiltert.entfernt.length > 0) {
-        markenfremd.push({
-          portal,
-          anzahl: gefiltert.entfernt.length,
-          erkannt: gefiltert.entfernt.map((e) => e.erkannt),
-        })
-        await writeFile(
-          join(ordner, datei),
-          JSON.stringify({ ...roh, items: behalten }, null, 2),
-          'utf8',
-        )
-      }
-    }
-
-    quellen.push(`${portal}=${datei}`)
+    halteFest({ name: `${stufe.beschriftung}: Such-Eingaben`, stand: 'laeuft' })
+    await rufeSkript('build-search-urls.js', [parameterdatei, eingabedatei], {
+      cwd: ordner,
+      timeoutMs: 60_000,
+    })
+    const eingaben = JSON.parse(await readFile(join(ordner, eingabedatei), 'utf8')) as Record<
+      string,
+      unknown
+    >
+    await writeFile(
+      join(ordner, eingabedatei),
+      JSON.stringify(setzeModelle(eingaben, modelle), null, 2),
+      'utf8',
+    )
+    const toleranzen = toleranzenFuer(eingabe, stufe)
     halteFest({
-      name: `${portal} durchsuchen`,
+      name: `${stufe.beschriftung}: Such-Eingaben`,
       stand: 'fertig',
       text:
-        behalten.length === gefunden.length
-          ? `${behalten.length} Treffer`
-          : `${behalten.length} von ${gefunden.length} Treffern — ${gefunden.length - behalten.length} markenfremd`,
+        `${toleranzen.radiusKm} km Umkreis · ±${toleranzen.kmToleranz.toLocaleString('de-DE')} km · ` +
+        `±${toleranzen.ezToleranzJahre} Jahre · ±${toleranzen.leistungToleranzKw} kW`,
     })
+
+    // --- Beschaffung je Portal --------------------------------------------
+    const berichte: Portalbericht[] = []
+    const neueAngaben: Inseratsangabe[] = []
+
+    for (const portal of eingabe.portale) {
+      const datei = `${ROHDATEI[portal].replace(/\.json$/, '')}-${stufe.name}.json`
+      const schrittname = `${stufe.beschriftung}: ${portal}`
+      const modell = modelle[portal === 'mobile.de' ? 'mobilede' : portal] ?? null
+
+      halteFest({ name: schrittname, stand: 'laeuft' })
+      try {
+        await rufeSkript('fetch-portal.js', [portal, eingabedatei, datei], {
+          cwd: ordner,
+          umgebung: eingabe.umgebung,
+        })
+      } catch (fehler) {
+        const grund = fehler instanceof Error ? fehler.message.slice(0, 300) : String(fehler)
+        berichte.push({ portal, modell, gefunden: 0, behalten: 0, reportordner: null, fehler: grund })
+        halteFest({ name: schrittname, stand: 'fehler', text: grund })
+        continue
+      }
+
+      const gefunden = await leseTreffer(join(ordner, datei))
+      if (gefunden.length === 0) {
+        berichte.push({ portal, modell, gefunden: 0, behalten: 0, reportordner: null })
+        halteFest({ name: schrittname, stand: 'leer', text: 'keine Treffer' })
+        continue
+      }
+
+      let behalten = gefunden
+      if (eingabe.markenfilter !== false) {
+        const gefiltert = filtereNachMarke(gefunden, eingabe.subjekt.marke)
+        behalten = gefiltert.behalten
+        if (gefiltert.entfernt.length > 0) {
+          markenfremd.push({
+            portal,
+            anzahl: gefiltert.entfernt.length,
+            erkannt: gefiltert.entfernt.map((e) => e.erkannt),
+          })
+          await writeFile(join(ordner, datei), JSON.stringify({ items: behalten }, null, 2), 'utf8')
+        }
+      }
+
+      // Der eigene Report dieses Zyklus und dieses Portals — er belegt, wie
+      // tief gesucht wurde, und ist für sich vorlegbar.
+      const reportordner = `./out/${stufe.name}-${portal.replace('.', '')}`
+      let reportPfad: string | null = null
+      try {
+        await rufeSkript('run-report.js', [parameterdatei, reportordner, `${portal}=${datei}`], {
+          cwd: ordner,
+          timeoutMs: 10 * 60 * 1000,
+        })
+        reportPfad = join(ordner, reportordner)
+      } catch (fehler) {
+        // Ein misslungener Zwischenreport darf den Lauf nicht kosten — die
+        // Rohdaten sind da und gehen in den Gesamtkorb.
+        protokolliereWarnung('wbw.lauf', 'Ein Zyklus-Report liess sich nicht erzeugen.', {
+          portal,
+          zyklus: stufe.name,
+          grund: fehler instanceof Error ? fehler.message.slice(0, 200) : String(fehler),
+        })
+      }
+
+      for (const eintrag of behalten) {
+        const kennung = kennzeichnung(eintrag)
+        if (gesehen.has(kennung)) continue
+        gesehen.add(kennung)
+        neueAngaben.push(alsAngabe(eintrag, portal))
+      }
+
+      quellenGesamt.push(`${portal}=${datei}`)
+      berichte.push({
+        portal,
+        modell,
+        gefunden: gefunden.length,
+        behalten: behalten.length,
+        reportordner: reportPfad,
+      })
+      halteFest({
+        name: schrittname,
+        stand: 'fertig',
+        text:
+          behalten.length === gefunden.length
+            ? `${behalten.length} Treffer${modell ? ` · „${modell}"` : ''}`
+            : `${behalten.length} von ${gefunden.length} — ${gefunden.length - behalten.length} markenfremd`,
+      })
+    }
+
+    // --- Prüfung der neu hinzugekommenen Fahrzeuge ------------------------
+    if (neueAngaben.length > 0 && eingabe.pruefen !== false) {
+      const schrittname = `${stufe.beschriftung}: Inserate prüfen`
+      halteFest({ name: schrittname, stand: 'laeuft' })
+      const neueUrteile = await pruefeInserate(
+        {
+          subjekt: {
+            marke: eingabe.subjekt.marke,
+            modell: eingabe.subjekt.modell,
+            variante: eingabe.subjekt.variante,
+            ez: eingabe.subjekt.ez,
+            kilometerstand: eingabe.subjekt.mileage,
+            leistungKw: eingabe.subjekt.power,
+          },
+          sollAusstattung: eingabe.sollAusstattung,
+        },
+        neueAngaben,
+      )
+      for (const [id, urteil] of neueUrteile) urteile.set(id, urteil)
+      const offen = [...neueUrteile.values()].filter((u) => u.ungeprueft).length
+      halteFest({
+        name: schrittname,
+        stand: 'fertig',
+        text:
+          `${neueAngaben.length} geprüft · ${brauchbare(neueUrteile.values())} aufnehmbar` +
+          (offen > 0 ? ` · ${offen} ohne Urteil` : ''),
+      })
+    }
+
+    const brauchbarGesamt = brauchbare(urteile.values())
+    zyklen.push({
+      name: stufe.name,
+      beschriftung: stufe.beschriftung,
+      toleranzen,
+      portale: berichte,
+      neu: neueAngaben.length,
+      brauchbar: brauchbarGesamt,
+    })
+
+    if (genugGefunden(brauchbarGesamt, eingabe.mindestzahl)) {
+      halteFest({
+        name: 'Suche beendet',
+        stand: 'fertig',
+        text: `${brauchbarGesamt} brauchbare Vergleichsfahrzeuge — weitere Zyklen nicht nötig`,
+      })
+      break
+    }
   }
 
-  if (quellen.length === 0) {
+  if (quellenGesamt.length === 0) {
     throw new Error('Kein Portal hat Treffer geliefert. Der Lauf wurde abgebrochen.')
   }
 
-  // --- Auswerten und Report ------------------------------------------------
-  halteFest({ name: 'Auswerten und Report erzeugen', stand: 'laeuft' })
-  await rufeSkript('run-report.js', ['params.json', './out', ...quellen], {
+  // --- Gesamtkorb ----------------------------------------------------------
+  halteFest({ name: 'Gesamtkorb auswerten', stand: 'laeuft' })
+  await rufeSkript('run-report.js', [letzteParameter, './out', ...quellenGesamt], {
     cwd: ordner,
-    timeoutMs: 10 * 60 * 1000,
+    timeoutMs: 15 * 60 * 1000,
   })
   const ergebnis = JSON.parse(await readFile(join(ordner, 'out', 'result.json'), 'utf8'))
-  halteFest({ name: 'Auswerten und Report erzeugen', stand: 'fertig' })
+  halteFest({ name: 'Gesamtkorb auswerten', stand: 'fertig' })
 
   return {
     ordner,
     ergebnis,
     markenfremd,
     protokoll,
+    zyklen,
+    urteile: Object.fromEntries(urteile),
     dateien: {
       html: join(ordner, 'out', 'WBW-Vergleichsfahrzeuge.html'),
       pdf: join(ordner, 'out', 'WBW-Vergleichsfahrzeuge.pdf'),

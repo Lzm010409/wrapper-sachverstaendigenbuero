@@ -78,6 +78,13 @@
       "when": 1788849791595,
       "tag": "0010_silly_tattoo",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788855567341,
+      "tag": "0011_wbw_zyklen",
+      "breakpoints": true
     }
   ]
 }

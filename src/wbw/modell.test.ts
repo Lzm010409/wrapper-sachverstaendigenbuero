@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { loeseModellAuf, passendeModelle } from './modell'
+import { haupttyp, loeseModellAuf, passendeModelle, stufenFuer } from './modell'
 
 /** Ausschnitt aus den 357 Modellnamen, die AutoScout24 fuer Mercedes fuehrt. */
 const MERCEDES = [
@@ -58,5 +58,69 @@ describe('passendeModelle', () => {
 
   it('gibt die ganze Liste, wenn nichts passt', () => {
     expect(passendeModelle('Phantasie', MERCEDES).length).toBe(MERCEDES.length)
+  })
+})
+
+describe('Haupttyp', () => {
+  it('schneidet Ausstattungslinie und Antriebszusatz ab', () => {
+    expect(haupttyp('E 53 AMG 4Matic+')).toBe('E 53')
+  })
+
+  it('behält die Typnummer, wirft den Kraftstoffbuchstaben', () => {
+    expect(haupttyp('GLC 300 d')).toBe('GLC 300')
+  })
+
+  it('hält den Hubraum nicht für eine Typnummer', () => {
+    // `2.0` trägt einen Punkt — sonst käme `Superb Combi 2.0` heraus, und
+    // damit wäre der Haupttyp genauer als die Bezeichnung selbst.
+    expect(haupttyp('Superb Combi 2.0 TDI')).toBe('Superb')
+  })
+
+  it('hält eine Motorkennung nicht für eine Typnummer', () => {
+    expect(haupttyp('3er 320d')).toBe('3er')
+  })
+
+  it('kommt mit der Typnummer als erstem Wort zurecht', () => {
+    expect(haupttyp('911 Carrera 4S')).toBe('911')
+  })
+
+  it('gibt null, wenn nichts abzuschneiden ist', () => {
+    // Ein Haupttyp, der die Bezeichnung selbst ist, wäre keine Weitung.
+    expect(haupttyp('E 53')).toBeNull()
+    expect(haupttyp('Superb')).toBeNull()
+    expect(haupttyp('  ')).toBeNull()
+    expect(haupttyp(null)).toBeNull()
+  })
+})
+
+describe('Stufen für ein Portal', () => {
+  // Ausschnitt aus der echten Modellliste von AutoScout24 für Mercedes-Benz.
+  const AS24 = ['E-Klasse', 'E 53 AMG', 'E 63 AMG', 'GLC-Klasse', 'GLC 300', 'A 45 AMG']
+
+  it('geht von genau über den Haupttyp zur Baureihe', () => {
+    expect(stufenFuer('E 53 AMG 4Matic+', AS24)).toEqual([
+      { stufe: 'genau', modell: 'E 53 AMG' },
+      { stufe: 'baureihe', modell: 'E-Klasse' },
+    ])
+  })
+
+  it('nimmt den Haupttyp auf, wenn das Portal ihn führt', () => {
+    expect(stufenFuer('GLC 300 d', AS24)).toEqual([
+      { stufe: 'genau', modell: 'GLC 300' },
+      { stufe: 'baureihe', modell: 'GLC-Klasse' },
+    ])
+  })
+
+  it('erfindet keinen Namen, den das Portal nicht führt', () => {
+    // Kein `S-Klasse` in der Liste — dann gibt es die Stufe eben nicht,
+    // statt eine Suche auf einen Namen zu schicken, den das Portal
+    // stillschweigend fallen lässt.
+    expect(stufenFuer('S 580 lang', ['E-Klasse', 'E 53 AMG'])).toEqual([])
+  })
+
+  it('führt jede Stufe nur einmal', () => {
+    // `A 45 AMG` ist genau und zugleich der kürzeste Eintrag mit `a` —
+    // zweimal dieselbe Suche wäre zweimal dieselbe Wartezeit.
+    expect(stufenFuer('A 45 AMG S', AS24)).toEqual([{ stufe: 'genau', modell: 'A 45 AMG' }])
   })
 })
