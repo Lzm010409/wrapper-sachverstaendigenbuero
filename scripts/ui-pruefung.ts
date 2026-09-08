@@ -525,6 +525,46 @@ async function teilFaelle(seite: Page) {
     }
   })
 
+  await pruefe('Fotoviewer blättert, ohne Bilder zu stapeln', async () => {
+    /*
+      Regressionsprobe für einen Fehler, bei dem `Buehnenbild` und
+      `Beschriftung` denselben Schlüssel trugen (beide `foto.id`) — als
+      Geschwister im selben Elternknoten verwechselte React die beiden beim
+      Blättern, und das alte Bild blieb neben dem neuen stehen, bis zum
+      Neuladen der Seite.
+    */
+    await seite.goto(`${BASIS}/faelle`, { waitUntil: 'networkidle' })
+    if ((await seite.locator('.zeile').count()) === 0) return
+    await seite.locator('.zeile').first().click()
+    await seite.waitForURL(/\/faelle\/[0-9a-f-]{36}/, { timeout: 15000 }).catch(() => {})
+    await seite.waitForLoadState('networkidle')
+
+    const fotosReiter = seite.locator('.fall-reiter a:has-text("Fotos")')
+    if ((await fotosReiter.count()) === 0) return
+    await fotosReiter.click()
+    await seite.waitForLoadState('networkidle')
+
+    const kacheln = seite.locator('.foto-kachel')
+    if ((await kacheln.count()) < 2) return // Probe braucht mindestens zwei Fotos.
+
+    await kacheln.first().click()
+    await seite.waitForSelector('.foto-buehne', { timeout: 5000 })
+    const titelVorher = await seite.locator('.foto-buehne-titel').innerText()
+
+    await seite.locator('.foto-buehne-leiste button[aria-label="Nächstes Foto"]').click()
+    await seite.waitForTimeout(500)
+
+    const bilder = await seite.locator('.foto-buehne-bild').count()
+    if (bilder > 1) {
+      melde('fehler', `Nach dem Blättern stehen ${bilder} Bilder gleichzeitig in der Grossansicht.`)
+    }
+    const titelNachher = await seite.locator('.foto-buehne-titel').innerText()
+    if (titelNachher === titelVorher) {
+      melde('fehler', 'Nach dem Blättern zeigt die Grossansicht noch dasselbe Foto.')
+    }
+    await seite.locator('.foto-buehne button[aria-label="Schliessen"]').click()
+  })
+
   await pruefe('Fall neu laden', async () => {
     await seite.goto(`${BASIS}/faelle`, { waitUntil: 'networkidle' })
     if ((await seite.locator('.zeile').count()) === 0) return
