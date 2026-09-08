@@ -3230,3 +3230,139 @@ body {
 }
 
 .recht-zeile:last-child { border-bottom: 0; }
+
+/* ---------- Filterleiste ---------- */
+
+/*
+ * Die Leiste über einer Liste. Sie ist eine Karte wie `.werkzeugleiste`,
+ * trägt aber zwei Reihen und darunter die Marken der gesetzten Filter.
+ *
+ * Der Rand fällt weg, der Schatten trägt die Kante — dieselbe Linie wie bei
+ * `.karte`. `.werkzeugleiste` hat beides noch; sie bleibt unangetastet,
+ * damit dieser Umbau nicht nebenbei drei andere Seiten verschiebt.
+ */
+.filterleiste {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.filterleiste-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+
+/*
+ * `hidden` muss das `display: flex` darüber schlagen.
+ *
+ * Der Browser bringt `[hidden] { display: none }` selbst mit — aber aus
+ * seinem eigenen Stylesheet, und eine Klasse wiegt schwerer als ein
+ * Attributselektor von dort. Die zweite Filterreihe stand deshalb immer
+ * offen, obwohl `hidden` gesetzt war. Die Regel gilt bewusst für die ganze
+ * Anwendung: derselbe Fehler wartet in jedem Bauteil, das `el.hidden` mit
+ * einer Layoutklasse kombiniert.
+ */
+[hidden] {
+  display: none !important;
+}
+
+/* Das Suchfeld nimmt den Platz, der übrig bleibt — es ist das Feld, in das
+   zuerst getippt wird. Unter 240px wird es unbrauchbar, dann bricht die
+   Reihe lieber um. */
+.filterleiste input[type='search'] {
+  flex: 1 1 240px;
+  min-width: 240px;
+  align-self: center;
+}
+
+.filterleiste .feld {
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.filterleiste select,
+.filterleiste input[type='date'],
+.filterleiste .feld input[type='text'] {
+  width: auto;
+  min-width: 150px;
+}
+
+.filterleiste button[type='submit'] {
+  align-self: center;
+}
+
+/*
+ * Die Marken der gesetzten Filter.
+ *
+ * Sie beantworten die Frage, die eine kurze Liste immer aufwirft: „warum
+ * sehe ich so wenig?". Deshalb stehen sie unter der Leiste und nicht in ihr
+ * — sie gehören zur Antwort, nicht zur Eingabe.
+ */
+.filtermarken {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.filtermarke {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.3em 0.7em;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border: 0;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+}
+
+.filtermarke strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Blau erst beim Hinzeigen: eine Reihe blauer Marken sähe aus wie eine Reihe
+   Knöpfe, die etwas auslösen. Sie zeigen einen Zustand und nehmen ihn auf
+   Klick zurück — das ist eine Nebenhandlung, keine Hauptsache. */
+.filtermarke:hover,
+.filtermarke:focus-visible {
+  color: var(--akzent-stark);
+  background: var(--akzent-soft);
+}
+
+.filter-zuruecksetzen {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* Auf dem Telefon steht jedes Feld für sich — nebeneinander wären es
+   Felder von 60 Pixeln, in die niemand tippt. */
+@media (max-width: 620px) {
+  .filterleiste-reihe {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterleiste .feld,
+  .filterleiste select,
+  .filterleiste input[type='date'],
+  .filterleiste input[type='search'],
+  .filterleiste .feld input[type='text'] {
+    width: 100%;
+    min-width: 0;
+  }
+}

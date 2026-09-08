@@ -1,18 +1,51 @@
 import Link from 'next/link'
-import { ladeFaelle } from '@/autoixpert/abfragen'
+import {
+  filterGesetzt,
+  ladeFaelle,
+  vorhandeneMarken,
+  zaehleGefilterte,
+  type Fallfilter,
+} from '@/autoixpert/abfragen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { Filterleiste } from '@/app/teile/filterleiste'
 
-export default async function FaelleSeite() {
+/** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
+function wert(roh: string | string[] | undefined): string | undefined {
+  const einzeln = Array.isArray(roh) ? roh[0] : roh
+  return einzeln?.trim() || undefined
+}
+
+export default async function FaelleSeite({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
   // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
   // rendert gleichzeitig mit ihm, und ihre Nutzlast ging im Rumpf der
   // Umleitung mit hinaus.
   await verlangeAnmeldung()
 
-  const faelle = await ladeFaelle()
+  const roh = await searchParams
+  const filter: Fallfilter = {
+    suche: wert(roh.suche),
+    zustand: wert(roh.zustand),
+    von: wert(roh.von),
+    bis: wert(roh.bis),
+    marke: wert(roh.marke),
+    modell: wert(roh.modell),
+    baujahr: wert(roh.baujahr),
+  }
+  const gefiltert = filterGesetzt(filter)
+
+  const [faelle, gesamt, marken] = await Promise.all([
+    ladeFaelle(filter),
+    zaehleGefilterte(filter),
+    vorhandeneMarken(),
+  ])
   const eingerichtet = Boolean(process.env.AUTOIXPERT_API_TOKEN)
 
   return (
@@ -20,10 +53,18 @@ export default async function FaelleSeite() {
       <div className="seiten-kopf">
         <div>
           <h1>Fälle</h1>
+          {/*
+            Die Zahl kommt aus einer eigenen Zählung, nicht aus der Länge der
+            Liste: die schneidet bei hundert ab, und „100 Fälle" wäre unter
+            einer Liste aus hundert Zeilen eine Behauptung, die schon bei
+            hunderteins falsch ist.
+          */}
           <p className="unterzeile">
-            {faelle.length === 0
-              ? 'Noch kein Fall importiert'
-              : `${faelle.length} ${faelle.length === 1 ? 'Fall' : 'Fälle'} aus autoiXpert`}
+            {gesamt === 0
+              ? gefiltert
+                ? 'Kein Fall passt zu diesem Filter'
+                : 'Noch kein Fall importiert'
+              : `${gesamt} ${gesamt === 1 ? 'Fall' : 'Fälle'}${gefiltert ? ' gefunden' : ' aus autoiXpert'}`}
           </p>
         </div>
       </div>
@@ -38,10 +79,48 @@ export default async function FaelleSeite() {
 
       <ImportFormular aktiv={eingerichtet} />
 
+      <Filterleiste
+        weitereAb={2}
+        treffer={
+          faelle.length < gesamt ? `${faelle.length} von ${gesamt} gezeigt` : undefined
+        }
+        felder={[
+          {
+            art: 'suche',
+            name: 'suche',
+            platzhalter: 'Aktenzeichen, Anspruchsteller, Kennzeichen oder FIN',
+          },
+          {
+            art: 'auswahl',
+            name: 'zustand',
+            beschriftung: 'Zustand',
+            alle: 'Alle Zustände',
+            werte: [
+              { wert: 'recorded', text: 'aufgenommen' },
+              { wert: 'locked', text: 'abgeschlossen' },
+              { wert: 'deleted', text: 'gelöscht' },
+            ],
+          },
+          {
+            art: 'auswahl',
+            name: 'marke',
+            beschriftung: 'Marke',
+            alle: 'Alle Marken',
+            werte: marken.map((m) => ({ wert: m, text: m })),
+          },
+          { art: 'text', name: 'modell', beschriftung: 'Modell', platzhalter: 'z. B. E-Klasse' },
+          { art: 'text', name: 'baujahr', beschriftung: 'Baujahr', platzhalter: 'JJJJ' },
+          { art: 'datum', name: 'von', beschriftung: 'Abgerufen ab' },
+          { art: 'datum', name: 'bis', beschriftung: 'Abgerufen bis' },
+        ]}
+      />
+
       {faelle.length === 0 ? (
         <div className="leer">
           <p style={{ margin: 0 }}>
-            Lade einen Fall über sein Aktenzeichen oder die technische ID.
+            {gefiltert
+              ? 'Kein Fall passt zu diesem Filter. Nimm eine Einschränkung heraus.'
+              : 'Lade einen Fall über sein Aktenzeichen oder die technische ID.'}
           </p>
         </div>
       ) : (
