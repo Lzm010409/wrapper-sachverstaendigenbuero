@@ -537,12 +537,58 @@ hinterlegte Zeile trägt **keinen einzigen** Beleg; nur solche Einträge
 liessen sich über die Schnittstelle gefahrlos entfernen. Steht dort
 „unbekannt", war die Zahl nicht abrufbar — dann bitte nichts löschen.
 
-**Warum es keinen Knopf gibt.** Die sevDesk-Schnittstelle kennt kein
-Zusammenführen (geprüft am 09.09.2026: es gibt `GET`, `PUT` und `DELETE`
-auf `/Contact`, mehr nicht), und festgeschriebene Rechnungen lassen sich
-nicht auf einen anderen Kontakt umhängen. Gruppen, in denen mehrere
-Einträge Belege tragen, sind deshalb mit „nur in sevDesk zusammenführbar"
-gekennzeichnet — dort hilft nur die sevDesk-Oberfläche.
+### Zusammenführen
+
+Ein `merge` kennt die sevDesk-Schnittstelle nicht. Sie kennt aber
+`PUT /Invoice/{id}` — und **Rechnung, Beleg, Anschrift und Kontaktweg
+tragen alle ein Feld `contact`** (beim Beleg heisst es `supplier`). Damit
+lässt sich alles auf den bleibenden Kontakt *umhängen*, statt es zu
+kopieren.
+
+Am 09.09.2026 am echten Konto geprüft: ein `PUT` mit ausschliesslich dem
+Feld `contact` ändert an einer Rechnung genau zwei Felder — `contact` und
+`update`. Die übrigen 73 bleiben unangetastet. Der Rückweg funktioniert
+genauso.
+
+**Der Ablauf hat drei Handgriffe, und das ist Absicht:**
+
+1. **Vorschau.** Liest nur. Zeigt Schritt für Schritt, was gleich
+   geschieht, und markiert die Belege, die festgeschrieben sind.
+2. **Zusammenführen.** Hängt um — und **löscht nichts**. Solange nichts
+   gelöscht ist, lässt sich jeder Umhang mit „Zurücknehmen" rückgängig
+   machen; Rechnungen an einen gelöschten Kontakt zurückzuhängen ginge
+   nicht.
+3. **Löschen.** Ein eigener Knopf je Kontakt, der erst erscheint, wenn
+   der Kontakt nachweislich leer ist. Unmittelbar davor wird noch einmal
+   frisch geprüft: Rechnungen, Belege, Aufträge, Gutschriften. Ist die
+   Prüfung nicht abrufbar, wird **nicht** gelöscht.
+
+**Der Probeschritt.** Vor allem anderen wandert genau eine nicht
+festgeschriebene Rechnung, und es wird per `GET` nachgesehen, ob sie
+wirklich gewechselt hat. Geht das schief, bricht der ganze Vorgang ab —
+dann kostet der Irrtum eine Rechnung statt acht, und die eine steht im
+Protokoll.
+
+**Nach jedem Schreibzugriff steht ein Lesezugriff.** Eine 200 von sevDesk
+heisst „die Anfrage war in Ordnung", nicht „ich habe es getan". Nur was
+beim Zurücklesen wirklich gewechselt hat, gilt als geglückt.
+
+**Festgeschriebene Belege** werden nicht vorab aussortiert. Der Versuch
+wird unternommen, und was sevDesk antwortet, steht im Bericht — das ist
+richtig, egal wie sevDesk sich künftig verhält. Ein Kontakt, an dem etwas
+hängen bleibt, bekommt den Vermerk „Dublette zu …" in seiner Beschreibung
+und bleibt stehen.
+
+**Anschriften und Kontaktwege** wandern nur, wenn der bleibende Kontakt
+sie noch nicht hat. Verglichen werden Straße und Postleitzahl, nicht der
+Ort: im Konto steht dieselbe Anschrift als „40589 Düsseldorf" und als
+„40589 Ddorf". „Ruwerstr. 7a" und „Ruwerstraße 7a" gelten ebenfalls als
+dieselbe. Was doppelt ist, verschwindet mit dem gelöschten Kontakt.
+
+**Das Recht** heisst `sevdesk.zusammenfuehren` und steckt in der Rolle
+`admin`. Jeder Schritt — auch jeder misslungene — steht in der Tabelle
+`kontaktumhang` mit Benutzer, Zeitpunkt, Objekt und der Antwort von
+sevDesk.
 
 ## Wenn ein Benutzer einen Fehler meldet
 

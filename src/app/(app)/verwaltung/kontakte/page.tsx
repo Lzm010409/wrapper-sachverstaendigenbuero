@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { darf } from '@/rechte/zugriff'
 import { sevdeskEingerichtet } from '@/sevdesk/client'
 import { ladeDubletten } from '@/sevdesk/kontakte'
-import type { Dublettengruppe, Kontakt } from '@/kontakte/dubletten'
+import type { Dublettengruppe } from '@/kontakte/dubletten'
+import { Gruppe } from './gruppe'
 import { Meldung } from '@/app/teile/meldung'
 
 /**
@@ -56,6 +58,7 @@ export default async function Kontaktdubletten() {
   }
 
   const leere = gruppen.reduce((s, g) => s + g.leere.length, 0)
+  const darfZusammenfuehren = await darf('sevdesk.zusammenfuehren')
 
   return (
     <>
@@ -71,23 +74,27 @@ export default async function Kontaktdubletten() {
             <span className="hinweis-titel">Was sich davon aufräumen lässt</span>
             {leere > 0 ? (
               <>
-                {leere} {leere === 1 ? 'Eintrag trägt' : 'Einträge tragen'} keinen einzigen Beleg —{' '}
-                {leere === 1 ? 'er lässt' : 'sie lassen'} sich gefahrlos entfernen. Alles Übrige
-                hängt an Rechnungen und ist nur in sevDesk selbst zusammenzuführen: die
-                Schnittstelle kennt kein Zusammenführen, und festgeschriebene Rechnungen lassen
-                sich nicht umhängen.
+                Nicht festgeschriebene Rechnungen, Belege, Anschriften und Kontaktwege lassen
+                sich auf den bleibenden Kontakt umhängen; ist ein Eintrag danach leer, kann er
+                gelöscht werden. {leere} {leere === 1 ? 'Eintrag ist' : 'Einträge sind'} schon
+                jetzt ohne Beleg. Festgeschriebene Belege bleiben, wo sie sind — der Versuch wird
+                unternommen, das Ergebnis steht im Bericht.
               </>
             ) : (
               <>
-                Jeder Eintrag trägt Belege. Zusammengeführt werden kann hier nichts — das geht nur
-                in sevDesk selbst.
+                Jeder Eintrag trägt Belege. Umgehängt wird trotzdem, soweit nichts festgeschrieben
+                ist; was bleibt, bleibt.
               </>
             )}
           </div>
 
           <div className="dubletten">
             {gruppen.map((gruppe) => (
-              <Gruppe key={gruppe.schluessel} gruppe={gruppe} />
+              <Gruppe
+                key={gruppe.schluessel}
+                gruppe={gruppe}
+                darfZusammenfuehren={darfZusammenfuehren}
+              />
             ))}
           </div>
         </>
@@ -114,63 +121,5 @@ function Kopf({ gruppen }: { gruppen: Dublettengruppe[] | null }) {
         Zur Verwaltung
       </Link>
     </div>
-  )
-}
-
-function Gruppe({ gruppe }: { gruppe: Dublettengruppe }) {
-  return (
-    <section className="karte dublettengruppe">
-      <div className="dublettenkopf">
-        <h2>{gruppe.anzeige}</h2>
-        {gruppe.leere.length > 0 ? (
-          <span className="marke-pille m-warn">
-            {gruppe.leere.length} ohne Beleg
-          </span>
-        ) : null}
-        {gruppe.nurInSevdesk ? (
-          <span className="marke-pille m-entwurf">nur in sevDesk zusammenführbar</span>
-        ) : null}
-      </div>
-
-      <table className="dublettentabelle">
-        <thead>
-          <tr>
-            <th scope="col">Name in sevDesk</th>
-            <th scope="col">Kundennummer</th>
-            <th scope="col">Angelegt</th>
-            <th scope="col" style={{ textAlign: 'right' }}>Belege</th>
-          </tr>
-        </thead>
-        <tbody>
-          {gruppe.kontakte.map((kontakt) => (
-            <Zeile key={kontakt.id} kontakt={kontakt} />
-          ))}
-        </tbody>
-      </table>
-    </section>
-  )
-}
-
-function Zeile({ kontakt }: { kontakt: Kontakt }) {
-  return (
-    <tr className={kontakt.belege === 0 ? 'ohne-beleg' : undefined}>
-      <td>{kontakt.anzeige}</td>
-      <td style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{kontakt.kundennummer ?? '—'}</td>
-      <td>{kontakt.angelegtAm ? kontakt.angelegtAm.toLocaleDateString('de-DE') : '—'}</td>
-      <td style={{ textAlign: 'right' }}>
-        {/*
-          `-1` heisst: die Zahl liess sich nicht holen. Das als „0" zu zeigen
-          wäre die gefährlichste aller Anzeigen — sie ist die Grundlage für
-          „kann weg".
-        */}
-        {kontakt.belege < 0 ? (
-          <span className="unterzeile">unbekannt</span>
-        ) : kontakt.belege === 0 ? (
-          <span className="unterzeile">keine</span>
-        ) : (
-          kontakt.belege
-        )}
-      </td>
-    </tr>
   )
 }

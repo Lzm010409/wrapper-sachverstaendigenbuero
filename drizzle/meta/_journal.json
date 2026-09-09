@@ -99,6 +99,13 @@
       "when": 1788934329389,
       "tag": "0013_rechnungsspiegel",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788938771979,
+      "tag": "0014_kontaktumhang",
+      "breakpoints": true
     }
   ]
 }
