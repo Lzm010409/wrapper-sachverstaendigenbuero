@@ -79,7 +79,8 @@ Aus der abgelegten Dokumentation (`Autoixpert API/`), nachgelesen statt vermutet
 4. **Webhooks liefern nur IDs, ohne Signatur.** Absicherung geht ausschließlich über
    benutzerdefinierte Header.
    → **Entscheidung:** Der Webhook-Endpunkt prüft ein gemeinsames Geheimnis im Header
-   und holt das Objekt anschließend aktiv über die API.
+   und holt das Objekt anschließend aktiv über die API. Umgesetzt unter
+   `/api/webhooks/autoixpert`, siehe eigener Abschnitt unten.
 
 5. **`external_id` darf in der URL anstelle der Gutachten-ID stehen.**
    → **Entscheidung:** Das Aktenzeichen (`MMJJ/NNNNKK`, z. B. `0926/2081TG`) ist der
@@ -95,13 +96,20 @@ ist keine.
 
 | Regel | Voreinstellung | Lösen über |
 | --- | --- | --- |
-| nur offene Gutachten | an | `AUTOIXPERT_NUR_OFFENE=false` |
+| nur offene Gutachten (Listenfilter) | an | `AUTOIXPERT_NUR_OFFENE=false` |
 | frühestens angelegt am | `2026-05-01` | `AUTOIXPERT_FRUEHESTENS` |
 | schreibende Zugriffe | gesperrt | `AUTOIXPERT_SCHREIBEN=erlaubt` |
 
 Die Listenabfrage setzt die Filter **hinter** den übergebenen Filter, sie sind
 also nicht überschreibbar. Der Einzelabruf `/reports/{id}` kennt keine
-Filterparameter — dort prüft der Client die Antwort im Nachgang.
+Filterparameter — dort prüft der Client die Antwort im Nachgang, aber nur noch
+gegen `fruehestensErstellt`. Der Abschlussstatus (`state: "locked"`) sperrt
+den Einzelabruf **nicht mehr**: ein bereits importierter Fall soll sich auch
+nach Abschluss aktualisieren lassen, sonst bliebe er nach `report.locked`
+(siehe Webhook-Abschnitt unten) auf dem letzten offenen Stand stehen. Nur
+`nurOffene` als Listenfilter bleibt unverändert — er schützt vor einem
+ungefilterten Durchblättern aller Gutachten, nicht vor dem gezielten Nachladen
+eines einzelnen.
 
 ## Aktenzeichen: zwei Schreibweisen, zwei Aufgaben
 
@@ -598,6 +606,42 @@ nach draussen und in ein System, aus dem das Cockpit nichts zurücknehmen
 kann; jede Korrektur an der Auswahl würde sonst erneut hochladen, und im
 Ordner sammelten sich Zwischenstände. Er verlangt `versand.vermerken` —
 dasselbe Recht wie jede andere Handlung, die das Haus verlässt.
+
+## Webhook: Gutachten sofort übernehmen
+
+Bisher kam ein Fall nur über den manuellen Import (Aktenzeichen oder ID ins
+Formular) in die `fall`-Tabelle. `POST /api/webhooks/autoixpert` macht daraus
+zusätzlich ein Ereignis: Bei jedem `report.*`-Ereignis (angelegt,
+abgeschlossen, entsperrt, Aktenzeichen/Labels/eigenes Feld geändert, in den
+Papierkorb verschoben, wiederhergestellt, gelöscht) lädt der Endpunkt das
+Gutachten über `client.holeGutachten(reportId)` nach und legt es über
+dieselbe Ablagefunktion (`speichereFall`) ab wie der manuelle Import — erkannt
+über die autoiXpert-ID, nie doppelt.
+
+**Ein Ablauf für jedes Ereignis, keine Fallunterscheidung nach `eventType`.**
+autoiXpert schickt bei allen `report.*`-Ereignissen dieselbe schmale Payload
+(`teamId`, `reportId`, `reportExternalId`, `eventType`) — die Falldaten selbst
+holt der Endpunkt aktiv nach, nicht aus dem Webhook-Körper. `report.deleted`
+und `report.moved_to_trash` laufen denselben Weg; der Nachladeversuch scheitert
+dann typischerweise mit 404, was wie jeder andere Fehlschlag behandelt wird
+(protokolliert, nichts gespeichert). Die lokale Fall-Zeile wird dabei bewusst
+**nicht** gelöscht — sie hängt an Stellungnahmen.
+
+**Warum der Endpunkt fast nie einen Fehlercode zurückgibt.** Nur ein falsches
+oder fehlendes Geheimnis im Header `x-autoixpert-webhook-secret` (401) und ein
+unbrauchbarer Anfragen-Körper (400) sind echte Ablehnungen. Alles andere —
+Gutachten durch die Abrufregel ausgeschlossen, autoiXpert nicht erreichbar,
+unbekannter Ereignistyp — kommt mit 200 zurück und landet nur im Protokoll.
+autoiXperts Wiederholungsverhalten bei Fehlern ist nicht dokumentiert; ein 5xx
+könnte den Webhook nach wiederholten Fehlschlägen ebenso gut deaktivieren wie
+eine hilfreiche Wiederholung auslösen. Ein verpasstes Ereignis fällt damit auf
+den manuellen Import zurück (Knopf „Fall aktualisieren") — es gibt noch keinen
+periodischen Abgleich als Netz darunter.
+
+**Fehlertoleranz, weil das Gutachten bei `report.created` meist leer ist.**
+Direkt nach der Anlage trägt es oft nur die ID. `leseFalldaten` liest jedes
+Feld optional — ein sehr dünnes Gutachten erzeugt keine Ausnahme, nur viele
+offene Felder in der Ansicht.
 
 ## Offene Punkte
 
