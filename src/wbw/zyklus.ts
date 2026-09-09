@@ -48,8 +48,19 @@ export const ZYKLEN: Zyklusstufe[] = [
   { name: 'weit', beschriftung: 'Zyklus 3 · weit', faktor: 2, modellstufe: 'baureihe' },
 ]
 
-/** Vorgabe für die Zahl brauchbarer Vergleichsfahrzeuge, ab der es genügt. */
+/** Vorgabe für die Zahl der Fahrzeuge im Korb, ab der es genügt. */
 export const MINDESTZAHL = 8
+
+/**
+ * Ab wie vielen Fahrzeugen ein Korb überhaupt etwas trägt.
+ *
+ * Unterhalb davon greifen die Rückfälle: die Ausstattungslinie wird für die
+ * Auswertung fallengelassen (siehe `fuehreLaufAus`), und es wird kein
+ * Medianvorschlag mehr ausgewiesen (siehe `ergebnis.ts`). Ein Median aus zwei
+ * Preisen ist keiner — er ist der Mittelwert zweier Zufälle mit vier
+ * signifikanten Stellen davor.
+ */
+export const MINDESTKORB = 4
 
 /**
  * Die Toleranzen einer Stufe.

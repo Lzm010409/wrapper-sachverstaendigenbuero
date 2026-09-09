@@ -70,6 +70,7 @@ knapp, und alle fünf Sekunden zu fragen ist Lärm.
 | Variable | Folge, solange sie fehlt |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Prüfberichte lassen sich nicht auswerten, Abschnitte nicht ausformulieren. Alles Übrige läuft. |
+| `SEVDESK_API_TOKEN` | Kein Zahlungsstand — die Geldampel bleibt leer, der Reiter „Vorgang" sagt es. Alles Übrige läuft. |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` | Kein Microsoft-Knopf in der Anmeldung; es gilt nur die Passwortanmeldung. |
 
 Coolify gibt Geheimnisse über seine API **nicht** heraus — die Werte der
@@ -138,6 +139,7 @@ Weg sicher — aber genau das lässt sich nicht versprechen.
 | `AUTOIXPERT_API_TOKEN` | Fälle aus autoiXpert laden |
 | `AUTOIXPERT_BASIS_URL` | `https://app.autoixpert.de/externalApi/v1` — **mit `/v1`**, sonst laufen alle Pfade ins Leere |
 | `PIPEDRIVE_API_TOKEN` | Phase, Schadenhöhe und sevDesk-Verweis im Reiter „Vorgang" |
+| `SEVDESK_API_TOKEN` | Zahlungsstand der Rechnungen — die Geldampel in Liste und Vorgang |
 
 **Abrufregel gegen autoiXpert** — Voreinstellung ist die enge Fassung, es muss
 nichts gesetzt werden:
@@ -433,6 +435,160 @@ der Benutzer bekommt eine Meldung darüber.
 `FOTO_SPEICHER` hinzeigt). Ein Fall mit 67 Fotos belegt dort rund 1,8 MB.
 Nach einem Neustart ist der Speicher leer und füllt sich beim nächsten
 Öffnen wieder; das kostet einmal etwa anderthalb Sekunden je Reiteraufruf.
+
+## Der Fotoassistent
+
+Im Reiter **Fotos** steht über dem Raster der Kasten „Fotoassistent". Ein
+Klick auf **Fotos analysieren** lässt das Sprachmodell jedes Bild ansehen und
+zu jedem einen Beschreibungsvorschlag samt Kategorie liefern.
+
+**Übernommen wird nichts von allein.** Die Vorschläge stehen still da, bis
+jemand sie durchgeht: **Vorschläge durchgehen** öffnet den Prüfmodus — ein
+Bild gross, der Vorschlag darunter, Pfeiltasten zum Blättern, die
+Eingabetaste übernimmt. Erst dieses Übernehmen schreibt nach autoiXpert, und
+zwar nur mit dem Recht „Nach autoiXpert zurückschreiben" **und**
+`AUTOIXPERT_SCHREIBEN=erlaubt`. Ohne beides stehen die Vorschläge lesbar da
+und der Knopf ist gesperrt.
+
+**Vorgeschlagen wird nur, wo noch nichts steht.** Was der Sachverständige
+selbst beschriftet hat, bleibt unangetastet — analysiert wird es trotzdem,
+denn sonst wüsste die Lückenmeldung nichts davon.
+
+**Die Zeile mit den Pillen ist der Pflichtfotosatz:** Kennzeichen,
+Fahrgestellnummer, Tachostand, die vier Fahrzeugecken, Schadendetail,
+Innenraum und Reifen. Ein Kreuz auf gelbem Grund heisst: zu dieser Aufnahme
+gibt es im Fotosatz kein Bild.
+
+**Was das kostet.** Analysiert wird auf dem Vorschaubild (400 × 300), also
+rund 160 Bildtoken je Foto. Ein Fall mit 67 Fotos liegt bei etwa 11.000
+Token auf dem schnellen Modell — Bruchteile eines Cents. Der Lauf holt ein
+Paket von zwölf Bildern je Aufruf; der Fortschritt steht im Knopf.
+
+**Was dabei das Haus verlässt.** Die Vorschaubilder gehen an Anthropic —
+dasselbe Bild, das im Raster steht, nur eben ausser Haus. Bei 400 × 300
+Bildpunkten sind Kennzeichen und Fahrgestellnummer darauf nicht lesbar, und
+das Modell ist angewiesen, keine Zahlen zu nennen, die es nicht sieht. Wer
+das grundsätzlich nicht will, lässt den Knopf stehen: ohne ihn geht kein
+einziges Bild hinaus.
+
+**Ohne `ANTHROPIC_API_KEY`** ist der Knopf gesperrt, mit einem Hinweis
+darauf. Der Fotos-Reiter selbst funktioniert davon unberührt weiter.
+
+## Die Geldampel
+
+In der Fälle-Liste steht neben der Pipedrive-Phase eine zweite Marke: der
+Zahlungsstand aus sevDesk. Im Reiter **Vorgang** steht derselbe Stand
+ausführlich — Betrag, davon bezahlt, was noch offen ist, Fälligkeit,
+Rechnungsnummern.
+
+**Wie Rechnung und Akte zueinander finden.** Über die Rechnungsnummer: sie
+ist das Aktenzeichen mit einer laufenden Nummer dahinter (`0926/2081TG01`
+zur Akte `0926/2081TG`). Der Umweg über den Pipedrive-Deal entfällt damit,
+und Fälle ohne Deal fallen nicht durchs Raster. Die alte Schreibweise mit
+Unterstrich (`1222_693TG`) wird ebenso gefunden.
+
+**Die Zustände:** *Entwurf · Offen · Überfällig · Teilbezahlt · Bezahlt* —
+und *Keine Rechnung*, wenn zum Aktenzeichen nichts in sevDesk liegt. In der
+Liste wird der letzte Fall nicht angezeigt; er ist bei einem frischen Fall
+der Normalzustand.
+
+**Überfällig heisst: das Zahlungsziel der Rechnung ist vorbei** — das aus
+sevDesk, nicht ein eigenes. Achtung: der Rechnungstext spricht von 14 Tagen,
+`timeToPay` steht im Rechnungsworkflow auf 30. Die Ampel folgt sevDesk; der
+Widerspruch gehört im n8n-Workflow „Neuer Rechnungsworfklow" geradegezogen.
+
+**„Widerspruch"** erscheint, wo Pipedrive und sevDesk sich nicht einig sind
+— ein Deal auf „Bezahlt", zu dem kein Geld gebucht ist, oder umgekehrt Geld,
+das in Pipedrive noch nicht angekommen ist. Das ist das eigentliche
+Fundstück: solche Fälle findet sonst niemand.
+
+**Wie der Stand zustande kommt.** Die Rechnungen liegen als Spiegel in der
+Datenbank. Abgeglichen wird beim Blick in die Liste, höchstens einmal je
+Minute, und nur das, was sich seit dem letzten Mal geändert hat. Der erste
+Lauf holt alles — am 09.09.2026 waren das 1444 Rechnungen in zwei Anfragen,
+knapp vier Sekunden. Danach ist es eine Anfrage mit einer Handvoll Zeilen.
+Unter der Karte im Reiter „Vorgang" steht, wann zuletzt abgeglichen wurde.
+
+**Doppelt vergebene Rechnungsnummern** kommen vor (am 09.09.2026 einmal:
+`0823/936TG01`, einmal bezahlt und einmal offen angelegt). Die Ampel zählt
+sie einmal — den weitesten Zustand — und sagt darunter, dass die Nummer
+doppelt liegt. Aufräumen lässt sie sich nur in sevDesk selbst.
+
+**Geschrieben wird nichts.** Der Client hat keine schreibende Methode.
+Gebucht, gemahnt und storniert wird in sevDesk und in den n8n-Workflows,
+die das schon tun.
+
+## Doppelte Kontakte in sevDesk
+
+**Verwaltung → Doppelte Kontakte.** Die Seite gruppiert die sevDesk-
+Kontakte nach einem Vergleichsnamen: kleingeschrieben, ohne Umlaute, ohne
+Rechtsform, ohne Interpunktion. „Salt & Pictures GmbH" und „Salt und
+Pictures GmbH" landen damit nebeneinander.
+
+**Die Ursache steht im n8n-Workflow.** „Neuer Rechnungsworfklow" sucht den
+Kontakt über `customerName` — exakt. Trifft er nicht, legt der nächste
+Knoten einen neuen an. Am 09.07.2025 sind so hintereinander sechs leere
+Kontakte „Arndt Automobile GmbH" entstanden (Kundennummern 8598–8604).
+Solange dieser Workflow unverändert bleibt, entstehen neue Dubletten.
+
+**Was die Zahlen bedeuten.** Die Spalte „Belege" zählt alles, was an einem
+Kontakt hängt — Rechnungen, Belege, Aufträge, Positionen. Eine gelb
+hinterlegte Zeile trägt **keinen einzigen** Beleg; nur solche Einträge
+liessen sich über die Schnittstelle gefahrlos entfernen. Steht dort
+„unbekannt", war die Zahl nicht abrufbar — dann bitte nichts löschen.
+
+### Zusammenführen
+
+Ein `merge` kennt die sevDesk-Schnittstelle nicht. Sie kennt aber
+`PUT /Invoice/{id}` — und **Rechnung, Beleg, Anschrift und Kontaktweg
+tragen alle ein Feld `contact`** (beim Beleg heisst es `supplier`). Damit
+lässt sich alles auf den bleibenden Kontakt *umhängen*, statt es zu
+kopieren.
+
+Am 09.09.2026 am echten Konto geprüft: ein `PUT` mit ausschliesslich dem
+Feld `contact` ändert an einer Rechnung genau zwei Felder — `contact` und
+`update`. Die übrigen 73 bleiben unangetastet. Der Rückweg funktioniert
+genauso.
+
+**Der Ablauf hat drei Handgriffe, und das ist Absicht:**
+
+1. **Vorschau.** Liest nur. Zeigt Schritt für Schritt, was gleich
+   geschieht, und markiert die Belege, die festgeschrieben sind.
+2. **Zusammenführen.** Hängt um — und **löscht nichts**. Solange nichts
+   gelöscht ist, lässt sich jeder Umhang mit „Zurücknehmen" rückgängig
+   machen; Rechnungen an einen gelöschten Kontakt zurückzuhängen ginge
+   nicht.
+3. **Löschen.** Ein eigener Knopf je Kontakt, der erst erscheint, wenn
+   der Kontakt nachweislich leer ist. Unmittelbar davor wird noch einmal
+   frisch geprüft: Rechnungen, Belege, Aufträge, Gutschriften. Ist die
+   Prüfung nicht abrufbar, wird **nicht** gelöscht.
+
+**Der Probeschritt.** Vor allem anderen wandert genau eine nicht
+festgeschriebene Rechnung, und es wird per `GET` nachgesehen, ob sie
+wirklich gewechselt hat. Geht das schief, bricht der ganze Vorgang ab —
+dann kostet der Irrtum eine Rechnung statt acht, und die eine steht im
+Protokoll.
+
+**Nach jedem Schreibzugriff steht ein Lesezugriff.** Eine 200 von sevDesk
+heisst „die Anfrage war in Ordnung", nicht „ich habe es getan". Nur was
+beim Zurücklesen wirklich gewechselt hat, gilt als geglückt.
+
+**Festgeschriebene Belege** werden nicht vorab aussortiert. Der Versuch
+wird unternommen, und was sevDesk antwortet, steht im Bericht — das ist
+richtig, egal wie sevDesk sich künftig verhält. Ein Kontakt, an dem etwas
+hängen bleibt, bekommt den Vermerk „Dublette zu …" in seiner Beschreibung
+und bleibt stehen.
+
+**Anschriften und Kontaktwege** wandern nur, wenn der bleibende Kontakt
+sie noch nicht hat. Verglichen werden Straße und Postleitzahl, nicht der
+Ort: im Konto steht dieselbe Anschrift als „40589 Düsseldorf" und als
+„40589 Ddorf". „Ruwerstr. 7a" und „Ruwerstraße 7a" gelten ebenfalls als
+dieselbe. Was doppelt ist, verschwindet mit dem gelöschten Kontakt.
+
+**Das Recht** heisst `sevdesk.zusammenfuehren` und steckt in der Rolle
+`admin`. Jeder Schritt — auch jeder misslungene — steht in der Tabelle
+`kontaktumhang` mit Benutzer, Zeitpunkt, Objekt und der Antwort von
+sevDesk.
 
 ## Wenn ein Benutzer einen Fehler meldet
 

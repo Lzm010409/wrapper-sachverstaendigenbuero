@@ -940,6 +940,12 @@ button.haupt:disabled:hover {
 .m-warn::before {
   background: var(--warn);
 }
+.m-gut::before {
+  background: var(--good);
+}
+.m-krit::before {
+  background: var(--crit);
+}
 
 /*
  * Die Klassen bleiben, ihre Füllung nicht: Fläche und Schrift sind für alle
@@ -1161,6 +1167,85 @@ button.haupt:disabled:hover {
   background: var(--surface);
   border: 1px dashed var(--line);
   border-radius: var(--radius);
+}
+
+/* ---------- Vorgangsschritte: Notizen und Mails aus Pipedrive ---------- */
+
+.vorgangsschritte-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.vorgangsschritt {
+  background: var(--surface);
+}
+
+.vorgangsschritt-kopf {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* Touch-Target mindestens 44px, auch wenn der Inhalt schmaler ist. */
+  min-height: 44px;
+}
+
+.vorgangsschritt-kopf:hover {
+  background: var(--surface-alt);
+}
+
+.vorgangsschritt-datum {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.vorgangsschritt-von {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.vorgangsschritt-betreff {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vorgangsschritt-pfeil {
+  margin-left: auto;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.vorgangsschritt-kopf[aria-expanded='true'] .vorgangsschritt-pfeil {
+  transform: rotate(-135deg);
+}
+
+.vorgangsschritt-inhalt {
+  padding: 4px 16px 16px 16px;
+  border-top: 1px solid var(--line-soft);
 }
 
 code {
@@ -3219,6 +3304,243 @@ body {
 @media (max-width: 700px) {
   .foto-buehne { padding: 10px; }
   .foto-buehne-bild img { max-height: 58vh; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Fotoassistent
+ *
+ * Der Kasten sitzt ueber dem Raster, nicht darin: er gehoert zum ganzen
+ * Fotosatz, nicht zu einem Bild. Flaeche `--surface-alt` statt `--surface`,
+ * damit er sich vom Raster abhebt, ohne einen zweiten Rahmen zu brauchen.
+ *
+ * Der Pruefmodus benutzt die vorhandene `.foto-buehne` weiter. Ein zweiter
+ * Dialog mit eigener Abdunklung, eigener Breite und eigenem Verhalten waere
+ * dieselbe Sache ein zweites Mal — und beim naechsten Umbau die Stelle, die
+ * jemand vergisst.
+ * ------------------------------------------------------------------ */
+
+.assistent {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.assistent-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.assistent-knoepfe {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/*
+  Der Pflichtfotosatz als Reihe von Pillen. Die Bedeutung haengt nicht an
+  der Farbe allein: das Zeichen davor sagt dasselbe noch einmal, und fuer
+  den Screenreader steht "fehlt" bzw. "vorhanden" ausgeschrieben dahinter.
+*/
+.pflichtsatz {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.pflichtsatz li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-mid);
+}
+
+.pflichtsatz li.da span[aria-hidden] {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.pflichtsatz li.fehlt {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/*
+  Im Pruefmodus stehen Feld, Haekchen und Knoepfe untereinander statt in
+  einer Reihe: das Beschreibungsfeld braucht die volle Breite, und die
+  Knoepfe sollen immer an derselben Stelle liegen, damit der Durchgang zur
+  Gewohnheit wird und man nicht bei jedem Bild sucht.
+*/
+.assistent-formular {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistent-formular .foto-haekchen,
+.assistent-formular .assistent-knoepfe {
+  width: 100%;
+}
+
+/*
+  `.foto-beschriftung .feld` traegt `flex: 1 1 260px` — sinnvoll in der
+  Reihe der Grossansicht, wo 260px die **Breite** meinen. Hier steht das
+  Formular als Spalte, und dieselbe Angabe wurde zur Hoehe: das Feld wuchs
+  auf 260 Pixel und riss ein leeres Loch zwischen Beschreibung und Haken.
+*/
+.assistent-formular .feld {
+  flex: 0 0 auto;
+}
+
+.assistent-formular .assistent-knoepfe {
+  justify-content: flex-end;
+}
+
+/* ------------------------------------------------------------------ *
+ * Doppelte Kontakte
+ *
+ * Eine Tabelle je Gruppe statt einer langen Liste: die Frage lautet nicht
+ * "welche Kontakte gibt es", sondern "welche von diesen dreien ist die
+ * richtige" — und die beantwortet man nur nebeneinander.
+ * ------------------------------------------------------------------ */
+
+.dubletten {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dublettengruppe h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dublettenkopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dublettentabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dublettentabelle th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 4px 8px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dublettentabelle td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.dublettentabelle tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+  Der Fuss einer Gruppe: links der Stand, rechts der Knopf. Der Stand steht
+  bewusst dort und nicht in einer Einblendung — bei acht Kontakten waeren
+  das acht Einblendungen, von denen keine stehen bliebe.
+*/
+.gruppenfuss {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  min-height: 34px;
+}
+
+/* Was schon geloescht ist, tritt zurueck — es ist nur noch Beleg dafuer, dass es weg ist. */
+.dublettentabelle tr.geloescht td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/*
+  Vorschau und Bericht sitzen im Kasten der Gruppe, abgesetzt durch die
+  Flaeche: was gleich geschieht, soll sich von dem unterscheiden, was
+  dasteht.
+*/
+.vorschau {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.vorschau.gescheitert {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+}
+
+.vorschauliste {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vorschauliste li {
+  padding: 2px 0;
+}
+
+/* Ein Vorbehalt ist kein Fehler, aber auch keine Zusage. */
+.vorschauliste li.mit-vorbehalt {
+  color: var(--ink-mid);
+}
+
+.dublettentabelle input[type='radio'],
+.dublettentabelle input[type='checkbox'] {
+  /* 24px Trefferflaeche in einer Tabellenzeile, die selbst 34px hoch ist. */
+  width: 16px;
+  height: 16px;
+  margin: 4px;
+  cursor: pointer;
+}
+
+/*
+  Leere Eintraege abgesetzt, aber nicht ausgegraut: sie sind das, worauf es
+  ankommt — die, die man loeschen koennte. Ausgegraut lesen sich Zeilen wie
+  "erledigt".
+*/
+.dublettentabelle tr.ohne-beleg td {
+  background: var(--warn-soft);
+}
+
+.dublettentabelle tr.ohne-beleg td:first-child {
+  border-left: 3px solid var(--warn);
+  padding-left: 8px;
 }
 
 /* Benutzerverwaltung: eine Zeile je Recht */

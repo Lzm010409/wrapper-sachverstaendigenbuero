@@ -3,7 +3,13 @@
 import { useMemo, useState, useTransition } from 'react'
 import { ladeBelegeInGutachtenordner, uebernimmKorb } from '@/wbw/aktionen'
 import { fahrzeugKennung, type Korbeintrag } from '@/wbw/ergebnis'
-import { AUFFAELLIGKEITEN, vorbelegt, type Auffaelligkeit, type Pruefurteil } from '@/wbw/urteil'
+import {
+  AUFFAELLIGKEITEN,
+  UNBEKANNTE_BAUART,
+  vorbelegt,
+  type Auffaelligkeit,
+  type Pruefurteil,
+} from '@/wbw/urteil'
 import { Kreisel } from '@/app/teile/anzeigen'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis } from '@/melden/typen'
@@ -465,6 +471,17 @@ function Beurteilung({ urteil }: { urteil: Pruefurteil | undefined }) {
       <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
         {urteil.begruendung}
       </span>
+      {/*
+        Wofür die Prüfung das Fahrzeug gehalten hat. Steht hier, weil ein
+        Fehlurteil sonst nur wirkt, ohne sichtbar zu sein: am 08.09.2026 stand
+        ein Golf im Korb einer Sharan-Suche, und die Zeile verriet es nicht.
+      */}
+      {urteil.erkanntesModell || urteil.erkannteBauart !== UNBEKANNTE_BAUART ? (
+        <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
+          erkannt: {urteil.erkanntesModell || '—'}
+          {urteil.erkannteBauart !== UNBEKANNTE_BAUART ? ` · ${urteil.erkannteBauart}` : ''}
+        </span>
+      ) : null}
       {urteil.auffaelligkeiten.length > 0 ? (
         <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
           {urteil.auffaelligkeiten.map((a: Auffaelligkeit) => (

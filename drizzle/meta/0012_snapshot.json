@@ -1,5 +1,5 @@
 {
-  "id": "07eea5ae-e2f8-4268-82b0-456feb606167",
+  "id": "14095093-074d-4583-8add-3739e5997179",
   "prevId": "e79c3bdf-697b-427a-b531-b520da3fc30a",
   "version": "7",
   "dialect": "postgresql",
@@ -1309,24 +1309,105 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.foto_analyse": {
+      "name": "foto_analyse",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
-        "fall_abgerufen_idx": {
-          "name": "fall_abgerufen_idx",
+        "fall_id": {
+          "name": "fall_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vorschlaege": {
+          "name": "vorschlaege",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "ohne_vorschlag": {
+          "name": "ohne_vorschlag",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "angestossen_von": {
+          "name": "angestossen_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "foto_analyse_fall_idx": {
+          "name": "foto_analyse_fall_idx",
           "columns": [
             {
-              "expression": "abgerufen_am",
+              "expression": "fall_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "foto_analyse_fall_id_fall_id_fk": {
+          "name": "foto_analyse_fall_id_fall_id_fk",
+          "tableFrom": "foto_analyse",
+          "tableTo": "fall",
+          "columnsFrom": [
+            "fall_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "foto_analyse_angestossen_von_benutzer_id_fk": {
+          "name": "foto_analyse_angestossen_von_benutzer_id_fk",
+          "tableFrom": "foto_analyse",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "angestossen_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2032,21 +2113,6 @@
           "columns": [
             {
               "expression": "fall_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "stellungnahme_erstellt_idx": {
-          "name": "stellungnahme_erstellt_idx",
-          "columns": [
-            {
-              "expression": "erstellt_am",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

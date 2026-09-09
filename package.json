@@ -19,6 +19,7 @@
     "bibliothek:import": "tsx scripts/bibliothek-import.ts",
     "bibliothek:export": "tsx scripts/bibliothek-export.ts",
     "benutzer:anlegen": "tsx scripts/benutzer-anlegen.ts",
+    "fotolexikon:seed": "tsx scripts/fotolexikon-seed.ts",
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {

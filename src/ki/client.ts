@@ -65,6 +65,14 @@ export interface WerkzeugDefinition {
    * Verlangt `additionalProperties: false` und `required` im Schema. Ohne das
    * ist die Rückgabe nur „meistens" schemakonform, und die Prüfung mit Zod
    * an der Aufrufstelle wird zur Fehlerquelle statt zur Absicherung.
+   *
+   * **Erlaubt ist dann aber nur ein Teil von JSON Schema.** Grenzen und
+   * Muster — `minimum`, `maximum`, `multipleOf`, `minLength`, `maxLength`,
+   * `pattern`, `minItems`, `maxItems`, `uniqueItems` — quittiert die
+   * Schnittstelle mit einem 400, bevor der Aufruf das Modell erreicht. Solche
+   * Vorgaben gehören in den `description`-Text des Feldes; nachprüfen muss sie
+   * das Zod-Schema an der Aufrufstelle. Typen, `enum`, `const` und `anyOf`
+   * gehen.
    */
   strict?: boolean
 }

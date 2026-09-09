@@ -13,7 +13,7 @@
  * übersprungen, und die Bibliothek wird nur befüllt, wenn sie leer ist —
  * ein Neustart überschreibt also keine gepflegten Einträge.
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, accessSync, constants } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createHash, randomBytes, scrypt as scryptCb } from 'node:crypto'
@@ -293,6 +293,39 @@ function richteKleinanzeigenEin() {
   melde('Kleinanzeigen-Beschaffung läuft über die Anwendung selbst.')
 }
 
+/**
+ * Sagt beim Hochfahren, ob ein Browser für die Belege da ist.
+ *
+ * Am 08.09.2026 fiel das Fehlen erst auf, nachdem eine WBW-Recherche
+ * durchgelaufen war und die Belege in den Gutachtenordner sollten — mit einer
+ * Meldung, die auf `google-chrome-stable` zeigte, den niemand eingerichtet
+ * hat. Beim Start kostet die Auskunft eine Zeile.
+ */
+function meldeDrucker() {
+  const kandidaten = [
+    process.env.WBW_CHROME,
+    process.env.CHROME_PATH,
+    '/usr/bin/chromium',
+    '/usr/lib/chromium/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+  ].filter(Boolean)
+
+  for (const pfad of kandidaten) {
+    try {
+      accessSync(pfad, constants.X_OK)
+      melde(`Belegdruck über ${pfad}.`)
+      return
+    } catch {
+      // nächster
+    }
+  }
+  console.warn(
+    '[start] Kein Browser gefunden — Belege lassen sich nicht als PDF drucken. ' +
+      `Gesucht unter: ${kandidaten.join(', ') || '— nichts gesetzt —'}.`,
+  )
+}
+
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url) {
@@ -315,6 +348,7 @@ async function main() {
   }
 
   richteKleinanzeigenEin()
+  meldeDrucker()
 
   // Der Next-Server liegt im Abbild neben diesem Skript im Arbeitsverzeichnis.
   // Die Auflösung geht bewusst über das Arbeitsverzeichnis und nicht relativ
