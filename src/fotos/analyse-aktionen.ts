@@ -11,132 +11,173 @@ import { gutachtenSchema } from '@/autoixpert/typen'
 import { kiVerfuegbar } from '@/ki/client'
 import { beschriftePaket, naechstesPaket, type Fahrzeugkontext } from './assistent'
 import { holeVorschaubilder } from './vorschaubilder'
-import { ladeAnalyse, loescheAnalyse, setzeStand, speichereAnalyse } from './analyse-ablage'
+import {
+  beendeLauf,
+  beginneLauf,
+  ladeAnalyse,
+  loescheAnalyse,
+  setzeStand,
+  speichereAnalyse,
+} from './analyse-ablage'
 import { ladeLexikon } from './lexikon-ablage'
 import { beschrifteFoto } from './aktionen'
-import type { Fotovorschlag } from './vorschlag'
+import { notiere } from '@/melden/ablage'
+import { protokolliereFehler } from '@/protokoll'
+import type { Fotoanalyse, Fotovorschlag } from './vorschlag'
 import type { Verwendung } from './ansicht'
 import type { Aktionsergebnis } from '@/melden/typen'
 
 /**
  * Der Fotoassistent als Serveraktion.
  *
- * **Ein Paket je Aufruf, nicht der ganze Fall.** Ein Fall mit 67 Fotos
- * wären sechs Modellaufrufe hintereinander — eine gute Minute, in der eine
- * einzige Anfrage offen steht. Das überlebt kein Proxy zuverlässig, und der
- * Benutzer sähe eine Minute lang nichts als einen Kreisel. Stattdessen holt
- * sich die Oberfläche ein Paket nach dem anderen: jeder Aufruf dauert
- * Sekunden, der Fortschritt ist echt („24 von 67 beschriftet"), und bricht
- * einer ab, ist die Arbeit der vorigen nicht verloren.
+ * **Ein Hintergrundlauf, keine offene Anfrage.** Ein Fall mit 67 Fotos
+ * braucht mehrere Modellaufrufe hintereinander — eine gute Minute, in der
+ * eine einzige HTTP-Antwort nicht offenstehen kann, ohne dass ein Proxy
+ * dazwischenfunkt oder der Browser abbricht. `starteAnalyseLauf` legt den
+ * Lauf deshalb nur an und kehrt sofort zurück; die eigentliche Arbeit
+ * (`fuehreAnalyseAus`) läuft **ohne** `await` im selben, langlebigen
+ * Node-Prozess weiter — derselbe Aufbau wie beim WBW-Recherchelauf
+ * (`wbw/auftrag.ts`, dort ausführlich begründet). Die Oberfläche fragt den
+ * Stand alle paar Sekunden ab (`frageAnalyseStandAb`, siehe `foto-assistent.
+ * tsx`) und bekommt beim Fertigwerden zusätzlich eine Benachrichtigung
+ * (`@/melden`), die auch dann ankommt, wenn niemand mehr auf der Seite ist.
  *
  * **Warum die Analyse kein eigenes Recht braucht.** Sie schreibt nichts nach
  * draussen und kostet Bruchteile eines Cents je Fall. Das Recht sitzt eine
  * Stufe später, beim Übernehmen — dort wirkt es im führenden System.
  */
 
-export interface Analysefortschritt {
-  /** Wie viele Fotos der Fall hat. */
-  gesamt: number
-  /** Wie viele davon einen Vorschlag haben. */
-  beschriftet: number
-  /** Wie viele in diesem Aufruf hinzukamen. */
-  neu: number
-  fertig: boolean
-  fehler?: string
-}
+/** Sicherung gegen einen Lauf, der nie „fertig" meldet. */
+const HOECHSTENS_RUNDEN = 40
 
-function abbruch(fehler: string): Analysefortschritt {
-  return { gesamt: 0, beschriftet: 0, neu: 0, fertig: true, fehler }
-}
-
-/**
- * Beschriftet das nächste Paket Fotos.
- *
- * Aufrufen, bis `fertig` gesetzt ist. `fertig` heisst entweder „alle Fotos
- * haben einen Vorschlag" oder „dieser Aufruf hat nichts mehr zustande
- * gebracht" — im zweiten Fall wäre ein weiterer Versuch nur dieselbe
- * Störung noch einmal.
- */
-export async function analysiereFotos(fallId: string): Promise<Analysefortschritt> {
+/** Startet den Hintergrundlauf, sofern nicht schon einer für diesen Fall arbeitet. */
+export async function starteAnalyseLauf(fallId: string): Promise<Aktionsergebnis> {
   const benutzer = await verlangeBenutzer()
 
   if (!kiVerfuegbar()) {
-    return abbruch('Die KI-Funktionen sind auf diesem Server nicht eingerichtet.')
+    return { fehler: 'Die KI-Funktionen sind auf diesem Server nicht eingerichtet.' }
   }
-  const client = clientAusUmgebung()
-  if (!client) return abbruch('autoiXpert ist auf diesem Server nicht eingerichtet.')
-
-  const [zeile] = await db.select({ daten: fall.daten }).from(fall).where(eq(fall.id, fallId)).limit(1)
-  const geprueft = zeile?.daten ? gutachtenSchema.safeParse(zeile.daten) : null
-  if (!geprueft?.success) return abbruch('Zu diesem Fall fehlen die autoiXpert-Daten.')
-  const gutachten = geprueft.data
-  const reportId = gutachten.id || gutachten.external_id
-  if (!reportId) return abbruch('Zu diesem Fall fehlt die autoiXpert-Kennung.')
-
-  let fotos
-  try {
-    fotos = await client.holeFotos(reportId)
-  } catch (fehler) {
-    return abbruch(fehler instanceof Error ? fehler.message : String(fehler))
+  if (!clientAusUmgebung()) {
+    return { fehler: 'autoiXpert ist auf diesem Server nicht eingerichtet.' }
   }
-  if (fotos.length === 0) return { gesamt: 0, beschriftet: 0, neu: 0, fertig: true }
 
   const vorhanden = await ladeAnalyse(fallId)
-  const bekannt = new Map((vorhanden?.vorschlaege ?? []).map((v) => [v.fotoId, v]))
-  // Ein Foto, das sich beim letzten Mal nicht laden liess, kommt nicht noch
-  // einmal an die Reihe. Sonst belegte es in jedem weiteren Paket einen
-  // Platz und der Lauf käme nie ans Ende.
-  const gescheitert = new Set(vorhanden?.ohneVorschlag ?? [])
-
-  const offen = naechstesPaket(fotos, new Set(bekannt.keys()), gescheitert)
-  if (offen.length === 0) {
-    return { gesamt: fotos.length, beschriftet: bekannt.size, neu: 0, fertig: true }
+  if (vorhanden?.laufZustand === 'laeuft') {
+    return { fehler: 'Für diesen Fall läuft bereits eine Analyse.' }
   }
 
-  const kontext: Fahrzeugkontext = {
-    marke: gutachten.car?.make ?? null,
-    modell: gutachten.car?.model ?? null,
-    kennzeichen: gutachten.car?.license_plate ?? null,
-    schadenbeschreibung: gutachten.car?.damage_description ?? null,
-  }
+  await beginneLauf(fallId, benutzer.id)
+  // Bewusst ohne `await`: die Antwort geht sofort hinaus, der Lauf arbeitet
+  // im selben Prozess weiter (siehe Erläuterung oben). `fuehreAnalyseAus`
+  // fängt jeden Fehler selbst ab — eine unbehandelte Zusage darf den Server
+  // nicht mitnehmen.
+  void fuehreAnalyseAus(fallId, benutzer.id)
 
-  // Die Stilvorlage kommt aus dem Fall selbst: was der Sachverständige hier
-  // schon geschrieben hat, ist die beste Vorgabe für den Rest.
-  const stilbeispiele = fotos
-    .map((f) => f.description?.trim())
-    .filter((b): b is string => Boolean(b))
-    .slice(0, 8)
+  return { hinweis: 'Analyse gestartet.' }
+}
 
-  const [bilder, teile] = await Promise.all([
-    holeVorschaubilder(client, reportId, offen.map((f) => f.id)),
-    ladeLexikon(),
-  ])
-  const neue = await beschriftePaket(kontext, stilbeispiele, teile, bilder)
+/** Für das Abfragen aus der Oberfläche — kein eigenes Recht, nur Anmeldung. */
+export async function frageAnalyseStandAb(fallId: string): Promise<Fotoanalyse | null> {
+  await verlangeBenutzer()
+  return ladeAnalyse(fallId)
+}
 
-  const alle: Fotovorschlag[] = [...bekannt.values(), ...neue]
-  const geglueckt = new Set(neue.map((v) => v.fotoId))
-  const ohneVorschlag = [
-    ...gescheitert,
-    ...offen.filter((f) => !geglueckt.has(f.id)).map((f) => f.id),
-  ]
-  await speichereAnalyse(fallId, benutzer.id, alle, ohneVorschlag)
+/**
+ * Der eigentliche Lauf. Läuft abgekoppelt und schreibt seinen Stand in die
+ * Zeile — hier wird nichts geworfen, was niemand fangen würde.
+ */
+async function fuehreAnalyseAus(fallId: string, benutzerId: string): Promise<void> {
+  let gesamt = 0
+  try {
+    const [zeile] = await db
+      .select({ daten: fall.daten })
+      .from(fall)
+      .where(eq(fall.id, fallId))
+      .limit(1)
+    const geprueft = zeile?.daten ? gutachtenSchema.safeParse(zeile.daten) : null
+    if (!geprueft?.success) throw new Error('Zu diesem Fall fehlen die autoiXpert-Daten.')
+    const gutachten = geprueft.data
+    const reportId = gutachten.id || gutachten.external_id
+    if (!reportId) throw new Error('Zu diesem Fall fehlt die autoiXpert-Kennung.')
 
-  const fertig = neue.length === 0 || alle.length + ohneVorschlag.length >= fotos.length
-  // Erst am Ende: die Oberfläche holt den Fortschritt aus der Rückgabe, und
-  // sechs Neuberechnungen der Fallseite für einen Knopfdruck wären fünf zu
-  // viel.
-  if (fertig) revalidatePath(`/faelle/${fallId}`)
+    const client = clientAusUmgebung()
+    if (!client) throw new Error('autoiXpert ist auf diesem Server nicht eingerichtet.')
 
-  return {
-    gesamt: fotos.length,
-    beschriftet: alle.length,
-    neu: neue.length,
-    // Kein Vorschlag zustande gekommen? Dann bringt das nächste Paket
-    // dasselbe Ergebnis — hier ist Schluss, mit Grund.
-    fertig,
-    ...(neue.length === 0
-      ? { fehler: 'Zu diesen Fotos kam kein Vorschlag zurück. Bitte später noch einmal versuchen.' }
-      : {}),
+    const fotos = await client.holeFotos(reportId)
+    gesamt = fotos.length
+
+    if (fotos.length > 0) {
+      const kontext: Fahrzeugkontext = {
+        marke: gutachten.car?.make ?? null,
+        modell: gutachten.car?.model ?? null,
+        kennzeichen: gutachten.car?.license_plate ?? null,
+        schadenbeschreibung: gutachten.car?.damage_description ?? null,
+      }
+      // Die Stilvorlage kommt aus dem Fall selbst: was der Sachverständige
+      // hier schon geschrieben hat, ist die beste Vorgabe für den Rest.
+      const stilbeispiele = fotos
+        .map((f) => f.description?.trim())
+        .filter((b): b is string => Boolean(b))
+        .slice(0, 8)
+      const teile = await ladeLexikon()
+
+      const bekannt = new Map<string, Fotovorschlag>()
+      const gescheitert = new Set<string>()
+
+      for (let runde = 0; runde < HOECHSTENS_RUNDEN; runde += 1) {
+        const offen = naechstesPaket(fotos, new Set(bekannt.keys()), gescheitert)
+        if (offen.length === 0) break
+
+        const bilder = await holeVorschaubilder(client, reportId, offen.map((f) => f.id))
+        const neue = await beschriftePaket(kontext, stilbeispiele, teile, bilder)
+
+        for (const v of neue) bekannt.set(v.fotoId, v)
+        const geglueckt = new Set(neue.map((v) => v.fotoId))
+        for (const f of offen) if (!geglueckt.has(f.id)) gescheitert.add(f.id)
+
+        // Nach jedem Paket abgelegt, nicht erst am Ende: bricht der Lauf
+        // später ab, ist die Arbeit der vorigen Pakete nicht verloren.
+        await speichereAnalyse(fallId, benutzerId, [...bekannt.values()], [...gescheitert])
+
+        // Kein Vorschlag zustande gekommen? Dann bringt die nächste Runde
+        // dasselbe Ergebnis — hier ist Schluss, mit Grund.
+        if (neue.length === 0) break
+      }
+    }
+
+    await beendeLauf(fallId, null)
+    const stand = await ladeAnalyse(fallId)
+    await notiere({
+      benutzerId,
+      art: 'erfolg',
+      titel: 'Fotoanalyse fertig',
+      text: `${stand?.vorschlaege.length ?? 0} von ${gesamt} Fotos beschriftet.`,
+      verweis: `/faelle/${fallId}?reiter=fotos`,
+      quelle: 'fotos',
+    })
+  } catch (fehler) {
+    const text = fehler instanceof Error ? fehler.message : String(fehler)
+    protokolliereFehler('fotos.assistent.lauf', 'Die Fotoanalyse ist gescheitert.', fehler, { fallId })
+    try {
+      await beendeLauf(fallId, text)
+    } catch (schreibfehler) {
+      protokolliereFehler(
+        'fotos.assistent.lauf.festhalten',
+        'Der gescheiterte Lauf liess sich nicht in der Datenbank vermerken.',
+        schreibfehler,
+        { fallId },
+      )
+    }
+    await notiere({
+      benutzerId,
+      art: 'fehler',
+      titel: 'Fotoanalyse gescheitert',
+      text: text.slice(0, 300),
+      verweis: `/faelle/${fallId}?reiter=fotos`,
+      quelle: 'fotos',
+    })
+  } finally {
+    revalidatePath(`/faelle/${fallId}`)
   }
 }
 
@@ -144,12 +185,11 @@ export async function analysiereFotos(fallId: string): Promise<Analysefortschrit
  * Wirft die gespeicherte Analyse eines Falls weg — der nächste Lauf fängt
  * für alle Fotos wieder bei null an.
  *
- * **Wofür das gebraucht wird.** `analysiereFotos` lässt jedes Foto mit
- * Vorschlag aus, gleich welchen Stands — auch ein verworfener zählt als
- * „schon dran gewesen" und bekäme sonst nie einen zweiten Versuch. Ändert
- * sich das Fotolexikon oder will man nach einer schlechten Serie neu
- * anfangen, braucht es deshalb einen Schnitt, keinen Umweg über 67 Mal
- * „Verwerfen".
+ * **Wofür das gebraucht wird.** Ein Foto mit Vorschlag zählt für
+ * `fuehreAnalyseAus` als „schon dran gewesen", gleich welchen Stands — auch
+ * ein verworfener bekäme sonst nie einen zweiten Versuch. Ändert sich das
+ * Fotolexikon oder will man nach einer schlechten Serie neu anfangen,
+ * braucht es deshalb einen Schnitt, keinen Umweg über 67 Mal „Verwerfen".
  *
  * **Was dabei nicht verloren geht.** Was schon nach autoiXpert übernommen
  * wurde, steht dort unverändert weiter — dieser Weg schreibt nirgendwo nach
@@ -158,6 +198,12 @@ export async function analysiereFotos(fallId: string): Promise<Analysefortschrit
  */
 export async function setzeAnalyseZurueck(fallId: string): Promise<Aktionsergebnis> {
   await verlangeBenutzer()
+
+  const vorhanden = await ladeAnalyse(fallId)
+  if (vorhanden?.laufZustand === 'laeuft') {
+    return { fehler: 'Die Analyse läuft gerade — bitte warten, bis sie fertig ist.' }
+  }
+
   await loescheAnalyse(fallId)
   revalidatePath(`/faelle/${fallId}`)
   return { hinweis: 'Analyse zurückgesetzt.' }

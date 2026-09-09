@@ -457,6 +457,13 @@ export const wbwLauf = pgTable(
  * beschrifteten. Der Prüfmodus zeigt davon nur die offenen; die
  * Vollständigkeitsprüfung braucht dagegen die Kategorie jedes Bildes, sonst
  * meldete sie eine Lücke, die der Sachverständige selbst schon gefüllt hat.
+ *
+ * **`lauf*` trägt denselben Hintergrundlauf wie `wbwLauf`.** Ein Fall mit 67
+ * Fotos braucht mehrere Modellaufrufe hintereinander — zu lang für eine
+ * einzelne Serverantwort. Der Lauf arbeitet deshalb im selben Prozess weiter,
+ * während die Antwort längst hinaus ist (`analyse-aktionen.ts`); diese drei
+ * Spalten sind der Stand, den die Oberfläche abfragt, und überleben damit
+ * ein Neuladen der Seite und den Weggang des Sachverständigen.
  */
 export const fotoAnalyse = pgTable(
   'foto_analyse',
@@ -476,6 +483,11 @@ export const fotoAnalyse = pgTable(
      * Runden lang.
      */
     ohneVorschlag: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /** `laeuft`, solange der Hintergrundlauf arbeitet — siehe oben. */
+    laufZustand: wbwZustandEnum().notNull().default('fertig'),
+    laufBegonnenAm: timestamp({ withTimezone: true }),
+    /** Nur bei `laufZustand = 'fehler'`: die Meldung, unverändert. */
+    laufFehler: text(),
     angestossenVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
     erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

@@ -1,17 +1,20 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Foto } from '@/fotos/ansicht'
 import type { Fotoanalyse, Fotovorschlag } from '@/fotos/vorschlag'
 import { PFLICHT, kategoriename, luecken, type Kategorie } from '@/fotos/kategorien'
 import {
-  analysiereFotos,
+  frageAnalyseStandAb,
   setzeAnalyseZurueck,
+  starteAnalyseLauf,
   uebernimmVorschlag,
   verwirfVorschlag,
 } from '@/fotos/analyse-aktionen'
+import { Meldung } from '@/app/teile/meldung'
 import { useMelder } from '@/app/teile/melder'
-import { ausErgebnis, fehler as alsFehler, erfolg } from '@/melden/typen'
+import { ausErgebnis, fehler as alsFehler, info } from '@/melden/typen'
 
 /**
  * Der Fotoassistent im Reiter „Fotos".
@@ -24,14 +27,15 @@ import { ausErgebnis, fehler as alsFehler, erfolg } from '@/melden/typen'
  * Der Prüfmodus zeigt ein Bild gross, den Vorschlag darunter und geht mit
  * der Pfeiltaste weiter; ein Durchgang statt 67 Umwege.
  *
- * **Warum der Lauf in Paketen und nicht in einem Aufruf.** Siehe
- * `src/fotos/analyse-aktionen.ts`: eine Anfrage über eine Minute überlebt
- * kein Proxy zuverlässig. Diese Schleife holt ein Paket nach dem anderen
- * und zeigt den echten Fortschritt statt eines Kreisels.
+ * **Warum hier nur gefragt, nicht gewartet wird.** Der Lauf arbeitet im
+ * Hintergrund weiter (siehe `analyse-aktionen.ts`, `fuehreAnalyseAus`) —
+ * genau wie die WBW-Recherche. Diese Komponente fragt alle zwei Sekunden
+ * nach dem Stand, solange er `laeuft`, und zeigt ihn an. Wer die Seite
+ * wechselt oder schliesst, verliert damit nichts: der Lauf läuft weiter,
+ * und das Cockpit meldet sich über die Glocke, wenn er fertig ist.
  */
 
-/** Sicherung gegen eine Schleife, die nicht endet, wenn der Server nie `fertig` meldet. */
-const HOECHSTENS_RUNDEN = 40
+const ABSTAND_MS = 2000
 
 type Erledigt = Record<string, 'uebernommen' | 'verworfen'>
 
@@ -48,14 +52,17 @@ export function Fotoassistent({
   schreibenErlaubt: boolean
   kiEingerichtet: boolean
 }) {
+  const router = useRouter()
   const { melde } = useMelder()
-  const [laeuft, setzeLaeuft] = useState(false)
+  const [stand, setzeStand] = useState<Fotoanalyse | null>(analyse)
+  const [startet, setzeStartet] = useState(false)
   const [setztZurueck, setzeSetztZurueck] = useState(false)
-  const [stand, setzeStand] = useState<{ beschriftet: number; gesamt: number } | null>(null)
   const [erledigt, setzeErledigt] = useState<Erledigt>({})
   const [pruefung, setzePruefung] = useState<Fotovorschlag[] | null>(null)
 
-  const nachId = new Map((analyse?.vorschlaege ?? []).map((v) => [v.fotoId, v]))
+  const laeuft = stand?.laufZustand === 'laeuft'
+
+  const nachId = new Map((stand?.vorschlaege ?? []).map((v) => [v.fotoId, v]))
   const mitBild = fotos.filter((f) => nachId.has(f.id))
 
   // Für die Lückenmeldung zählt jede erkannte Kategorie — auch die der
@@ -68,25 +75,55 @@ export function Fotoassistent({
     .map((f) => nachId.get(f.id)!)
     .filter((v) => v.stand === 'offen' && !erledigt[v.fotoId])
 
+  // Solange der Lauf arbeitet, alle zwei Sekunden nach seinem Stand fragen —
+  // derselbe Aufbau wie bei der WBW-Recherche (`wbw-lauf.tsx`).
+  useEffect(() => {
+    if (!laeuft) return
+    let abgebrochen = false
+
+    const uhr = setInterval(() => {
+      void frageAnalyseStandAb(fallId)
+        .then((neu) => {
+          if (abgebrochen) return
+          setzeStand(neu)
+          // Fertig oder gescheitert: die Serverdaten (Vorschläge, Pflichtsatz)
+          // sind neu zu holen, nicht nur der Lauf-Zustand.
+          if (neu?.laufZustand !== 'laeuft') router.refresh()
+        })
+        .catch(() => {
+          // Ein verpasster Abruf ist kein Grund aufzugeben — beim nächsten
+          // Mal steht der Stand wieder da.
+        })
+    }, ABSTAND_MS)
+
+    return () => {
+      abgebrochen = true
+      clearInterval(uhr)
+    }
+  }, [laeuft, fallId, router])
+
   async function starte() {
-    setzeLaeuft(true)
+    setzeStartet(true)
     try {
-      for (let runde = 0; runde < HOECHSTENS_RUNDEN; runde += 1) {
-        const fortschritt = await analysiereFotos(fallId)
-        setzeStand({ beschriftet: fortschritt.beschriftet, gesamt: fortschritt.gesamt })
-        if (fortschritt.fehler) {
-          melde(alsFehler(fortschritt.fehler))
-          break
-        }
-        if (fortschritt.fertig) {
-          melde(erfolg(`${fortschritt.beschriftet} von ${fortschritt.gesamt} Fotos beschriftet.`))
-          break
-        }
+      const ergebnis = await starteAnalyseLauf(fallId)
+      if (ergebnis.fehler) {
+        melde(alsFehler(ergebnis.fehler))
+        return
       }
+      setzeStand(await frageAnalyseStandAb(fallId))
+      melde(
+        info(
+          'Die Analyse läuft im Hintergrund weiter — Sie können die Seite wechseln oder ' +
+            'schliessen. Das Cockpit meldet sich über die Glocke, wenn sie fertig ist.',
+          'Analyse gestartet',
+        ),
+      )
     } catch (ausnahme) {
-      melde(alsFehler(ausnahme instanceof Error ? ausnahme.message : 'Der Lauf ist gescheitert.'))
+      melde(
+        alsFehler(ausnahme instanceof Error ? ausnahme.message : 'Der Lauf liess sich nicht starten.'),
+      )
     } finally {
-      setzeLaeuft(false)
+      setzeStartet(false)
     }
   }
 
@@ -105,11 +142,14 @@ export function Fotoassistent({
       const ergebnis = await setzeAnalyseZurueck(fallId)
       const meldung = ausErgebnis(ergebnis)
       if (meldung) melde(meldung)
-      // Die Vorschläge, auf die sich diese drei Stände bezogen, gibt es
-      // nicht mehr — sonst zeigte der Prüfmodus tote Einträge an.
-      setzeErledigt({})
-      setzeStand(null)
-      setzePruefung(null)
+      if (!ergebnis.fehler) {
+        // Die Vorschläge, auf die sich diese Stände bezogen, gibt es nicht
+        // mehr — sonst zeigte der Prüfmodus tote Einträge an.
+        setzeErledigt({})
+        setzePruefung(null)
+        setzeStand(null)
+        router.refresh()
+      }
     } catch (ausnahme) {
       melde(alsFehler(ausnahme instanceof Error ? ausnahme.message : 'Das Zurücksetzen ging nicht.'))
     } finally {
@@ -123,9 +163,11 @@ export function Fotoassistent({
         <div>
           <strong>Fotoassistent</strong>
           <p className="unterzeile" style={{ margin: '2px 0 0' }}>
-            {analyse
-              ? `${mitBild.length} von ${fotos.length} Fotos analysiert · ${offene.length} Vorschläge offen`
-              : 'Beschreibt die Fotos und prüft den Pflichtfotosatz. Übernommen wird nichts von allein.'}
+            {laeuft
+              ? `Läuft im Hintergrund — ${stand?.vorschlaege.length ?? 0} von ${fotos.length} bisher beschriftet …`
+              : stand
+                ? `${mitBild.length} von ${fotos.length} Fotos analysiert · ${offene.length} Vorschläge offen`
+                : 'Beschreibt die Fotos und prüft den Pflichtfotosatz. Übernommen wird nichts von allein.'}
           </p>
         </div>
         <div className="assistent-knoepfe">
@@ -137,27 +179,27 @@ export function Fotoassistent({
           <button
             type="button"
             className="knopf"
-            onClick={starte}
-            disabled={laeuft || setztZurueck || !kiEingerichtet}
+            onClick={() => void starte()}
+            disabled={laeuft || startet || setztZurueck || !kiEingerichtet}
             title={
-              analyse
+              stand
                 ? 'Ergänzt nur Fotos ohne Vorschlag. Für einen kompletten Neustart erst zurücksetzen.'
                 : undefined
             }
           >
             {laeuft
-              ? stand
-                ? `Beschriftet ${stand.beschriftet} von ${stand.gesamt} …`
-                : 'Läuft …'
-              : analyse
-                ? 'Erneut analysieren'
-                : 'Fotos analysieren'}
+              ? 'Läuft im Hintergrund …'
+              : startet
+                ? 'Wird gestartet …'
+                : stand
+                  ? 'Erneut analysieren'
+                  : 'Fotos analysieren'}
           </button>
-          {analyse ? (
+          {stand ? (
             <button
               type="button"
               className="knopf-schlicht"
-              onClick={zuruecksetzen}
+              onClick={() => void zuruecksetzen()}
               disabled={laeuft || setztZurueck}
               title="Verwirft alle gespeicherten Vorschläge dieses Falls und beginnt beim nächsten Lauf neu."
             >
@@ -174,7 +216,13 @@ export function Fotoassistent({
         </p>
       ) : null}
 
-      {analyse ? <Pflichtsatz fehlend={fehlend} /> : null}
+      {stand?.laufZustand === 'fehler' && stand.laufFehler ? (
+        <Meldung art="fehler" style={{ marginTop: 10 }}>
+          {stand.laufFehler}
+        </Meldung>
+      ) : null}
+
+      {stand ? <Pflichtsatz fehlend={fehlend} /> : null}
 
       {pruefung ? (
         <Pruefmodus

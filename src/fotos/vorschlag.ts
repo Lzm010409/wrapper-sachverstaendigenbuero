@@ -33,12 +33,20 @@ export interface Fotovorschlag {
   stand: Vorschlagsstand
 }
 
+/** Der Stand des Hintergrundlaufs, der diese Analyse befüllt — siehe `analyse-aktionen.ts`. */
+export type Laufzustand = 'laeuft' | 'fertig' | 'fehler'
+
 export interface Fotoanalyse {
-  /** ISO-Zeitpunkt des Laufs. */
+  /** ISO-Zeitpunkt des letzten Schreibens. */
   erstelltAm: string
   vorschlaege: Fotovorschlag[]
   /** Die IDs der Fotos, zu denen kein Vorschlag zustande kam. */
   ohneVorschlag: string[]
+  laufZustand: Laufzustand
+  /** ISO-Zeitpunkt, seit dem der laufende (oder letzte) Lauf arbeitet. */
+  laufBegonnenAm: string | null
+  /** Nur bei `laufZustand === 'fehler'`. */
+  laufFehler: string | null
 }
 
 /**

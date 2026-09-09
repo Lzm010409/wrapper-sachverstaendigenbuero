@@ -41,6 +41,9 @@ export async function ladeAnalyse(fallId: string): Promise<Fotoanalyse | null> {
       vorschlaege: fotoAnalyse.vorschlaege,
       ohneVorschlag: fotoAnalyse.ohneVorschlag,
       erstelltAm: fotoAnalyse.erstelltAm,
+      laufZustand: fotoAnalyse.laufZustand,
+      laufBegonnenAm: fotoAnalyse.laufBegonnenAm,
+      laufFehler: fotoAnalyse.laufFehler,
     })
     .from(fotoAnalyse)
     .where(eq(fotoAnalyse.fallId, fallId))
@@ -68,14 +71,50 @@ export async function ladeAnalyse(fallId: string): Promise<Fotoanalyse | null> {
     ohneVorschlag: Array.isArray(zeile.ohneVorschlag)
       ? zeile.ohneVorschlag.filter((id): id is string => typeof id === 'string')
       : [],
+    laufZustand: zeile.laufZustand,
+    laufBegonnenAm: zeile.laufBegonnenAm?.toISOString() ?? null,
+    laufFehler: zeile.laufFehler,
   }
 }
 
 /**
- * Legt das Ergebnis eines Laufs ab und ersetzt dabei das vorige.
+ * Meldet den Hintergrundlauf an — legt die Zeile an, falls es noch keine
+ * gibt, ohne dabei vorhandene Vorschläge anzurühren.
  *
- * Der Lauf ist die neue Wahrheit: die alten Vorschläge bezogen sich auf den
- * Fotosatz von damals, und ein Bild kann inzwischen ausgetauscht sein.
+ * **Warum kein zweiter Lauf startet, wenn schon einer läuft.** `foto_analyse`
+ * hat eine Zeile je Fall; zwei gleichzeitige Läufe schrieben sich gegenseitig
+ * die Vorschläge weg. Die Aufrufstelle prüft deshalb vorher `laufZustand`
+ * (siehe `analyse-aktionen.ts`) — dieselbe Reihenfolge wie bei `wbwLauf`.
+ */
+export async function beginneLauf(fallId: string, angestossenVon: string | null): Promise<void> {
+  const werte = {
+    fallId,
+    angestossenVon,
+    laufZustand: 'laeuft' as const,
+    laufBegonnenAm: new Date(),
+    laufFehler: null,
+  }
+  await db
+    .insert(fotoAnalyse)
+    .values(werte)
+    .onConflictDoUpdate({ target: fotoAnalyse.fallId, set: werte })
+}
+
+/** Meldet den Hintergrundlauf als beendet — mit oder ohne Fehler. */
+export async function beendeLauf(fallId: string, fehler: string | null): Promise<void> {
+  await db
+    .update(fotoAnalyse)
+    .set({ laufZustand: fehler ? 'fehler' : 'fertig', laufFehler: fehler })
+    .where(eq(fotoAnalyse.fallId, fallId))
+}
+
+/**
+ * Legt das Ergebnis eines Pakets ab — on top von dem, was der Lauf schon
+ * hatte.
+ *
+ * Ersetzt bewusst nur `vorschlaege`/`ohneVorschlag`, nicht `laufZustand`:
+ * die Zeile bleibt `laeuft`, bis `beendeLauf` das Gegenteil sagt, auch wenn
+ * dazwischen mehrere Pakete nacheinander geschrieben werden.
  */
 export async function speichereAnalyse(
   fallId: string,
@@ -93,6 +132,18 @@ export async function speichereAnalyse(
 }
 
 /**
+ * Wirft die gespeicherte Analyse eines Falls komplett weg.
+ *
+ * Betrifft nur, was hier lokal steht. Was schon nach autoiXpert übernommen
+ * wurde, bleibt dort unverändert stehen — dieser Weg schreibt nirgendwo nach
+ * aussen, er vergisst nur, welche Vorschläge diese Anwendung schon gemacht
+ * hatte. Die Aufrufstelle prüft vorher, dass kein Lauf gerade arbeitet.
+ */
+export async function loescheAnalyse(fallId: string): Promise<void> {
+  await db.delete(fotoAnalyse).where(eq(fotoAnalyse.fallId, fallId))
+}
+
+/**
  * Vermerkt, dass ein Vorschlag übernommen oder verworfen wurde.
  *
  * Gelesen, geändert, geschrieben — ohne Sperre. Das ist hier vertretbar:
@@ -101,18 +152,6 @@ export async function speichereAnalyse(
  * ein Vorschlag, der noch einmal auftaucht. Eine Sperre auf der Zeile wäre
  * dafür der grössere Aufwand als der Schaden.
  */
-/**
- * Wirft die gespeicherte Analyse eines Falls komplett weg.
- *
- * Betrifft nur, was hier lokal steht. Was schon nach autoiXpert übernommen
- * wurde, bleibt dort unverändert stehen — dieser Weg schreibt nirgendwo nach
- * aussen, er vergisst nur, welche Vorschläge diese Anwendung schon gemacht
- * hatte.
- */
-export async function loescheAnalyse(fallId: string): Promise<void> {
-  await db.delete(fotoAnalyse).where(eq(fotoAnalyse.fallId, fallId))
-}
-
 export async function setzeStand(
   fallId: string,
   fotoId: string,
