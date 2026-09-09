@@ -39,6 +39,11 @@ RUN pnpm build
 # weder TypeScript-Werkzeuge noch den Parser.
 RUN pnpm exec tsx scripts/bibliothek-seed-erzeugen.ts seed/bibliothek.json
 
+# Dieselbe Überlegung für das Fotolexikon: die Beispielteile werden hier zu
+# JSON, damit `pnpm fotolexikon:seed` im Laufzeit-Abbild (ohne pnpm/tsx)
+# nicht nötig ist — der Startvorgang ergänzt sie von selbst.
+RUN pnpm exec tsx scripts/fotolexikon-seed-erzeugen.ts seed/fotolexikon.json
+
 # Next bündelt `postgres` in die Server-Chunks; im Standalone-Ordner liegt das
 # Paket deshalb nicht. Der Startvorgang braucht es aber eigenständig, also
 # wird es hier als echtes Verzeichnis herausgelöst (-L löst die
