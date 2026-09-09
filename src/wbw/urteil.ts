@@ -12,6 +12,14 @@
  * Zugangsschlüssel, keine Datenbank.
  */
 
+import type { Bauart } from './karosserie'
+
+/** Was die Prüfung im Inserat erkannt hat, wenn der Text es nicht hergibt. */
+export const UNBEKANNTE_BAUART = 'unbekannt'
+
+/** Die Bauart eines Inserats aus Sicht der Prüfung. */
+export type ErkannteBauart = Bauart | typeof UNBEKANNTE_BAUART
+
 export type Auffaelligkeit =
   | 'export'
   | 'bastler'
@@ -58,6 +66,22 @@ export interface Pruefurteil {
   fehlendeAusstattung: string[]
   /** 0 bis 100 — fachliche Nähe zum Subjektfahrzeug. */
   vergleichbarkeit: number
+  /**
+   * Wofür die Prüfung das Fahrzeug hält, z. B. `VW Golf VI`.
+   *
+   * Steht in der Korbtabelle, damit ein Fehlurteil sichtbar ist statt nur
+   * wirksam: am 08.09.2026 stand ein Golf im Korb einer Sharan-Suche, und
+   * nichts an der Zeile verriet, dass die Prüfung ihn als Golf gelesen hatte.
+   */
+  erkanntesModell: string
+  /**
+   * Die Bauart aus Titel und Beschreibung.
+   *
+   * Auf Kleinanzeigen die **einzige** Quelle: das Portal liefert kein
+   * Bauart-Feld, und der Titel nennt sie fast nie. Der Regex-Abgleich des
+   * Plugins findet dort nichts und lässt das Fahrzeug bewusst durch.
+   */
+  erkannteBauart: ErkannteBauart
   /** Ein Satz, warum. Steht in der Tabelle neben dem Fahrzeug. */
   begruendung: string
   auffaelligkeiten: Auffaelligkeit[]
@@ -74,6 +98,8 @@ export function ungeprueft(id: string, grund: string): Pruefurteil {
     erkannteAusstattung: [],
     fehlendeAusstattung: [],
     vergleichbarkeit: 50,
+    erkanntesModell: '',
+    erkannteBauart: UNBEKANNTE_BAUART,
     begruendung: grund,
     auffaelligkeiten: [],
     empfehlung: 'pruefen',

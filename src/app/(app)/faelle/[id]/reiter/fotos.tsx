@@ -1,4 +1,6 @@
 import { ladeFotos } from '@/fotos/ansicht'
+import { ladeAnalyse } from '@/fotos/analyse-ablage'
+import { kiVerfuegbar } from '@/ki/client'
 import { Meldung } from '@/app/teile/meldung'
 import type { Gutachten } from '@/autoixpert/typen'
 import { Fotoraster } from './fotos-raster'
@@ -11,7 +13,7 @@ import { Fotoraster } from './fotos-raster'
  * `fotos-raster.tsx` für das Warum.
  */
 export async function FotoReiter({ gutachten, fallId }: { gutachten: Gutachten; fallId: string }) {
-  const ansicht = await ladeFotos(gutachten)
+  const [ansicht, analyse] = await Promise.all([ladeFotos(gutachten), ladeAnalyse(fallId)])
 
   if (ansicht.stand === 'nicht_eingerichtet') {
     return (
@@ -35,6 +37,12 @@ export async function FotoReiter({ gutachten, fallId }: { gutachten: Gutachten; 
   }
 
   return (
-    <Fotoraster fallId={fallId} fotos={ansicht.fotos} schreibenErlaubt={ansicht.schreibenErlaubt} />
+    <Fotoraster
+      fallId={fallId}
+      fotos={ansicht.fotos}
+      schreibenErlaubt={ansicht.schreibenErlaubt}
+      analyse={analyse}
+      kiEingerichtet={kiVerfuegbar()}
+    />
   )
 }

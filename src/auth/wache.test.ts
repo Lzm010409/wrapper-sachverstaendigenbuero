@@ -30,6 +30,8 @@ const OFFEN: Record<string, string> = {
   'api/gesundheit/route.ts': 'Zustandsauskunft fuer den Container-Healthcheck',
   'api/auth/entra/start/route.ts': 'Beginn der Anmeldung — vor der Anmeldung',
   'api/auth/entra/callback/route.ts': 'Rueckkehr von Microsoft — vor der Anmeldung',
+  'api/webhooks/autoixpert/route.ts':
+    'Aufrufer ist autoiXpert, nicht ein angemeldeter Benutzer — geprueft ueber ein Geheimnis im Header',
 }
 
 /** Die Aufrufe, die als Anmeldepruefung gelten. */

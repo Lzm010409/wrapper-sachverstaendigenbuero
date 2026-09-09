@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { haupttyp, loeseModellAuf, passendeModelle, stufenFuer } from './modell'
+import {
+  haupttyp,
+  loeseModellAuf,
+  passendeModelle,
+  stufenFuer,
+  waehleSuchmodell,
+} from './modell'
 
 /** Ausschnitt aus den 357 Modellnamen, die AutoScout24 fuer Mercedes fuehrt. */
 const MERCEDES = [
@@ -122,5 +128,48 @@ describe('Stufen für ein Portal', () => {
     // `A 45 AMG` ist genau und zugleich der kürzeste Eintrag mit `a` —
     // zweimal dieselbe Suche wäre zweimal dieselbe Wartezeit.
     expect(stufenFuer('A 45 AMG S', AS24)).toEqual([{ stufe: 'genau', modell: 'A 45 AMG' }])
+  })
+})
+
+/** Ausschnitt der Citroen-Modellliste von AutoScout24. */
+const CITROEN = ['Berlingo', 'Berlingo Multispace', 'C3', 'C4', 'C5 Aircross', 'Jumpy']
+
+describe('waehleSuchmodell', () => {
+  it('nimmt den Untertyp, wo das Portal ihn kennt', () => {
+    const e = waehleSuchmodell('E 53 AMG 4Matic+', 'E-Klasse', MERCEDES)
+    expect(e).toEqual({ modell: 'E 53 AMG', quelle: 'untertyp', verworfen: '4Matic+' })
+  })
+
+  it('faellt auf die Baureihe zurueck, wo der Untertyp keine ist', () => {
+    /*
+      Der Citroen-Fall vom 08.09.2026. Die DAT lieferte als Untertyp "Feel XL"
+      - die Ausstattungslinie samt Laengenbezeichnung, kein Fahrzeug. Ohne
+      Rueckfall suchte AutoScout24 ueber die ganze Marke Citroen.
+    */
+    const e = waehleSuchmodell('Feel XL', 'Berlingo Multispace (K9)', CITROEN)
+    expect(e).toEqual({
+      modell: 'Berlingo Multispace',
+      quelle: 'baureihe',
+      verworfen: '(K9)',
+    })
+  })
+
+  it('bleibt offen, wenn auch die Baureihe nichts trifft', () => {
+    // Dann wird nicht geraten - der Sachverstaendige waehlt aus der Liste.
+    expect(waehleSuchmodell('Feel XL', 'Phantasie', CITROEN)).toEqual({
+      modell: null,
+      quelle: 'offen',
+      verworfen: null,
+    })
+  })
+
+  it('greift nicht, wenn der Untertyp bereits passt', () => {
+    // Der Rueckfall darf den genaueren Namen nie verdraengen: "E 53 AMG" ist
+    // ein anderes Fahrzeug als die ganze E-Klasse.
+    expect(waehleSuchmodell('E 300', 'E-Klasse', MERCEDES).modell).toBe('E 300')
+  })
+
+  it('kommt ohne Baureihe zurecht', () => {
+    expect(waehleSuchmodell('Feel XL', null, CITROEN).quelle).toBe('offen')
   })
 })

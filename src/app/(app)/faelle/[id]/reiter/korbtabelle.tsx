@@ -3,10 +3,18 @@
 import { useMemo, useState, useTransition } from 'react'
 import { ladeBelegeInGutachtenordner, uebernimmKorb } from '@/wbw/aktionen'
 import { fahrzeugKennung, type Korbeintrag } from '@/wbw/ergebnis'
-import { AUFFAELLIGKEITEN, vorbelegt, type Auffaelligkeit, type Pruefurteil } from '@/wbw/urteil'
+import {
+  AUFFAELLIGKEITEN,
+  UNBEKANNTE_BAUART,
+  vorbelegt,
+  type Auffaelligkeit,
+  type Pruefurteil,
+} from '@/wbw/urteil'
 import { Kreisel } from '@/app/teile/anzeigen'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis } from '@/melden/typen'
+import { Spaltenkopf } from '@/app/teile/spaltenkopf'
+import type { Richtung } from '@/app/teile/sortierung'
 
 /**
  * Der Vergleichskorb: eine Zeile je Fahrzeug, mit Haken.
@@ -169,6 +177,10 @@ export function Korbtabelle({
 
   const alleSichtbarenGewaehlt = sichtbar.length > 0 && sichtbar.every((z) => gewaehlt.has(z.kennung))
   const gefiltert = Boolean(quelle || empfehlung || nurAuffaellig || nurGewaehlt || hoechstpreis)
+  // `Spaltenkopf` (geteilt mit den serverseitig sortierten Listen) erwartet
+  // die Richtung als Wort, nicht als Bool - das bleibt hier lokal, damit der
+  // übrige Zustand dieser Tabelle unangetastet bleibt.
+  const richtung: Richtung = absteigend ? 'absteigend' : 'aufsteigend'
 
   return (
     <>
@@ -252,31 +264,46 @@ export function Korbtabelle({
                   }
                 />
               </th>
-              <Kopf spalte="rang" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf spalte="rang" jetzt={sortierung} richtung={richtung} klick={sortiereNach}>
                 #
-              </Kopf>
+              </Spaltenkopf>
               <th>Fahrzeug</th>
-              <Kopf spalte="preis" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf spalte="preis" jetzt={sortierung} richtung={richtung} klick={sortiereNach}>
                 Preis
-              </Kopf>
-              <Kopf spalte="kilometerstand" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              </Spaltenkopf>
+              <Spaltenkopf
+                spalte="kilometerstand"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 km
-              </Kopf>
-              <Kopf spalte="erstzulassung" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              </Spaltenkopf>
+              <Spaltenkopf
+                spalte="erstzulassung"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 EZ
-              </Kopf>
+              </Spaltenkopf>
               <th>kW</th>
-              <Kopf spalte="entfernung" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf
+                spalte="entfernung"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 Ort
-              </Kopf>
-              <Kopf
+              </Spaltenkopf>
+              <Spaltenkopf
                 spalte="vergleichbarkeit"
                 jetzt={sortierung}
-                ab={absteigend}
+                richtung={richtung}
                 klick={sortiereNach}
               >
                 Beurteilung
-              </Kopf>
+              </Spaltenkopf>
             </tr>
           </thead>
           <tbody>
@@ -418,34 +445,6 @@ export function Korbtabelle({
   )
 }
 
-/** Eine sortierbare Spaltenüberschrift. */
-function Kopf({
-  spalte,
-  jetzt,
-  ab,
-  klick,
-  children,
-}: {
-  spalte: Sortierung
-  jetzt: Sortierung
-  ab: boolean
-  klick: (s: Sortierung) => void
-  children: React.ReactNode
-}) {
-  const aktiv = jetzt === spalte
-  return (
-    <th aria-sort={aktiv ? (ab ? 'descending' : 'ascending') : 'none'}>
-      <button type="button" className="spaltenkopf" onClick={() => klick(spalte)}>
-        {children}
-        <span aria-hidden="true">{aktiv ? (ab ? ' ↓' : ' ↑') : ''}</span>
-        <span className="nur-vorlesen">
-          {aktiv ? (ab ? ', absteigend sortiert' : ', aufsteigend sortiert') : ', sortieren'}
-        </span>
-      </button>
-    </th>
-  )
-}
-
 /** Das Urteil der Prüfung, so knapp wie es tragbar ist. */
 function Beurteilung({ urteil }: { urteil: Pruefurteil | undefined }) {
   if (!urteil) {
@@ -472,6 +471,17 @@ function Beurteilung({ urteil }: { urteil: Pruefurteil | undefined }) {
       <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
         {urteil.begruendung}
       </span>
+      {/*
+        Wofür die Prüfung das Fahrzeug gehalten hat. Steht hier, weil ein
+        Fehlurteil sonst nur wirkt, ohne sichtbar zu sein: am 08.09.2026 stand
+        ein Golf im Korb einer Sharan-Suche, und die Zeile verriet es nicht.
+      */}
+      {urteil.erkanntesModell || urteil.erkannteBauart !== UNBEKANNTE_BAUART ? (
+        <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
+          erkannt: {urteil.erkanntesModell || '—'}
+          {urteil.erkannteBauart !== UNBEKANNTE_BAUART ? ` · ${urteil.erkannteBauart}` : ''}
+        </span>
+      ) : null}
       {urteil.auffaelligkeiten.length > 0 ? (
         <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
           {urteil.auffaelligkeiten.map((a: Auffaelligkeit) => (

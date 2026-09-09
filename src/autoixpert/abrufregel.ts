@@ -51,6 +51,12 @@ export function pflichtfilter(regel: Abrufregel = abrufregel) {
  * Prueft ein einzeln geladenes Gutachten gegen die Regel.
  * Der Einzelabruf ueber `/reports/{id}` kennt keine Filterparameter - dort ist
  * die Pruefung nachgelagert die einzige Moeglichkeit.
+ *
+ * Der Abschlussstatus (`state: "locked"`) wird hier bewusst NICHT mehr
+ * geprueft — anders als `pflichtfilter()`, wo `nurOffene` weiterhin die
+ * Listenabfrage einschraenkt. Ein bereits importierter Fall soll sich auch
+ * nach Abschluss aktualisieren lassen, allen voran ueber den Webhook: das
+ * Ereignis `report.locked` waere sonst ohne Wirkung geblieben.
  */
 export function pruefeGutachten(
   gutachten: {
@@ -62,12 +68,6 @@ export function pruefeGutachten(
   regel: Abrufregel = abrufregel,
 ): void {
   const bezeichnung = gutachten.token ?? gutachten.id ?? "unbekannt";
-
-  if (regel.nurOffene && gutachten.state === "locked") {
-    throw new AbrufregelVerletzt(
-      `Gutachten ${bezeichnung} ist abgeschlossen. Die aktuelle Abrufregel lässt nur offene Gutachten zu.`,
-    );
-  }
 
   if (regel.fruehestensErstellt && gutachten.created_at) {
     if (new Date(gutachten.created_at) < new Date(regel.fruehestensErstellt)) {

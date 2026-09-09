@@ -1,18 +1,28 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import {
+  FALL_SORTIERFELDER,
   filterGesetzt,
   ladeFaelle,
   vorhandeneMarken,
   zaehleGefilterte,
   type Fallfilter,
+  type FallSortierfeld,
 } from '@/autoixpert/abfragen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
+import { ladePhasenFuerListe } from '@/fall/vorgang'
+import { ladeAmpeln } from '@/geld/stand'
+import { widerspruch } from '@/geld/ampel'
+import { Geldpille } from '@/app/teile/geldpille'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
 import { Pagination } from '@/app/teile/pagination'
 import { leseSeite } from '@/app/teile/seitenwahl'
+import { Sortierleiste } from '@/app/teile/sortierleiste'
+import { leseSortierung } from '@/app/teile/sortierung'
+import { SkelettListe } from '@/app/teile/skelett'
 
 /** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
 function wert(roh: string | string[] | undefined): string | undefined {
@@ -43,9 +53,13 @@ export default async function FaelleSeite({
   }
   const gefiltert = filterGesetzt(filter)
   const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
+  const sortierung = leseSortierung<FallSortierfeld>(
+    { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
+    FALL_SORTIERFELDER.map((f) => f.wert),
+  )
 
   const [faelle, gesamt, marken] = await Promise.all([
-    ladeFaelle(filter, groesse, versatz),
+    ladeFaelle(filter, sortierung ?? undefined, groesse, versatz),
     zaehleGefilterte(filter),
     vorhandeneMarken(),
   ])
@@ -82,8 +96,11 @@ export default async function FaelleSeite({
 
       <ImportFormular aktiv={eingerichtet} />
 
+      <Sortierleiste felder={FALL_SORTIERFELDER} />
+
       <Filterleiste
         weitereAb={2}
+        zusatzParameter={{ sortiert: sortierung?.feld, richtung: sortierung?.richtung }}
         felder={[
           {
             art: 'suche',
@@ -124,58 +141,82 @@ export default async function FaelleSeite({
           </p>
         </div>
       ) : (
-        <div className="liste">
-          {faelle.map((f) => {
-            const geprueft = gutachtenSchema.safeParse(f.daten)
-            const d = geprueft.success ? leseFalldaten(geprueft.data) : null
-
-            return (
-              <Link key={f.id} href={`/faelle/${f.id}`} className="zeile">
-                <span className="zeile-nummer">{f.aktenzeichen ?? '—'}</span>
-                <span>
-                  <span className="zeile-titel">
-                    {/* Bei unlesbaren Daten wäre „Ohne Anspruchsteller" eine
-                        Behauptung über etwas, das gar nicht gelesen wurde. */}
-                    {geprueft.success
-                      ? (d?.anspruchsteller?.name ?? 'Ohne Anspruchsteller')
-                      : 'Falldaten nicht lesbar'}
-                    {d?.fahrzeug.kennzeichen ? ` · ${d.fahrzeug.kennzeichen}` : ''}
-                  </span>
-                  <span className="zeile-meta">
-                    {d?.gutachtenTyp ? <span>{d.gutachtenTyp}</span> : null}
-                    {d?.fahrzeug.hersteller ? (
-                      <span>
-                        {d.fahrzeug.hersteller} {d.fahrzeug.modell}
-                      </span>
-                    ) : null}
-                    {d?.versicherung?.name ? <span>{d.versicherung.name}</span> : null}
-                  </span>
-                </span>
-                <span className="zeile-rechts">
-                  {!geprueft.success ? (
-                    <span className="marke-pille m-warn">unlesbar</span>
-                  ) : d?.zustand ? (
-                    <span
-                      className={`marke-pille ${
-                        d.zustand === 'abgeschlossen' ? 'm-freigegeben' : 'm-entwurf'
-                      }`}
-                    >
-                      {d.zustand}
-                    </span>
-                  ) : null}
-                  <span className="treffer-zahl">
-                    {f.abgerufenAm
-                      ? new Date(f.abgerufenAm).toLocaleDateString('de-DE')
-                      : ''}
-                  </span>
-                </span>
-              </Link>
-            )
-          })}
-        </div>
+        // Eigene Suspense-Grenze: die Liste selbst kommt sofort aus der
+        // Datenbank, nur die Pipedrive-Phasen brauchen einen Netzaufruf.
+        // Ohne diese Grenze wartet die ganze Liste auf Pipedrive — genau der
+        // Fehler, den der Vorgang-Reiter schon einmal gemacht hat.
+        <Suspense fallback={<SkelettListe zeilen={faelle.length} titel="Die Fälle" />}>
+          <FaelleZeilen faelle={faelle} />
+        </Suspense>
       )}
 
       <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
+  )
+}
+
+async function FaelleZeilen({ faelle }: { faelle: Awaited<ReturnType<typeof ladeFaelle>> }) {
+  // Beide Quellen nebeneinander: Pipedrive und sevDesk wissen nichts
+  // voneinander, und nacheinander gefragt addierten sich ihre Wartezeiten.
+  const [phasen, zahlung] = await Promise.all([
+    ladePhasenFuerListe(faelle.map((f) => f.aktenzeichen)),
+    ladeAmpeln(faelle.map((f) => f.aktenzeichen)),
+  ])
+
+  return (
+    <div className="liste">
+      {faelle.map((f) => {
+        const geprueft = gutachtenSchema.safeParse(f.daten)
+        const d = geprueft.success ? leseFalldaten(geprueft.data) : null
+        const phase = f.aktenzeichen ? phasen.get(f.aktenzeichen) : undefined
+        const ampel = f.aktenzeichen ? zahlung.ampeln.get(f.aktenzeichen) : undefined
+        // Der Widerspruch ist das eigentliche Fundstück: eine Phase, die
+        // etwas anderes behauptet als das Geld auf dem Konto.
+        const streit = ampel ? widerspruch(ampel.stand, phase) : null
+
+        return (
+          <Link key={f.id} href={`/faelle/${f.id}`} className="zeile">
+            <span className="zeile-nummer">{f.aktenzeichen ?? '—'}</span>
+            <span>
+              <span className="zeile-titel">
+                {/* Bei unlesbaren Daten wäre „Ohne Anspruchsteller" eine
+                    Behauptung über etwas, das gar nicht gelesen wurde. */}
+                {geprueft.success
+                  ? (d?.anspruchsteller?.name ?? 'Ohne Anspruchsteller')
+                  : 'Falldaten nicht lesbar'}
+                {d?.fahrzeug.kennzeichen ? ` · ${d.fahrzeug.kennzeichen}` : ''}
+              </span>
+              <span className="zeile-meta">
+                {d?.gutachtenTyp ? <span>{d.gutachtenTyp}</span> : null}
+                {d?.fahrzeug.hersteller ? (
+                  <span>
+                    {d.fahrzeug.hersteller} {d.fahrzeug.modell}
+                  </span>
+                ) : null}
+                {d?.versicherung?.name ? <span>{d.versicherung.name}</span> : null}
+              </span>
+            </span>
+            <span className="zeile-rechts">
+              {!geprueft.success ? (
+                <span className="marke-pille m-warn">unlesbar</span>
+              ) : phase ? (
+                <span className="marke-pille m-akzent">{phase}</span>
+              ) : null}
+              {ampel && ampel.stand !== 'ohne_rechnung' ? (
+                <Geldpille stand={ampel.stand} offenCent={ampel.offenCent} />
+              ) : null}
+              {streit ? (
+                <span className="marke-pille m-warn" title={streit}>
+                  Widerspruch
+                </span>
+              ) : null}
+              <span className="treffer-zahl">
+                {f.abgerufenAm ? new Date(f.abgerufenAm).toLocaleDateString('de-DE') : ''}
+              </span>
+            </span>
+          </Link>
+        )
+      })}
+    </div>
   )
 }

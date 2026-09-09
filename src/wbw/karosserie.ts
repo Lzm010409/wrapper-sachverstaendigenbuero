@@ -33,6 +33,24 @@ export type Bauart =
   | 'Limousine'
 
 /**
+ * Dieselben Bauarten zur Laufzeit.
+ *
+ * Der Typ allein reicht nicht: die Werkzeugdefinition der KI-Prüfung braucht
+ * die Liste als `enum`, und das Zod-Schema daneben ebenso. Zwei getippte
+ * Listen liefen auseinander, sobald eine Bauart dazukommt.
+ */
+export const BAUARTEN: Bauart[] = [
+  'Cabrio',
+  'Coupé',
+  'Kombi',
+  'SUV',
+  'Van',
+  'Pickup',
+  'Kleinwagen',
+  'Limousine',
+]
+
+/**
  * `car.shape` aus autoiXpert → Bauart des Plugins.
  *
  * Nicht jede Fahrzeugart hat eine Entsprechung: Motorrad, Wohnmobil, LKW,

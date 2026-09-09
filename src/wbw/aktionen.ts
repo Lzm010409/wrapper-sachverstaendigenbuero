@@ -3,6 +3,8 @@
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { holeLauf, starteLauf, type LaufEingaben, type Laufstand } from './auftrag'
+import { ermittleModelle } from './lauf'
+import { waehleSuchmodell } from './modell'
 import { uebernimmAuswahl } from './korb'
 import { ladeBelegeHoch } from './hochladen'
 
@@ -135,4 +137,70 @@ export async function ladeBelegeInGutachtenordner(laufId: string): Promise<Uploa
   // etwas fehlt, obwohl der Vorgang durchlief.
   const meldung = [teile.join(' · '), ...ergebnis.hinweise].join('. ')
   return ergebnis.hinweise.length > 0 ? { fehler: meldung } : { hinweis: meldung }
+}
+
+export interface Modellpruefung {
+  /** Ob AutoScout24 den Suchbegriff auflösen kann — über Untertyp oder Baureihe. */
+  bekannt: boolean
+  /** Der Name, unter dem das Portal das Fahrzeug führt. */
+  aufgeloest: string | null
+  /** Woher der aufgelöste Name stammt. */
+  quelle: 'untertyp' | 'baureihe' | 'offen'
+  /** Was das Portal selbst zu diesem Namen vorschlägt. */
+  vorschlaege: string[]
+  /** Wie viele Modelle die Marke bei AutoScout24 hat. */
+  anzahl: number
+  /** Gesetzt, wenn die Liste nicht abgerufen werden konnte. */
+  fehler?: string
+}
+
+/**
+ * Prüft **vor** dem Lauf, ob AutoScout24 den Suchbegriff kennt.
+ *
+ * **Warum vorher.** Bisher stand die Antwort erst im Protokoll eines
+ * laufenden Auftrags: „AutoScout24 kennt ‚Highline BMT‘ nicht unter 119
+ * Modellen von Volkswagen. Gesucht wird über die ganze Marke." Wer das liest,
+ * hat schon fünf Minuten gewartet — und bekommt am Ende einen Korb, der aus
+ * einem Portal weniger stammt, ohne dass es der Zahl anzusehen wäre. Am
+ * 08.09.2026 lieferte AutoScout24 daraufhin in beiden Zyklen null Treffer.
+ *
+ * Die Prüfung ist ein Hinweis, keine Sperre: der Sachverständige darf
+ * wissentlich über die Marke suchen.
+ */
+export async function pruefeModellname(
+  marke: string,
+  modell: string,
+  baureihe?: string | null,
+): Promise<Modellpruefung> {
+  await verlangeBenutzer()
+
+  const leer: Modellpruefung = {
+    bekannt: true,
+    aufgeloest: null,
+    quelle: 'offen',
+    vorschlaege: [],
+    anzahl: 0,
+  }
+  if (!marke.trim() || !modell.trim()) return leer
+
+  try {
+    const liste = await ermittleModelle(marke, modell)
+    // Dieselbe Wahl wie im Lauf: Untertyp zuerst, Baureihe als Rückfall. Die
+    // Oberfläche darf nichts anderes anzeigen, als nachher gesucht wird.
+    const treffer = waehleSuchmodell(modell, baureihe ?? null, liste.modelle)
+    return {
+      bekannt: treffer.modell !== null,
+      aufgeloest: treffer.modell,
+      quelle: treffer.quelle,
+      vorschlaege: liste.vorschlaege.slice(0, 6),
+      anzahl: liste.anzahl,
+    }
+  } catch (fehler) {
+    // Ein Abruffehler ist kein Befund. Er darf nicht als „Modell unbekannt"
+    // erscheinen und den Sachverständigen ein richtiges Feld ändern lassen.
+    return {
+      ...leer,
+      fehler: fehler instanceof Error ? fehler.message.slice(0, 200) : 'Abruf gescheitert.',
+    }
+  }
 }

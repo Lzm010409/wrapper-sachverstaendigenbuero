@@ -78,6 +78,55 @@ export function loeseModellAuf(
   return { modell: null, weg: 'offen', verworfen: null }
 }
 
+export interface Suchmodell {
+  /** Der Modellname des Portals, oder `null`. */
+  modell: string | null
+  /** Woraus er stammt. */
+  quelle: 'untertyp' | 'baureihe' | 'offen'
+  /** Was verworfen wurde, z. B. `4Matic+`. */
+  verworfen: string | null
+}
+
+/**
+ * Der Suchbegriff für ein Portal: Untertyp zuerst, Baureihe als Rückfall.
+ *
+ * **Warum der Rückfall.** Der Untertyp der DAT ist nicht verlässlich ein
+ * Modellname. Bei Mercedes ist er einer (`E 53 AMG 4Matic+`), bei anderen
+ * Herstellern trägt dasselbe Feld die Ausstattungslinie: `Highline BMT` bei
+ * einem VW Sharan, `Feel XL` bei einem Citroën Berlingo. Ein solcher Begriff
+ * löst beim Portal nicht auf, und ein unbekannter Name wird dort
+ * stillschweigend fallengelassen — gesucht wird dann über die ganze Marke,
+ * mit den engen Toleranzen des ersten Zyklus, und es kommt nichts zurück.
+ *
+ * Die Baureihe löst dagegen sauber auf, Klammerzusätze eingeschlossen:
+ * `Berlingo Multispace (K9)` → `Berlingo Multispace`. Sie wurde nur nie
+ * gefragt.
+ *
+ * **Die Reihenfolge ist der Punkt.** Der Rückfall greift ausschliesslich,
+ * wenn der Untertyp nichts trifft. Wo er trifft, bleibt er stehen — `E 53
+ * AMG` ist ein anderes Fahrzeug als die ganze E-Klasse, und eine Suche nach
+ * der Baureihe mischt 143-kW-Diesel mit einem 320-kW-AMG.
+ *
+ * Trifft auch die Baureihe nichts, bleibt es offen. Geraten wird nie.
+ */
+export function waehleSuchmodell(
+  untertyp: string | null | undefined,
+  baureihe: string | null | undefined,
+  modelle: string[],
+): Suchmodell {
+  const ausUntertyp = loeseModellAuf(untertyp, modelle)
+  if (ausUntertyp.modell) {
+    return { modell: ausUntertyp.modell, quelle: 'untertyp', verworfen: ausUntertyp.verworfen }
+  }
+
+  const ausBaureihe = loeseModellAuf(baureihe, modelle)
+  if (ausBaureihe.modell) {
+    return { modell: ausBaureihe.modell, quelle: 'baureihe', verworfen: ausBaureihe.verworfen }
+  }
+
+  return { modell: null, quelle: 'offen', verworfen: null }
+}
+
 /**
  * Modelle, die zu einer Bezeichnung passen könnten — für die Auswahl, wenn
  * die Auflösung offen bleibt.

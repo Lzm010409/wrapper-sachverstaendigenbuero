@@ -3,17 +3,18 @@
  *
  *   1. Datenbankschema anlegen bzw. fortschreiben
  *   2. Argumentbibliothek befüllen, falls sie noch leer ist
- *   3. Den Next-Server starten
+ *   3. Fotolexikon um fehlende Beispielteile ergänzen
+ *   4. Den Next-Server starten
  *
  * Bewusst reines JavaScript ohne Werkzeugkette: im Laufzeit-Abbild liegt nur
  * die Standalone-Ausgabe von Next. Verwendet wird ausschließlich `postgres`,
  * das die Anwendung ohnehin mitbringt.
  *
  * Der Ablauf ist wiederholbar: bereits angewandte Migrationen werden
- * übersprungen, und die Bibliothek wird nur befüllt, wenn sie leer ist —
- * ein Neustart überschreibt also keine gepflegten Einträge.
+ * übersprungen, und beide Startbefüllungen ergänzen nur, was fehlt — ein
+ * Neustart überschreibt also keine gepflegten Einträge.
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, accessSync, constants } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createHash, randomBytes, scrypt as scryptCb } from 'node:crypto'
@@ -25,6 +26,7 @@ const scrypt = promisify(scryptCb)
 const WURZEL = process.cwd()
 const MIGRATIONEN = join(WURZEL, 'drizzle')
 const STARTBEFUELLUNG = join(WURZEL, 'seed', 'bibliothek.json')
+const STARTBEFUELLUNG_FOTOLEXIKON = join(WURZEL, 'seed', 'fotolexikon.json')
 
 function melde(text) {
   console.log(`[start] ${text}`)
@@ -191,6 +193,56 @@ async function befuelleBibliothek(sql) {
 }
 
 /**
+ * Ergänzt das Fotolexikon um fehlende Beispielteile.
+ *
+ * Anders als die Bibliothek wird hier nicht abgeglichen, sondern nur
+ * ergänzt: das Fotolexikon ist von Anfang an zur Pflege über die
+ * Verwaltungsseite gedacht (`src/app/(app)/verwaltung/fotolexikon`), ein
+ * Teil dort kann also frei umbenannt oder umformuliert sein. Ein Neustart
+ * legt einen Namen aus der Startbefüllung nur an, wenn er noch nicht
+ * existiert — er ändert nie einen vorhandenen Eintrag und löscht nie einen.
+ */
+async function befuelleFotolexikon(sql) {
+  if (!existsSync(STARTBEFUELLUNG_FOTOLEXIKON)) {
+    melde('Keine Fotolexikon-Startbefüllung vorhanden — übersprungen.')
+    return
+  }
+
+  const teile = JSON.parse(readFileSync(STARTBEFUELLUNG_FOTOLEXIKON, 'utf8'))
+
+  const vorhanden = new Set(
+    (await sql`select lower(name) as name from foto_teil`).map((z) => z.name),
+  )
+
+  let angelegt = 0
+  for (const teil of teile) {
+    if (vorhanden.has(teil.name.toLowerCase())) continue
+
+    // Seiten und Beschädigungsarten gehen als Text durch die Bindung und
+    // werden erst in der Anweisung selbst zum passenden Typ gecastet — ohne
+    // Annahmen darüber, wie `postgres` ein rohes JS-Array oder -Objekt sonst
+    // serialisieren würde.
+    const seitenListe = teil.seiten.length ? `{${teil.seiten.join(',')}}` : '{}'
+    await sql`
+      insert into foto_teil (name, seiten, erkennungsmerkmal, beschaedigungsarten)
+      values (
+        ${teil.name},
+        ${seitenListe}::foto_teil_seite[],
+        ${teil.erkennungsmerkmal ?? null},
+        ${JSON.stringify(teil.beschaedigungsarten)}::jsonb
+      )
+    `
+    angelegt++
+  }
+
+  if (angelegt > 0) {
+    melde(`Fotolexikon ergänzt: ${angelegt} Teil${angelegt === 1 ? '' : 'e'} neu angelegt.`)
+  } else {
+    melde('Fotolexikon ist auf Stand — nichts Neues aus der Startbefüllung.')
+  }
+}
+
+/**
  * Legt beim allerersten Start einen Zugang an, damit die Anwendung nicht
  * ohne Anmeldemöglichkeit dasteht.
  *
@@ -293,6 +345,39 @@ function richteKleinanzeigenEin() {
   melde('Kleinanzeigen-Beschaffung läuft über die Anwendung selbst.')
 }
 
+/**
+ * Sagt beim Hochfahren, ob ein Browser für die Belege da ist.
+ *
+ * Am 08.09.2026 fiel das Fehlen erst auf, nachdem eine WBW-Recherche
+ * durchgelaufen war und die Belege in den Gutachtenordner sollten — mit einer
+ * Meldung, die auf `google-chrome-stable` zeigte, den niemand eingerichtet
+ * hat. Beim Start kostet die Auskunft eine Zeile.
+ */
+function meldeDrucker() {
+  const kandidaten = [
+    process.env.WBW_CHROME,
+    process.env.CHROME_PATH,
+    '/usr/bin/chromium',
+    '/usr/lib/chromium/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+  ].filter(Boolean)
+
+  for (const pfad of kandidaten) {
+    try {
+      accessSync(pfad, constants.X_OK)
+      melde(`Belegdruck über ${pfad}.`)
+      return
+    } catch {
+      // nächster
+    }
+  }
+  console.warn(
+    '[start] Kein Browser gefunden — Belege lassen sich nicht als PDF drucken. ' +
+      `Gesucht unter: ${kandidaten.join(', ') || '— nichts gesetzt —'}.`,
+  )
+}
+
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url) {
@@ -304,6 +389,7 @@ async function main() {
   try {
     await wendeMigrationenAn(sql)
     await befuelleBibliothek(sql)
+    await befuelleFotolexikon(sql)
     await legeErstenZugangAn(sql)
     await raeumeWbwLaeufeAuf(sql)
     await raeumeMeldungenAuf(sql)
@@ -315,6 +401,7 @@ async function main() {
   }
 
   richteKleinanzeigenEin()
+  meldeDrucker()
 
   // Der Next-Server liegt im Abbild neben diesem Skript im Arbeitsverzeichnis.
   // Die Auflösung geht bewusst über das Arbeitsverzeichnis und nicht relativ
