@@ -1,11 +1,13 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import {
+  FALL_SORTIERFELDER,
   filterGesetzt,
   ladeFaelle,
   vorhandeneMarken,
   zaehleGefilterte,
   type Fallfilter,
+  type FallSortierfeld,
 } from '@/autoixpert/abfragen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
@@ -16,6 +18,8 @@ import { Geldpille } from '@/app/teile/geldpille'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Sortierleiste } from '@/app/teile/sortierleiste'
+import { leseSortierung } from '@/app/teile/sortierung'
 import { SkelettListe } from '@/app/teile/skelett'
 
 /** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
@@ -46,9 +50,13 @@ export default async function FaelleSeite({
     baujahr: wert(roh.baujahr),
   }
   const gefiltert = filterGesetzt(filter)
+  const sortierung = leseSortierung<FallSortierfeld>(
+    { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
+    FALL_SORTIERFELDER.map((f) => f.wert),
+  )
 
   const [faelle, gesamt, marken] = await Promise.all([
-    ladeFaelle(filter),
+    ladeFaelle(filter, sortierung ?? undefined),
     zaehleGefilterte(filter),
     vorhandeneMarken(),
   ])
@@ -85,11 +93,14 @@ export default async function FaelleSeite({
 
       <ImportFormular aktiv={eingerichtet} />
 
+      <Sortierleiste felder={FALL_SORTIERFELDER} />
+
       <Filterleiste
         weitereAb={2}
         treffer={
           faelle.length < gesamt ? `${faelle.length} von ${gesamt} gezeigt` : undefined
         }
+        zusatzParameter={{ sortiert: sortierung?.feld, richtung: sortierung?.richtung }}
         felder={[
           {
             art: 'suche',

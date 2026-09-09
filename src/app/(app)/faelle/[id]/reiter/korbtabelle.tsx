@@ -13,6 +13,8 @@ import {
 import { Kreisel } from '@/app/teile/anzeigen'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis } from '@/melden/typen'
+import { Spaltenkopf } from '@/app/teile/spaltenkopf'
+import type { Richtung } from '@/app/teile/sortierung'
 
 /**
  * Der Vergleichskorb: eine Zeile je Fahrzeug, mit Haken.
@@ -175,6 +177,10 @@ export function Korbtabelle({
 
   const alleSichtbarenGewaehlt = sichtbar.length > 0 && sichtbar.every((z) => gewaehlt.has(z.kennung))
   const gefiltert = Boolean(quelle || empfehlung || nurAuffaellig || nurGewaehlt || hoechstpreis)
+  // `Spaltenkopf` (geteilt mit den serverseitig sortierten Listen) erwartet
+  // die Richtung als Wort, nicht als Bool - das bleibt hier lokal, damit der
+  // übrige Zustand dieser Tabelle unangetastet bleibt.
+  const richtung: Richtung = absteigend ? 'absteigend' : 'aufsteigend'
 
   return (
     <>
@@ -258,31 +264,46 @@ export function Korbtabelle({
                   }
                 />
               </th>
-              <Kopf spalte="rang" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf spalte="rang" jetzt={sortierung} richtung={richtung} klick={sortiereNach}>
                 #
-              </Kopf>
+              </Spaltenkopf>
               <th>Fahrzeug</th>
-              <Kopf spalte="preis" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf spalte="preis" jetzt={sortierung} richtung={richtung} klick={sortiereNach}>
                 Preis
-              </Kopf>
-              <Kopf spalte="kilometerstand" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              </Spaltenkopf>
+              <Spaltenkopf
+                spalte="kilometerstand"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 km
-              </Kopf>
-              <Kopf spalte="erstzulassung" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              </Spaltenkopf>
+              <Spaltenkopf
+                spalte="erstzulassung"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 EZ
-              </Kopf>
+              </Spaltenkopf>
               <th>kW</th>
-              <Kopf spalte="entfernung" jetzt={sortierung} ab={absteigend} klick={sortiereNach}>
+              <Spaltenkopf
+                spalte="entfernung"
+                jetzt={sortierung}
+                richtung={richtung}
+                klick={sortiereNach}
+              >
                 Ort
-              </Kopf>
-              <Kopf
+              </Spaltenkopf>
+              <Spaltenkopf
                 spalte="vergleichbarkeit"
                 jetzt={sortierung}
-                ab={absteigend}
+                richtung={richtung}
                 klick={sortiereNach}
               >
                 Beurteilung
-              </Kopf>
+              </Spaltenkopf>
             </tr>
           </thead>
           <tbody>
@@ -421,34 +442,6 @@ export function Korbtabelle({
           : 'Es gehen Einzelbelege je Fahrzeug und die Portalpakete in den Ordner.'}
       </p>
     </>
-  )
-}
-
-/** Eine sortierbare Spaltenüberschrift. */
-function Kopf({
-  spalte,
-  jetzt,
-  ab,
-  klick,
-  children,
-}: {
-  spalte: Sortierung
-  jetzt: Sortierung
-  ab: boolean
-  klick: (s: Sortierung) => void
-  children: React.ReactNode
-}) {
-  const aktiv = jetzt === spalte
-  return (
-    <th aria-sort={aktiv ? (ab ? 'descending' : 'ascending') : 'none'}>
-      <button type="button" className="spaltenkopf" onClick={() => klick(spalte)}>
-        {children}
-        <span aria-hidden="true">{aktiv ? (ab ? ' ↓' : ' ↑') : ''}</span>
-        <span className="nur-vorlesen">
-          {aktiv ? (ab ? ', absteigend sortiert' : ', aufsteigend sortiert') : ', sortieren'}
-        </span>
-      </button>
-    </th>
   )
 }
 

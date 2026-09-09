@@ -1,12 +1,13 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { desc, eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { fall } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { AutoixpertFehler, clientAusUmgebung } from './client'
 import { leseFalldaten } from './felder'
+import { speichereFall } from './speichern'
 import { protokolliereFehler, protokolliereWarnung } from '@/protokoll'
 
 export interface ImportZustand {
@@ -53,38 +54,7 @@ export async function importiereFall(
     return { fehler: `Der Fall konnte nicht geladen werden. Kennung ${kennung}` }
   }
 
-  const daten = leseFalldaten(aufloesung.gutachten)
-
-  const vorhanden = await db
-    .select({ id: fall.id })
-    .from(fall)
-    .where(eq(fall.autoixpertId, daten.autoixpertId))
-    .limit(1)
-
-  let fallId: string
-  const bestehend = vorhanden[0]
-  if (bestehend) {
-    await db
-      .update(fall)
-      .set({
-        aktenzeichen: daten.aktenzeichen,
-        daten: aufloesung.gutachten,
-        abgerufenAm: new Date(),
-      })
-      .where(eq(fall.id, bestehend.id))
-    fallId = bestehend.id
-  } else {
-    const [angelegt] = await db
-      .insert(fall)
-      .values({
-        aktenzeichen: daten.aktenzeichen,
-        autoixpertId: daten.autoixpertId,
-        daten: aufloesung.gutachten,
-        abgerufenAm: new Date(),
-      })
-      .returning({ id: fall.id })
-    fallId = angelegt!.id
-  }
+  const { fallId } = await speichereFall(aufloesung.gutachten)
 
   revalidatePath('/faelle')
 
