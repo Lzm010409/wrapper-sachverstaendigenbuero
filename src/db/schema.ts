@@ -539,6 +539,53 @@ export const rechnung = pgTable(
 )
 
 /**
+ * Das Umhängeprotokoll: was beim Zusammenführen doppelter sevDesk-Kontakte
+ * tatsächlich passiert ist.
+ *
+ * **Warum je Schritt eine Zeile und nicht je Vorgang eine Zusammenfassung.**
+ * Ein Zusammenführen ist kein atomarer Vorgang — sevDesk kennt keine
+ * Transaktion über mehrere Belege. Es kann also auf halbem Weg stehen
+ * bleiben, und dann muss nachvollziehbar sein, welche Rechnung schon
+ * umgehängt ist und welche nicht. Nur so lässt sich der Rückbau auf genau
+ * die geglückten Schritte anwenden.
+ *
+ * **Warum auch die misslungenen Schritte hier stehen.** „sevDesk hat die
+ * Rechnung nicht umgehängt" ist die Auskunft, die jemand später braucht —
+ * sie in ein Anwendungsprotokoll zu schreiben, das nach 30 Tagen verfällt,
+ * hiesse sie zu verlieren.
+ */
+export const kontaktumhang = pgTable(
+  'kontaktumhang',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** Klammert die Schritte einer Zusammenführung. */
+    vorgang: uuid().notNull(),
+    benutzerId: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    /** Der Kontakt, der bleibt. */
+    siegerId: text().notNull(),
+    /** Der Kontakt, von dem umgehängt wurde. */
+    verliererId: text().notNull(),
+    /** `Invoice`, `Voucher` oder `Contact`. */
+    objektArt: text().notNull(),
+    objektId: text().notNull(),
+    /** Wozu die Bezeichnung dient: im Protokoll steht die Rechnungsnummer, nicht nur eine ID. */
+    bezeichnung: text(),
+    /** `umgehaengt`, `markiert`, `geloescht`, `adresse`, `kommunikation`. */
+    schritt: text().notNull(),
+    erfolg: boolean().notNull(),
+    /** Bei Misserfolg: was sevDesk gesagt hat, unverändert. */
+    meldung: text(),
+    /** Gesetzt, wenn der Schritt zurückgenommen wurde. */
+    rueckgaengigAm: timestamp({ withTimezone: true }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('kontaktumhang_vorgang_idx').on(t.vorgang),
+    index('kontaktumhang_verlierer_idx').on(t.verliererId),
+  ],
+)
+
+/**
  * Eine Meldung, die den Blick überdauern muss.
  *
  * Was am Bildschirm passiert, sagt die Oberfläche selbst. Was **im

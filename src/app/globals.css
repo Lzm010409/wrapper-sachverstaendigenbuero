@@ -3463,6 +3463,58 @@ body {
   border-bottom: 0;
 }
 
+/* Was schon geloescht ist, tritt zurueck — es ist nur noch Beleg dafuer, dass es weg ist. */
+.dublettentabelle tr.geloescht td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/*
+  Vorschau und Bericht sitzen im Kasten der Gruppe, abgesetzt durch die
+  Flaeche: was gleich geschieht, soll sich von dem unterscheiden, was
+  dasteht.
+*/
+.vorschau {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.vorschau.gescheitert {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+}
+
+.vorschauliste {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vorschauliste li {
+  padding: 2px 0;
+}
+
+/* Ein Vorbehalt ist kein Fehler, aber auch keine Zusage. */
+.vorschauliste li.mit-vorbehalt {
+  color: var(--ink-mid);
+}
+
+.dublettentabelle input[type='radio'],
+.dublettentabelle input[type='checkbox'] {
+  /* 24px Trefferflaeche in einer Tabellenzeile, die selbst 34px hoch ist. */
+  width: 16px;
+  height: 16px;
+  margin: 4px;
+  cursor: pointer;
+}
+
 /*
   Leere Eintraege abgesetzt, aber nicht ausgegraut: sie sind das, worauf es
   ankommt — die, die man loeschen koennte. Ausgegraut lesen sich Zeilen wie

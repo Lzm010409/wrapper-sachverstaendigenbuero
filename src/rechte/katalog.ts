@@ -34,6 +34,7 @@ export const RECHTE = [
   'autoixpert.schreiben',
   'wbw.kostenpflichtig',
   'versand.vermerken',
+  'sevdesk.zusammenfuehren',
   'benutzer.verwalten',
   'protokoll.lesen',
 ] as const
@@ -87,6 +88,15 @@ export const BESCHREIBUNGEN: Rechtebeschreibung[] = [
     name: 'Versand vermerken',
     erklaerung:
       '„Als versendet markieren" ist eine Aussage über die Aussenwelt und Grundlage für Fristen.',
+  },
+  {
+    recht: 'sevdesk.zusammenfuehren',
+    name: 'Kontakte in sevDesk zusammenführen',
+    erklaerung:
+      'Rechnungen und Belege eines doppelten Kontakts auf einen anderen umhängen und den ' +
+      'leeren Kontakt löschen. Wirkt in der Buchhaltung, nicht nur hier. Jeder Schritt steht ' +
+      'im Umhängeprotokoll und lässt sich zurücknehmen, solange die Rechnung nicht ' +
+      'festgeschrieben wurde.',
   },
   {
     recht: 'benutzer.verwalten',
