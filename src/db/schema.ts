@@ -47,6 +47,9 @@ export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfo
 /** Die Stufe eines Protokolleintrags. */
 export const protokollstufeEnum = pgEnum('protokollstufe', ['fehler', 'warnung', 'info'])
 
+/** Die Seite eines Fahrzeugteils im Fotolexikon — siehe `fotoTeil`. */
+export const fotoTeilSeiteEnum = pgEnum('foto_teil_seite', ['links', 'rechts', 'vorne', 'hinten'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -477,6 +480,42 @@ export const fotoAnalyse = pgTable(
     erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('foto_analyse_fall_idx').on(t.fallId)],
+)
+
+/**
+ * Das Fotolexikon: welche Teile es gibt, welche Seiten dafür gelten und mit
+ * welchem Wortlaut eine Beschädigung daran heisst.
+ *
+ * **Warum eine Zeile je Teil und nicht drei Tabellen.** Die Seiten sind ein
+ * festes, kleines Vokabular (`fotoTeilSeiteEnum`) — ein Array reicht. Die
+ * Beschädigungsarten dagegen sind je Teil ein eigener, kurzer Wortschatz
+ * (Blech "deformiert", Kunststoff "plastisch verformt") und werden nie
+ * unabhängig vom Teil gesucht oder angezeigt — eine eigene Tabelle dafür wäre
+ * ein Join, den niemand braucht, für eine Handvoll Einträge je Teil.
+ *
+ * **Warum das den Fotoassistenten überhaupt bindet.** Ohne dieses Lexikon
+ * formuliert das Sprachmodell frei — mit ihm liefert es nur noch Teil, Seite
+ * und Beschädigungsart aus dieser Liste, und der Satz wird daraus
+ * zusammengesetzt (`src/fotos/lexikon.ts`). Ein Haus mit eigenem Wording
+ * bekommt damit durchgehend denselben Begriff statt einer KI-Interpretation
+ * je Fall.
+ */
+export const fotoTeil = pgTable(
+  'foto_teil',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    seiten: fotoTeilSeiteEnum().array().notNull().default(sql`'{}'::foto_teil_seite[]`),
+    /**
+     * `[{ begriff: string, hinweis: string }]` — geprüft beim Lesen mit Zod,
+     * siehe `src/fotos/lexikon-ablage.ts`.
+     */
+    beschaedigungsarten: jsonb().notNull().default(sql`'[]'::jsonb`),
+    erstelltVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    geaendertAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('foto_teil_name_idx').on(sql`lower(${t.name})`)],
 )
 
 /**
@@ -934,3 +973,4 @@ export type WbwLauf = typeof wbwLauf.$inferSelect
 export type Gemeldetes = typeof meldung.$inferSelect
 export type Ereignis = typeof ereignis.$inferSelect
 export type BenutzerRecht = typeof benutzerRecht.$inferSelect
+export type FotoTeilZeile = typeof fotoTeil.$inferSelect

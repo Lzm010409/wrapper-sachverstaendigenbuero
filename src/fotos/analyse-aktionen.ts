@@ -12,6 +12,7 @@ import { kiVerfuegbar } from '@/ki/client'
 import { beschriftePaket, naechstesPaket, type Fahrzeugkontext } from './assistent'
 import { holeVorschaubilder } from './vorschaubilder'
 import { ladeAnalyse, setzeStand, speichereAnalyse } from './analyse-ablage'
+import { ladeLexikon } from './lexikon-ablage'
 import { beschrifteFoto } from './aktionen'
 import type { Fotovorschlag } from './vorschlag'
 import type { Verwendung } from './ansicht'
@@ -106,8 +107,11 @@ export async function analysiereFotos(fallId: string): Promise<Analysefortschrit
     .filter((b): b is string => Boolean(b))
     .slice(0, 8)
 
-  const bilder = await holeVorschaubilder(client, reportId, offen.map((f) => f.id))
-  const neue = await beschriftePaket(kontext, stilbeispiele, bilder)
+  const [bilder, teile] = await Promise.all([
+    holeVorschaubilder(client, reportId, offen.map((f) => f.id)),
+    ladeLexikon(),
+  ])
+  const neue = await beschriftePaket(kontext, stilbeispiele, teile, bilder)
 
   const alle: Fotovorschlag[] = [...bekannt.values(), ...neue]
   const geglueckt = new Set(neue.map((v) => v.fotoId))

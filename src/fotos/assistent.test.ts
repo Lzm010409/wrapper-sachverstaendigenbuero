@@ -6,6 +6,7 @@ import {
   naechstesPaket,
   type Bildpaket,
 } from './assistent'
+import type { FotoTeil } from './lexikon'
 
 vi.mock('@/ki/client', () => ({
   MODELLE: { schnell: 'test-modell' },
@@ -23,6 +24,16 @@ const FAHRZEUG = {
   modell: 'E 53 AMG 4Matic+',
   kennzeichen: 'OL-AB 123',
   schadenbeschreibung: 'Anstoss hinten rechts',
+}
+
+const KOTFLUEGEL: FotoTeil = {
+  id: 't1',
+  name: 'Kotflügel',
+  seiten: ['links', 'rechts'],
+  beschaedigungsarten: [
+    { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
+    { begriff: 'deformiert', hinweis: 'Blech sichtbar eingedrückt oder verformt' },
+  ],
 }
 
 function bild(fotoId: string): Bildpaket {
@@ -60,6 +71,17 @@ describe('auftragstext', () => {
     expect(text).toContain('ansicht_hinten_rechts')
     expect(text).toContain('vin')
   })
+
+  it('listet das Teile-Lexikon mit Begriff und Hinweis, wenn Teile übergeben werden', () => {
+    const text = auftragstext(FAHRZEUG, [], [KOTFLUEGEL])
+    expect(text).toContain('Kotflügel')
+    expect(text).toContain('deformiert')
+    expect(text).toContain('Blech sichtbar eingedrückt oder verformt')
+  })
+
+  it('lässt den Teile-Abschnitt weg, wenn kein Lexikon übergeben wird', () => {
+    expect(auftragstext(FAHRZEUG, [])).not.toContain('Teile-Lexikon')
+  })
 })
 
 describe('beschriftePaket', () => {
@@ -71,7 +93,7 @@ describe('beschriftePaket', () => {
       ]),
     )
 
-    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
     expect(vorschlaege.map((v) => [v.fotoId, v.kategorie])).toEqual([
       ['a', 'kennzeichen'],
@@ -84,7 +106,7 @@ describe('beschriftePaket', () => {
       antwort([{ id: 'a', kategorie: 'reifen', beschreibung: 'Reifen vorne links', sicherheit: 80 }]),
     )
 
-    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
     expect(vorschlaege.map((v) => v.fotoId)).toEqual(['a'])
   })
@@ -97,7 +119,7 @@ describe('beschriftePaket', () => {
       ]),
     )
 
-    const [kennzeichen, schaden] = await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+    const [kennzeichen, schaden] = await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
     // Das Kennzeichen identifiziert Fahrzeug und Halter — nicht in die Börse.
     expect(kennzeichen?.verwendung.inRestwertboerse).toBe(false)
@@ -115,7 +137,7 @@ describe('beschriftePaket', () => {
       antwort([{ id: 'a', kategorie: 'schaden', beschreibung: `${'x'.repeat(200)}.`, sicherheit: 70 }]),
     )
 
-    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [bild('a')])
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [], [bild('a')])
 
     expect(vorschlag?.beschreibung.length).toBe(120)
     expect(vorschlag?.beschreibung.endsWith('.')).toBe(false)
@@ -124,7 +146,7 @@ describe('beschriftePaket', () => {
   it('nimmt einen leeren Vorschlag nicht an', async () => {
     ruf.mockResolvedValue(antwort([{ id: 'a', kategorie: 'schaden', beschreibung: '  ', sicherheit: 60 }]))
 
-    expect(await beschriftePaket(FAHRZEUG, [], [bild('a')])).toEqual([])
+    expect(await beschriftePaket(FAHRZEUG, [], [], [bild('a')])).toEqual([])
   })
 
   it('verwirft eine erfundene Kategorie, statt sie durchzulassen', async () => {
@@ -132,7 +154,7 @@ describe('beschriftePaket', () => {
       antwort([{ id: 'a', kategorie: 'typschild', beschreibung: 'Typschild', sicherheit: 90 }]),
     )
 
-    expect(await beschriftePaket(FAHRZEUG, [], [bild('a')])).toEqual([])
+    expect(await beschriftePaket(FAHRZEUG, [], [], [bild('a')])).toEqual([])
   })
 
   it('rettet eine Sicherheit ausserhalb von 0 bis 100, statt das Paket zu verlieren', async () => {
@@ -145,27 +167,102 @@ describe('beschriftePaket', () => {
       ]),
     )
 
-    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
     expect(vorschlaege.find((v) => v.fotoId === 'a')?.sicherheit).toBe(100)
     expect(vorschlaege.find((v) => v.fotoId === 'b')?.sicherheit).toBe(0)
   })
 
+  it('setzt den Hausstil-Satz aus teil, seite und beschaedigungsart zusammen', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          teil: 'Kotflügel',
+          seite: 'rechts',
+          beschaedigungsart: 'deformiert',
+          sicherheit: 90,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Kotflügel rechts deformiert')
+  })
+
+  it('fällt auf den freien Text zurück, wenn kein Teil erkannt wurde', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'Dachhimmel verschmutzt',
+          teil: 'kein_teil',
+          seite: 'ohne',
+          beschaedigungsart: 'keine',
+          sicherheit: 70,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Dachhimmel verschmutzt')
+  })
+
+  it('fällt auf den freien Text zurück, wenn sich das Modell nicht ans Lexikon gehalten hat', async () => {
+    // "vorne" gibt es für den Kotflügel im Lexikon nicht — die Kombination
+    // ist ungültig, obwohl beide Werte für sich genommen aus dem Werkzeug
+    // stammen könnten.
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'Kotflügel vorne beschädigt',
+          teil: 'Kotflügel',
+          seite: 'vorne',
+          beschaedigungsart: 'deformiert',
+          sicherheit: 70,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Kotflügel vorne beschädigt')
+  })
+
+  it('formuliert frei, wenn die Antwort teil/seite/beschaedigungsart gar nicht enthält', async () => {
+    // Die Sentinel-Vorbelegung im Zod-Schema greift — dieselbe Beschreibung
+    // wie vor dem Lexikon.
+    ruf.mockResolvedValue(
+      antwort([{ id: 'a', kategorie: 'schaden', beschreibung: 'Heckschürze verkratzt', sicherheit: 80 }]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Heckschürze verkratzt')
+  })
+
   it('gibt bei einem Fehler des Modells nichts zurück, statt zu werfen', async () => {
     ruf.mockRejectedValue(new Error('Zeitlimit'))
 
-    await expect(beschriftePaket(FAHRZEUG, [], [bild('a')])).resolves.toEqual([])
+    await expect(beschriftePaket(FAHRZEUG, [], [], [bild('a')])).resolves.toEqual([])
   })
 
   it('fragt gar nicht erst, wenn es keine Bilder gibt', async () => {
-    expect(await beschriftePaket(FAHRZEUG, [], [])).toEqual([])
+    expect(await beschriftePaket(FAHRZEUG, [], [], [])).toEqual([])
     expect(ruf).not.toHaveBeenCalled()
   })
 
   it('stellt die Kennung vor das jeweilige Bild', async () => {
     ruf.mockResolvedValue(antwort([]))
 
-    await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+    await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
     const inhalt = ruf.mock.calls[0]?.[0].inhalt ?? []
     const arten = inhalt.map((b) => (b.type === 'image' ? 'bild' : b.text))

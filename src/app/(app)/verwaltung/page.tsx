@@ -42,6 +42,9 @@ export default async function Verwaltung() {
           <Link href="/verwaltung/kontakte" className="knopf-schlicht">
             Doppelte Kontakte
           </Link>
+          <Link href="/verwaltung/fotolexikon" className="knopf-schlicht">
+            Fotolexikon
+          </Link>
           <Link href="/verwaltung/protokoll" className="knopf-schlicht">
             Fehlerprotokoll
           </Link>

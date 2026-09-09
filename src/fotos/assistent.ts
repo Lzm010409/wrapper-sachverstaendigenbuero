@@ -2,6 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { KATEGORIESCHLUESSEL, kategoriename, type Kategorie } from './kategorien'
 import { verwendungFuer, type Fotovorschlag } from './vorschlag'
+import { istSeite, SEITEN, zusammensetzen, type FotoTeil } from './lexikon'
 import { MODELLE, rufeMitWerkzeugAuf, type InhaltsBlock } from '@/ki/client'
 import { protokolliereWarnung } from '@/protokoll'
 
@@ -22,6 +23,13 @@ import { protokolliereWarnung } from '@/protokoll'
  * **Was das Modell entscheidet und was nicht.** Es liefert Kategorie und
  * Beschreibung. Die vier Verwendungshäkchen folgen daraus über die feste
  * Tabelle in `vorschlag.ts` — siehe die Begründung dort.
+ *
+ * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut.** Ist im Haus ein
+ * Teil hinterlegt (Seite, Beschädigungsarten mit Begriff), muss das Modell
+ * bei einem erkannten Teil Teil, Seite und Beschädigungsart nur aus dieser
+ * Liste wählen — der Satz wird serverseitig zusammengesetzt (`zusammensetzen`
+ * in `lexikon.ts`), nicht vom Modell formuliert. Ein nicht gelistetes Teil
+ * bleibt freier Text wie zuvor.
  *
  * **Was bei einem Fehler passiert.** Ein gescheitertes Paket nimmt die
  * übrigen nicht mit; seine Fotos bleiben schlicht ohne Vorschlag. Der
@@ -60,6 +68,16 @@ const vorschlagSchema = z.object({
   kategorie: z.enum(KATEGORIESCHLUESSEL as [Kategorie, ...Kategorie[]]),
   beschreibung: z.string(),
   /*
+    Roh übernommen, nicht gegen das Lexikon geprüft: welche Werte hier
+    überhaupt zulässig sind, hängt vom `teile`-Argument des jeweiligen
+    Aufrufs ab, nicht von einem festen Schema. Die Prüfung übernimmt
+    `zusammensetzen()` in `beschriftePaket` — dort steht auch das aktuelle
+    Lexikon zur Verfügung.
+  */
+  teil: z.string().default('kein_teil'),
+  seite: z.string().default('ohne'),
+  beschaedigungsart: z.string().default('keine'),
+  /*
     Geklemmt, nicht abgelehnt. `strict` kann `minimum`/`maximum` nicht
     erzwingen (siehe WERKZEUG), die Grenze steht also nur im
     Beschreibungstext. Ein einzelner Ausreisser würde sonst über
@@ -74,6 +92,13 @@ const antwortSchema = z.object({ vorschlaege: z.array(vorschlagSchema) })
 /**
  * Die Werkzeugdefinition des Fotoassistenten.
  *
+ * **Warum eine Funktion und keine Konstante.** `teil`, `seite` und
+ * `beschaedigungsart` dürfen nur Werte aus dem Fotolexikon annehmen — und das
+ * Lexikon steht in der Datenbank, ändert sich also zur Laufzeit. Ohne
+ * Lexikoneintrag bleibt für beide Felder nur der jeweilige Sentinel-Wert
+ * (`kein_teil`, `keine`) übrig; ein leeres `enum: []` ist kein gültiges JSON
+ * Schema.
+ *
  * **`strict: true` kennt nur einen Teil von JSON Schema.** Zahlengrenzen
  * (`minimum`, `maximum`, `multipleOf`), Textlängen, Muster und
  * Mengenangaben für Listen weist die Schnittstelle mit einem 400 ab — der
@@ -82,50 +107,85 @@ const antwortSchema = z.object({ vorschlaege: z.array(vorschlagSchema) })
  * gehören deshalb in den Beschreibungstext, und die Nachprüfung macht das
  * Zod-Schema oben.
  */
-const WERKZEUG = {
-  name: 'fotos_beschriften',
-  description:
-    'Gibt zu jedem übergebenen Foto genau einen Vorschlag zurück — mit derselben id, ' +
-    'die über dem Bild steht. Kein Foto auslassen, keine id erfinden.',
-  input_schema: {
-    type: 'object' as const,
-    additionalProperties: false,
-    properties: {
-      vorschlaege: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            id: { type: 'string', description: 'Die id des Fotos, unverändert.' },
-            kategorie: {
-              type: 'string',
-              enum: KATEGORIESCHLUESSEL,
-              description:
-                'Was die Aufnahme zeigt. Nur eine dieser Kategorien, keine eigene erfinden. ' +
-                'Bei Zweifel zwischen einer Eckansicht und einem Schadendetail entscheidet, ' +
-                'ob das ganze Fahrzeug oder ein einzelnes Bauteil im Bild ist.',
+function bauWerkzeug(teile: readonly FotoTeil[]) {
+  const teilNamen = teile.map((t) => t.name)
+  const alleBegriffe = [...new Set(teile.flatMap((t) => t.beschaedigungsarten.map((b) => b.begriff)))]
+
+  return {
+    name: 'fotos_beschriften',
+    description:
+      'Gibt zu jedem übergebenen Foto genau einen Vorschlag zurück — mit derselben id, ' +
+      'die über dem Bild steht. Kein Foto auslassen, keine id erfinden.',
+    input_schema: {
+      type: 'object' as const,
+      additionalProperties: false,
+      properties: {
+        vorschlaege: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              id: { type: 'string', description: 'Die id des Fotos, unverändert.' },
+              kategorie: {
+                type: 'string',
+                enum: KATEGORIESCHLUESSEL,
+                description:
+                  'Was die Aufnahme zeigt. Nur eine dieser Kategorien, keine eigene erfinden. ' +
+                  'Bei Zweifel zwischen einer Eckansicht und einem Schadendetail entscheidet, ' +
+                  'ob das ganze Fahrzeug oder ein einzelnes Bauteil im Bild ist.',
+              },
+              beschreibung: {
+                type: 'string',
+                description:
+                  'Die Bildunterschrift fürs Gutachten, sofern teil "kein_teil" ist — sonst wird ' +
+                  'dieses Feld ignoriert und der Satz aus teil/seite/beschaedigungsart ' +
+                  'zusammengesetzt. Deutsch, höchstens 120 Zeichen, ohne Satzzeichen am Ende.',
+              },
+              teil: {
+                type: 'string',
+                enum: teilNamen.length > 0 ? [...teilNamen, 'kein_teil'] : ['kein_teil'],
+                description:
+                  'Das erkannte Fahrzeugteil, exakt aus dem Teile-Lexikon im Auftrag — oder ' +
+                  '"kein_teil", wenn keines der dort gelisteten Teile zu sehen ist.',
+              },
+              seite: {
+                type: 'string',
+                enum: [...SEITEN, 'ohne'],
+                description:
+                  'Die Seite des erkannten Teils — nur wenn das Lexikon für dieses Teil eine ' +
+                  'Seite vorsieht, sonst "ohne".',
+              },
+              beschaedigungsart: {
+                type: 'string',
+                enum: alleBegriffe.length > 0 ? [...alleBegriffe, 'keine'] : ['keine'],
+                description:
+                  'Die Beschädigungsart, exakt einer der im Lexikon für dieses Teil gelisteten ' +
+                  'Begriffe — oder "keine", wenn teil "kein_teil" ist.',
+              },
+              sicherheit: {
+                type: 'integer',
+                description:
+                  'Ganze Zahl von 0 bis 100 — wie sicher die Kategorie ist. Unter 50, wenn ' +
+                  'das Bild unklar ist.',
+              },
             },
-            beschreibung: {
-              type: 'string',
-              description:
-                'Die Bildunterschrift fürs Gutachten. Deutsch, höchstens 120 Zeichen, ' +
-                'ohne Satzzeichen am Ende.',
-            },
-            sicherheit: {
-              type: 'integer',
-              description:
-                'Ganze Zahl von 0 bis 100 — wie sicher die Kategorie ist. Unter 50, wenn ' +
-                'das Bild unklar ist.',
-            },
+            required: [
+              'id',
+              'kategorie',
+              'beschreibung',
+              'teil',
+              'seite',
+              'beschaedigungsart',
+              'sicherheit',
+            ],
           },
-          required: ['id', 'kategorie', 'beschreibung', 'sicherheit'],
         },
       },
+      required: ['vorschlaege'],
     },
-    required: ['vorschlaege'],
-  },
-  strict: true,
+    strict: true,
+  }
 }
 
 const SYSTEM = `Du beschriftest die Fotos eines Kfz-Schadengutachtens. Der
@@ -139,6 +199,13 @@ Grundsätze:
 - Benenne Bauteil und Seite, wenn beides erkennbar ist: "Heckstossfänger
   links, Kratzer über die gesamte Breite".
 - Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
+- Für teil, seite und beschaedigungsart gilt ausschliesslich das
+  Teile-Lexikon weiter unten im Auftrag, sofern eines mitgeschickt wurde.
+  Erkennst du eines der dort gelisteten Teile beschädigt, wähle alle drei
+  Felder nur aus dieser Liste — nie einen eigenen Begriff, auch wenn er
+  naheliegt. Ist kein Teil dort gelistet oder passt keine Beschädigungsart,
+  setze teil auf "kein_teil", seite auf "ohne", beschaedigungsart auf
+  "keine" und beschreibe wie gewohnt frei im Feld beschreibung.
 - Keine Bewertung des Schadens, keine Reparaturempfehlung, keine Vermutung
   über die Ursache. Das ist die Arbeit des Sachverständigen.
 - Keine Einleitung, kein "Dieses Bild zeigt", kein Punkt am Ende.
@@ -181,7 +248,11 @@ export function naechstesPaket<T extends { id: string }>(
  * verfügbare Vorgabe. Fehlen sie, bleibt der knappe Sachstil aus dem
  * Systemtext.
  */
-export function auftragstext(fahrzeug: Fahrzeugkontext, stilbeispiele: string[]): string {
+export function auftragstext(
+  fahrzeug: Fahrzeugkontext,
+  stilbeispiele: string[],
+  teile: readonly FotoTeil[] = [],
+): string {
   const zeilen = [
     'Fahrzeug:',
     `- Marke und Modell: ${fahrzeug.marke ?? '—'} ${fahrzeug.modell ?? ''}`.trimEnd(),
@@ -191,6 +262,17 @@ export function auftragstext(fahrzeug: Fahrzeugkontext, stilbeispiele: string[])
     'Mögliche Kategorien:',
     ...KATEGORIESCHLUESSEL.map((k) => `- ${k} = ${kategoriename(k)}`),
   ]
+
+  if (teile.length > 0) {
+    zeilen.push(
+      '',
+      'Teile-Lexikon (siehe Systemtext — teil/seite/beschaedigungsart nur hieraus wählen):',
+      ...teile.flatMap((teil) => [
+        `- ${teil.name} (Seite: ${teil.seiten.length > 0 ? teil.seiten.join('/') : 'ohne'}):`,
+        ...teil.beschaedigungsarten.map((b) => `  · "${b.begriff}" — ${b.hinweis}`),
+      ]),
+    )
+  }
 
   if (stilbeispiele.length > 0) {
     zeilen.push(
@@ -219,11 +301,12 @@ function kurz(text: string | null, hoechstens = 600): string {
 export async function beschriftePaket(
   fahrzeug: Fahrzeugkontext,
   stilbeispiele: string[],
+  teile: FotoTeil[],
   bilder: Bildpaket[],
 ): Promise<Fotovorschlag[]> {
   if (bilder.length === 0) return []
 
-  const inhalt: InhaltsBlock[] = [{ type: 'text', text: auftragstext(fahrzeug, stilbeispiele) }]
+  const inhalt: InhaltsBlock[] = [{ type: 'text', text: auftragstext(fahrzeug, stilbeispiele, teile) }]
   for (const bild of bilder) {
     // Die Kennung steht **vor** dem Bild: das Modell liest der Reihe nach,
     // und eine Kennung dahinter gehörte optisch schon zum nächsten.
@@ -240,7 +323,7 @@ export async function beschriftePaket(
       modell: MODELLE.schnell,
       system: SYSTEM,
       inhalt,
-      werkzeug: WERKZEUG,
+      werkzeug: bauWerkzeug(teile),
       maxTokens: 4000,
     })
   } catch (fehler) {
@@ -269,7 +352,21 @@ export async function beschriftePaket(
   for (const bild of bilder) {
     const vorschlag = nachId.get(bild.fotoId)
     if (!vorschlag) continue
-    const beschreibung = vorschlag.beschreibung.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)
+
+    // Passt die Kombination zu einem gelisteten Teil, gilt ihr Wortlaut —
+    // sonst bleibt es beim freien Text des Modells (nicht gelistetes Teil,
+    // oder das Modell hat sich trotz Vorgabe nicht an das Lexikon gehalten).
+    const zusammengesetzt = zusammensetzen(
+      teile,
+      vorschlag.teil === 'kein_teil' ? null : vorschlag.teil,
+      istSeite(vorschlag.seite) ? vorschlag.seite : null,
+      vorschlag.beschaedigungsart === 'keine' ? null : vorschlag.beschaedigungsart,
+    )
+
+    const beschreibung = (zusammengesetzt ?? vorschlag.beschreibung)
+      .trim()
+      .replace(/[.;:,\s]+$/, '')
+      .slice(0, 120)
     if (!beschreibung) continue
     vorschlaege.push({
       fotoId: bild.fotoId,
@@ -293,13 +390,14 @@ export async function beschriftePaket(
 export async function beschrifteAlle(
   fahrzeug: Fahrzeugkontext,
   stilbeispiele: string[],
+  teile: FotoTeil[],
   bilder: Bildpaket[],
   melde: (fertig: number, gesamt: number) => void = () => {},
 ): Promise<Fotovorschlag[]> {
   const alle: Fotovorschlag[] = []
   let fertig = 0
   for (const paket of inPakete(bilder)) {
-    alle.push(...(await beschriftePaket(fahrzeug, stilbeispiele, paket)))
+    alle.push(...(await beschriftePaket(fahrzeug, stilbeispiele, teile, paket)))
     fertig += paket.length
     melde(fertig, bilder.length)
   }

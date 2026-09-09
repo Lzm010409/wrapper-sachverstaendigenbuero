@@ -37,6 +37,7 @@ export const RECHTE = [
   'sevdesk.zusammenfuehren',
   'benutzer.verwalten',
   'protokoll.lesen',
+  'fotolexikon.verwalten',
 ] as const
 
 export type Recht = (typeof RECHTE)[number]
@@ -109,6 +110,13 @@ export const BESCHREIBUNGEN: Rechtebeschreibung[] = [
     erklaerung:
       'Die Fehlerliste der Anwendung einsehen. Sie enthält keine personenbezogenen Daten, ' +
       'aber sie zeigt, was im Haus schiefgeht.',
+  },
+  {
+    recht: 'fotolexikon.verwalten',
+    name: 'Fotolexikon pflegen',
+    erklaerung:
+      'Teile, Seiten und Beschädigungsarten für den Fotoassistenten anlegen, ändern und ' +
+      'löschen. Legt fest, in welchem Wortlaut die KI Schäden künftig beschriftet.',
   },
 ]
 
