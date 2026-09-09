@@ -30,6 +30,7 @@ const KOTFLUEGEL: FotoTeil = {
   id: 't1',
   name: 'Kotflügel',
   seiten: ['links', 'rechts'],
+  erkennungsmerkmal: null,
   beschaedigungsarten: [
     { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
     { begriff: 'deformiert', hinweis: 'Blech sichtbar eingedrückt oder verformt' },
@@ -81,6 +82,20 @@ describe('auftragstext', () => {
 
   it('lässt den Teile-Abschnitt weg, wenn kein Lexikon übergeben wird', () => {
     expect(auftragstext(FAHRZEUG, [])).not.toContain('Teile-Lexikon')
+  })
+
+  it('nennt das Erkennungsmerkmal, wenn eines hinterlegt ist', () => {
+    const mitMerkmal: FotoTeil = {
+      ...KOTFLUEGEL,
+      erkennungsmerkmal: 'Sitzt vor der Tür, oberhalb des Reifens, mit Radlauf.',
+    }
+    const text = auftragstext(FAHRZEUG, [], [mitMerkmal])
+    expect(text).toContain('Erkennungsmerkmal: Sitzt vor der Tür, oberhalb des Reifens, mit Radlauf.')
+  })
+
+  it('zeigt keine leere Erkennungsmerkmal-Zeile ohne das Feld', () => {
+    const text = auftragstext(FAHRZEUG, [], [KOTFLUEGEL])
+    expect(text).not.toContain('Erkennungsmerkmal')
   })
 })
 
@@ -173,16 +188,14 @@ describe('beschriftePaket', () => {
     expect(vorschlaege.find((v) => v.fotoId === 'b')?.sicherheit).toBe(0)
   })
 
-  it('setzt den Hausstil-Satz aus teil, seite und beschaedigungsart zusammen', async () => {
+  it('setzt den Hausstil-Satz aus einem Treffer zusammen', async () => {
     ruf.mockResolvedValue(
       antwort([
         {
           id: 'a',
           kategorie: 'schaden',
           beschreibung: 'wird ignoriert',
-          teil: 'Kotflügel',
-          seite: 'rechts',
-          beschaedigungsart: 'deformiert',
+          treffer: [{ teil: 'Kotflügel', seite: 'rechts', beschaedigungsart: 'deformiert' }],
           sicherheit: 90,
         },
       ]),
@@ -193,6 +206,34 @@ describe('beschriftePaket', () => {
     expect(vorschlag?.beschreibung).toBe('Kotflügel rechts deformiert')
   })
 
+  it('verbindet zwei Treffer eines Fotos zu einem Satz', async () => {
+    const TUER: FotoTeil = {
+      id: 't2',
+      name: 'Tür',
+      seiten: ['links', 'rechts'],
+      erkennungsmerkmal: null,
+      beschaedigungsarten: [{ begriff: 'verkratzt', hinweis: 'nur oberflächlicher Kratzer' }],
+    }
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          treffer: [
+            { teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' },
+            { teil: 'Tür', seite: 'links', beschaedigungsart: 'verkratzt' },
+          ],
+          sicherheit: 85,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL, TUER], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Kotflügel links deformiert, Tür links verkratzt')
+  })
+
   it('fällt auf den freien Text zurück, wenn kein Teil erkannt wurde', async () => {
     ruf.mockResolvedValue(
       antwort([
@@ -200,9 +241,7 @@ describe('beschriftePaket', () => {
           id: 'a',
           kategorie: 'schaden',
           beschreibung: 'Dachhimmel verschmutzt',
-          teil: 'kein_teil',
-          seite: 'ohne',
-          beschaedigungsart: 'keine',
+          treffer: [],
           sicherheit: 70,
         },
       ]),
@@ -223,9 +262,7 @@ describe('beschriftePaket', () => {
           id: 'a',
           kategorie: 'schaden',
           beschreibung: 'Kotflügel vorne beschädigt',
-          teil: 'Kotflügel',
-          seite: 'vorne',
-          beschaedigungsart: 'deformiert',
+          treffer: [{ teil: 'Kotflügel', seite: 'vorne', beschaedigungsart: 'deformiert' }],
           sicherheit: 70,
         },
       ]),
@@ -236,9 +273,8 @@ describe('beschriftePaket', () => {
     expect(vorschlag?.beschreibung).toBe('Kotflügel vorne beschädigt')
   })
 
-  it('formuliert frei, wenn die Antwort teil/seite/beschaedigungsart gar nicht enthält', async () => {
-    // Die Sentinel-Vorbelegung im Zod-Schema greift — dieselbe Beschreibung
-    // wie vor dem Lexikon.
+  it('formuliert frei, wenn die Antwort gar kein treffer-Feld enthält', async () => {
+    // Der Zod-Default `[]` greift — dieselbe Beschreibung wie vor dem Lexikon.
     ruf.mockResolvedValue(
       antwort([{ id: 'a', kategorie: 'schaden', beschreibung: 'Heckschürze verkratzt', sicherheit: 80 }]),
     )

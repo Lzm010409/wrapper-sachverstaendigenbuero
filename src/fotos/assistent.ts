@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { KATEGORIESCHLUESSEL, kategoriename, type Kategorie } from './kategorien'
 import { verwendungFuer, type Fotovorschlag } from './vorschlag'
-import { istSeite, SEITEN, zusammensetzen, type FotoTeil } from './lexikon'
+import { istSeite, SEITEN, zusammensetzen, type FotoTeil, type Rohtreffer } from './lexikon'
 import { MODELLE, rufeMitWerkzeugAuf, type InhaltsBlock } from '@/ki/client'
 import { protokolliereWarnung } from '@/protokoll'
 
@@ -26,10 +26,12 @@ import { protokolliereWarnung } from '@/protokoll'
  *
  * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut.** Ist im Haus ein
  * Teil hinterlegt (Seite, Beschädigungsarten mit Begriff), muss das Modell
- * bei einem erkannten Teil Teil, Seite und Beschädigungsart nur aus dieser
- * Liste wählen — der Satz wird serverseitig zusammengesetzt (`zusammensetzen`
- * in `lexikon.ts`), nicht vom Modell formuliert. Ein nicht gelistetes Teil
- * bleibt freier Text wie zuvor.
+ * für jedes erkannte Teil einen eigenen Treffer (Teil, Seite,
+ * Beschädigungsart) liefern, nur aus dieser Liste — bis zu drei je Foto,
+ * falls mehrere Teile beschädigt sind. Der Satz wird serverseitig aus allen
+ * gültigen Treffern zusammengesetzt (`zusammensetzen` in `lexikon.ts`),
+ * nicht vom Modell formuliert. Ein nicht gelistetes Teil bleibt freier Text
+ * wie zuvor.
  *
  * **Was bei einem Fehler passiert.** Ein gescheitertes Paket nimmt die
  * übrigen nicht mit; seine Fotos bleiben schlicht ohne Vorschlag. Der
@@ -63,6 +65,12 @@ export interface Bildpaket {
   typ: 'image/jpeg' | 'image/png'
 }
 
+const trefferSchema = z.object({
+  teil: z.string(),
+  seite: z.string(),
+  beschaedigungsart: z.string(),
+})
+
 const vorschlagSchema = z.object({
   id: z.string(),
   kategorie: z.enum(KATEGORIESCHLUESSEL as [Kategorie, ...Kategorie[]]),
@@ -72,11 +80,11 @@ const vorschlagSchema = z.object({
     überhaupt zulässig sind, hängt vom `teile`-Argument des jeweiligen
     Aufrufs ab, nicht von einem festen Schema. Die Prüfung übernimmt
     `zusammensetzen()` in `beschriftePaket` — dort steht auch das aktuelle
-    Lexikon zur Verfügung.
+    Lexikon zur Verfügung. Grosszügig statt hart begrenzt: `safeParse` soll
+    bei einem Ausreisser nicht das ganze Paket kippen — die in `bauWerkzeug`
+    beschriebene Drei-Grenze wird erst danach per `.slice(0, 3)` erzwungen.
   */
-  teil: z.string().default('kein_teil'),
-  seite: z.string().default('ohne'),
-  beschaedigungsart: z.string().default('keine'),
+  treffer: z.array(trefferSchema).default([]),
   /*
     Geklemmt, nicht abgelehnt. `strict` kann `minimum`/`maximum` nicht
     erzwingen (siehe WERKZEUG), die Grenze steht also nur im
@@ -92,24 +100,58 @@ const antwortSchema = z.object({ vorschlaege: z.array(vorschlagSchema) })
 /**
  * Die Werkzeugdefinition des Fotoassistenten.
  *
- * **Warum eine Funktion und keine Konstante.** `teil`, `seite` und
- * `beschaedigungsart` dürfen nur Werte aus dem Fotolexikon annehmen — und das
- * Lexikon steht in der Datenbank, ändert sich also zur Laufzeit. Ohne
- * Lexikoneintrag bleibt für beide Felder nur der jeweilige Sentinel-Wert
- * (`kein_teil`, `keine`) übrig; ein leeres `enum: []` ist kein gültiges JSON
- * Schema.
+ * **Warum eine Funktion und keine Konstante.** `treffer.teil` und
+ * `treffer.beschaedigungsart` dürfen nur Werte aus dem Fotolexikon annehmen
+ * — und das Lexikon steht in der Datenbank, ändert sich also zur Laufzeit.
+ * Ohne Lexikoneintrag entfällt das Feld `treffer` ganz; ein leeres
+ * `enum: []` ist kein gültiges JSON Schema.
  *
  * **`strict: true` kennt nur einen Teil von JSON Schema.** Zahlengrenzen
  * (`minimum`, `maximum`, `multipleOf`), Textlängen, Muster und
- * Mengenangaben für Listen weist die Schnittstelle mit einem 400 ab — der
- * Aufruf kommt gar nicht erst beim Modell an (vgl. `PRUEF_WERKZEUG` in
- * `wbw/pruefung.ts`, wo derselbe Fehler am 08.09.2026 auffiel). Grenzen
- * gehören deshalb in den Beschreibungstext, und die Nachprüfung macht das
- * Zod-Schema oben.
+ * Mengenangaben für Listen (`minItems`/`maxItems`) weist die Schnittstelle
+ * mit einem 400 ab — der Aufruf kommt gar nicht erst beim Modell an (vgl.
+ * `PRUEF_WERKZEUG` in `wbw/pruefung.ts`, wo derselbe Fehler am 08.09.2026
+ * auffiel). Grenzen gehören deshalb in den Beschreibungstext; die
+ * Drei-Treffer-Grenze für `treffer` erzwingt erst `beschriftePaket` per
+ * `.slice(0, 3)`, nicht dieses Schema.
  */
 function bauWerkzeug(teile: readonly FotoTeil[]) {
   const teilNamen = teile.map((t) => t.name)
   const alleBegriffe = [...new Set(teile.flatMap((t) => t.beschaedigungsarten.map((b) => b.begriff)))]
+
+  const trefferEigenschaften = {
+    type: 'array' as const,
+    description:
+      'Erkannte Fahrzeugteile aus dem Teile-Lexikon im Auftrag, je eines pro sichtbarem ' +
+      'Schaden. Leer lassen, wenn keines der gelisteten Teile zu sehen ist — dann zählt ' +
+      'allein das Feld beschreibung. Höchstens drei Einträge; mehr passt ohnehin nicht in ' +
+      'eine Bildunterschrift.',
+    items: {
+      type: 'object' as const,
+      additionalProperties: false,
+      properties: {
+        teil: {
+          type: 'string',
+          enum: teilNamen,
+          description: 'Das erkannte Fahrzeugteil, exakt aus dem Teile-Lexikon im Auftrag.',
+        },
+        seite: {
+          type: 'string',
+          enum: SEITEN,
+          description:
+            'Die Seite dieses Teils — nur wenn das Lexikon für dieses Teil eine Seite vorsieht.',
+        },
+        beschaedigungsart: {
+          type: 'string',
+          enum: alleBegriffe,
+          description:
+            'Die Beschädigungsart, exakt einer der im Lexikon für DIESES Teil gelisteten ' +
+            'Begriffe.',
+        },
+      },
+      required: ['teil', 'seite', 'beschaedigungsart'],
+    },
+  }
 
   return {
     name: 'fotos_beschriften',
@@ -138,31 +180,11 @@ function bauWerkzeug(teile: readonly FotoTeil[]) {
               beschreibung: {
                 type: 'string',
                 description:
-                  'Die Bildunterschrift fürs Gutachten, sofern teil "kein_teil" ist — sonst wird ' +
-                  'dieses Feld ignoriert und der Satz aus teil/seite/beschaedigungsart ' +
-                  'zusammengesetzt. Deutsch, höchstens 120 Zeichen, ohne Satzzeichen am Ende.',
+                  'Die Bildunterschrift fürs Gutachten, sofern treffer leer ist — sonst wird ' +
+                  'dieses Feld ignoriert und der Satz aus den treffer-Einträgen zusammengesetzt. ' +
+                  'Deutsch, höchstens 120 Zeichen, ohne Satzzeichen am Ende.',
               },
-              teil: {
-                type: 'string',
-                enum: teilNamen.length > 0 ? [...teilNamen, 'kein_teil'] : ['kein_teil'],
-                description:
-                  'Das erkannte Fahrzeugteil, exakt aus dem Teile-Lexikon im Auftrag — oder ' +
-                  '"kein_teil", wenn keines der dort gelisteten Teile zu sehen ist.',
-              },
-              seite: {
-                type: 'string',
-                enum: [...SEITEN, 'ohne'],
-                description:
-                  'Die Seite des erkannten Teils — nur wenn das Lexikon für dieses Teil eine ' +
-                  'Seite vorsieht, sonst "ohne".',
-              },
-              beschaedigungsart: {
-                type: 'string',
-                enum: alleBegriffe.length > 0 ? [...alleBegriffe, 'keine'] : ['keine'],
-                description:
-                  'Die Beschädigungsart, exakt einer der im Lexikon für dieses Teil gelisteten ' +
-                  'Begriffe — oder "keine", wenn teil "kein_teil" ist.',
-              },
+              ...(teilNamen.length > 0 ? { treffer: trefferEigenschaften } : {}),
               sicherheit: {
                 type: 'integer',
                 description:
@@ -174,9 +196,7 @@ function bauWerkzeug(teile: readonly FotoTeil[]) {
               'id',
               'kategorie',
               'beschreibung',
-              'teil',
-              'seite',
-              'beschaedigungsart',
+              ...(teilNamen.length > 0 ? ['treffer'] : []),
               'sicherheit',
             ],
           },
@@ -199,13 +219,12 @@ Grundsätze:
 - Benenne Bauteil und Seite, wenn beides erkennbar ist: "Heckstossfänger
   links, Kratzer über die gesamte Breite".
 - Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
-- Für teil, seite und beschaedigungsart gilt ausschliesslich das
-  Teile-Lexikon weiter unten im Auftrag, sofern eines mitgeschickt wurde.
-  Erkennst du eines der dort gelisteten Teile beschädigt, wähle alle drei
-  Felder nur aus dieser Liste — nie einen eigenen Begriff, auch wenn er
-  naheliegt. Ist kein Teil dort gelistet oder passt keine Beschädigungsart,
-  setze teil auf "kein_teil", seite auf "ohne", beschaedigungsart auf
-  "keine" und beschreibe wie gewohnt frei im Feld beschreibung.
+- Für treffer gilt ausschliesslich das Teile-Lexikon weiter unten im
+  Auftrag, sofern eines mitgeschickt wurde. Erkennst du eines oder mehrere
+  der dort gelisteten Teile beschädigt, gib zu jedem einen eigenen Eintrag
+  in treffer zurück (höchstens drei) — nie einen eigenen Begriff, auch wenn
+  er naheliegt. Ist keines der gelisteten Teile zu sehen, lass treffer leer
+  und beschreibe wie gewohnt frei im Feld beschreibung.
 - Keine Bewertung des Schadens, keine Reparaturempfehlung, keine Vermutung
   über die Ursache. Das ist die Arbeit des Sachverständigen.
 - Keine Einleitung, kein "Dieses Bild zeigt", kein Punkt am Ende.
@@ -269,6 +288,7 @@ export function auftragstext(
       'Teile-Lexikon (siehe Systemtext — teil/seite/beschaedigungsart nur hieraus wählen):',
       ...teile.flatMap((teil) => [
         `- ${teil.name} (Seite: ${teil.seiten.length > 0 ? teil.seiten.join('/') : 'ohne'}):`,
+        ...(teil.erkennungsmerkmal ? [`  Erkennungsmerkmal: ${teil.erkennungsmerkmal}`] : []),
         ...teil.beschaedigungsarten.map((b) => `  · "${b.begriff}" — ${b.hinweis}`),
       ]),
     )
@@ -353,15 +373,16 @@ export async function beschriftePaket(
     const vorschlag = nachId.get(bild.fotoId)
     if (!vorschlag) continue
 
-    // Passt die Kombination zu einem gelisteten Teil, gilt ihr Wortlaut —
-    // sonst bleibt es beim freien Text des Modells (nicht gelistetes Teil,
+    // Passt ein Treffer zu einem gelisteten Teil, gilt sein Wortlaut —
+    // mehrere gültige Treffer werden zu einem Satz verbunden. Bleibt keiner
+    // übrig, bleibt es beim freien Text des Modells (kein gelistetes Teil,
     // oder das Modell hat sich trotz Vorgabe nicht an das Lexikon gehalten).
-    const zusammengesetzt = zusammensetzen(
-      teile,
-      vorschlag.teil === 'kein_teil' ? null : vorschlag.teil,
-      istSeite(vorschlag.seite) ? vorschlag.seite : null,
-      vorschlag.beschaedigungsart === 'keine' ? null : vorschlag.beschaedigungsart,
-    )
+    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 3).map((t) => ({
+      teil: t.teil,
+      seite: istSeite(t.seite) ? t.seite : null,
+      begriff: t.beschaedigungsart,
+    }))
+    const zusammengesetzt = zusammensetzen(teile, rohtreffer)
 
     const beschreibung = (zusammengesetzt ?? vorschlag.beschreibung)
       .trim()

@@ -17,6 +17,7 @@ import type { Aktionsergebnis } from '@/melden/typen'
 export interface FotoTeilEingabe {
   name: string
   seiten: string[]
+  erkennungsmerkmal: string
   beschaedigungsarten: { begriff: string; hinweis: string }[]
 }
 
@@ -24,11 +25,16 @@ export interface FotoTeilEingabe {
 function geputzt(eingabe: FotoTeilEingabe): {
   name: string
   seiten: Seite[]
+  erkennungsmerkmal: string | null
   beschaedigungsarten: Beschaedigungsart[]
 } {
+  const erkennungsmerkmal = eingabe.erkennungsmerkmal.trim()
   return {
     name: eingabe.name.trim(),
     seiten: eingabe.seiten.filter(istSeite),
+    // Leer heisst „kein Merkmal hinterlegt" — dafür steht `null`, kein
+    // leerer String in der Spalte.
+    erkennungsmerkmal: erkennungsmerkmal.length > 0 ? erkennungsmerkmal : null,
     beschaedigungsarten: eingabe.beschaedigungsarten
       .map((b) => ({ begriff: b.begriff.trim(), hinweis: b.hinweis.trim() }))
       .filter((b) => b.begriff.length > 0),

@@ -120,6 +120,13 @@
       "when": 1788953715873,
       "tag": "0016_superb_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788958968219,
+      "tag": "0017_rich_black_widow",
+      "breakpoints": true
     }
   ]
 }

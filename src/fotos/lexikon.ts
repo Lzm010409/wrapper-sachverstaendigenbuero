@@ -38,37 +38,57 @@ export interface FotoTeil {
   name: string
   /** Welche Seiten für dieses Teil gelten. Leer heisst: das Teil hat keine Seite. */
   seiten: Seite[]
+  /** Wie sich das Teil optisch von Nachbarteilen abgrenzt (z. B. Kotflügel vs. Tür). */
+  erkennungsmerkmal: string | null
   beschaedigungsarten: Beschaedigungsart[]
 }
 
-/**
- * Setzt aus Teil, Seite und Beschädigungsart den Hausstil-Satz zusammen.
- *
- * Gibt `null`, wenn die Kombination nicht zu einem gelisteten Teil passt —
- * das ist für den Aufrufer das Signal, auf den freien Text des Modells
- * zurückzufallen, statt einen falschen oder erfundenen Satz zu übernehmen.
- * Teil und Begriff müssen dafür Zeichen für Zeichen zu einem Lexikoneintrag
- * passen: beide kommen aus einer Auswahlliste, die dem Modell vorgegeben
- * wurde, ein Abweichen heisst also, dass sich das Modell nicht daran gehalten
- * hat.
- */
-export function zusammensetzen(
-  teile: readonly FotoTeil[],
-  teilName: string | null,
-  seite: Seite | null,
-  begriff: string | null,
-): string | null {
-  if (!teilName || !begriff) return null
+/** Ein roher Treffer, wie ihn das Modell für ein Foto liefert — vor der Prüfung. */
+export interface Rohtreffer {
+  teil: string
+  seite: Seite | null
+  begriff: string
+}
 
-  const teil = teile.find((t) => t.name === teilName)
+/**
+ * Prüft einen einzelnen Treffer gegen das Lexikon und baut seine Klausel.
+ *
+ * Gibt `null`, wenn der Treffer nicht zu einem gelisteten Teil passt — das
+ * ist das Signal, genau diesen Treffer zu verwerfen, ohne die übrigen
+ * anzutasten. Teil und Begriff müssen dafür Zeichen für Zeichen zu einem
+ * Lexikoneintrag passen: beide kommen aus einer Auswahlliste, die dem
+ * Modell vorgegeben wurde, ein Abweichen heisst also, dass sich das Modell
+ * nicht daran gehalten hat.
+ */
+function klausel(teile: readonly FotoTeil[], treffer: Rohtreffer): string | null {
+  const teil = teile.find((t) => t.name === treffer.teil)
   if (!teil) return null
-  if (!teil.beschaedigungsarten.some((b) => b.begriff === begriff)) return null
+  if (!teil.beschaedigungsarten.some((b) => b.begriff === treffer.begriff)) return null
 
   // Ein Teil ohne Seitenbezug (z. B. eine Heckverkleidung) bekommt keine
   // Seite in den Satz — eine trotzdem mitgelieferte Seite wird ignoriert,
   // statt die sonst gültige Kombination zu verwerfen.
-  if (teil.seiten.length === 0) return `${teil.name} ${begriff}`
+  if (teil.seiten.length === 0) return `${teil.name} ${treffer.begriff}`
 
-  if (!seite || !teil.seiten.includes(seite)) return null
-  return `${teil.name} ${seite} ${begriff}`
+  if (!treffer.seite || !teil.seiten.includes(treffer.seite)) return null
+  return `${teil.name} ${treffer.seite} ${treffer.begriff}`
+}
+
+/**
+ * Setzt aus mehreren Teil/Seite/Beschädigungsart-Treffern den Hausstil-Satz
+ * zusammen — eine Klausel je gültigem Treffer, durch Komma getrennt.
+ *
+ * Jeder Treffer wird einzeln geprüft: passt er nicht zu einem gelisteten
+ * Teil, zur zugehörigen Beschädigungsart oder zur erlaubten Seite, fällt
+ * **nur dieser eine Treffer** heraus — nicht die übrigen. Bleibt am Ende
+ * kein gültiger Treffer übrig (auch bei einem leeren Array), gibt die
+ * Funktion `null` zurück — das Signal für den Aufrufer, auf den freien Text
+ * des Modells zurückzufallen.
+ */
+export function zusammensetzen(
+  teile: readonly FotoTeil[],
+  treffer: readonly Rohtreffer[],
+): string | null {
+  const klauseln = treffer.map((t) => klausel(teile, t)).filter((k): k is string => k !== null)
+  return klauseln.length > 0 ? klauseln.join(', ') : null
 }

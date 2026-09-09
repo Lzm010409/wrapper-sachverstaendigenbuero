@@ -37,6 +37,9 @@ import { ausErgebnis, fehler as alsFehler, info } from '@/melden/typen'
 
 const ABSTAND_MS = 2000
 
+/** Unterhalb dieser Sicherheit fällt ein Vorschlag im Prüfmodus optisch auf. */
+const UNSICHER_SCHWELLE = 50
+
 type Erledigt = Record<string, 'uebernommen' | 'verworfen'>
 
 export function Fotoassistent({
@@ -172,7 +175,13 @@ export function Fotoassistent({
         </div>
         <div className="assistent-knoepfe">
           {offene.length > 0 ? (
-            <button type="button" className="knopf haupt" onClick={() => setzePruefung(offene)}>
+            <button
+              type="button"
+              className="knopf haupt"
+              // Die unsichersten Vorschläge zuerst — im Prüfmodus stehen sie
+              // sonst am Ende, wo sie am ehesten überflogen werden.
+              onClick={() => setzePruefung([...offene].sort((a, b) => a.sicherheit - b.sicherheit))}
+            >
               {offene.length} Vorschläge durchgehen
             </button>
           ) : null}
@@ -329,7 +338,11 @@ function Pruefmodus({
             ›
           </button>
           <span className="foto-buehne-titel">{kategoriename(vorschlag.kategorie)}</span>
-          <span className="unterzeile">Sicherheit {vorschlag.sicherheit} %</span>
+          {vorschlag.sicherheit < UNSICHER_SCHWELLE ? (
+            <span className="marke-pille m-warn">Sicherheit {vorschlag.sicherheit} %</span>
+          ) : (
+            <span className="unterzeile">Sicherheit {vorschlag.sicherheit} %</span>
+          )}
           <button type="button" onClick={schliesse} aria-label="Schliessen">
             ✕
           </button>

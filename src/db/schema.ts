@@ -518,6 +518,8 @@ export const fotoTeil = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     name: text().notNull(),
     seiten: fotoTeilSeiteEnum().array().notNull().default(sql`'{}'::foto_teil_seite[]`),
+    /** Wie sich dieses Teil optisch von Nachbarteilen abgrenzt — frei für den Auftragstext. */
+    erkennungsmerkmal: text(),
     /**
      * `[{ begriff: string, hinweis: string }]` — geprüft beim Lesen mit Zod,
      * siehe `src/fotos/lexikon-ablage.ts`.

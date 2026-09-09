@@ -32,6 +32,7 @@ const LEERE_ZEILE: ZeileEingabe = { begriff: '', hinweis: '' }
 export function TeilFormular({ teil }: { teil?: FotoTeil }) {
   const [bearbeiten, setzeBearbeiten] = useState(!teil)
   const [name, setzeName] = useState(teil?.name ?? '')
+  const [erkennungsmerkmal, setzeErkennungsmerkmal] = useState(teil?.erkennungsmerkmal ?? '')
   const [seiten, setzeSeiten] = useState<Seite[]>(teil?.seiten ?? [])
   const [zeilen, setzeZeilen] = useState<ZeileEingabe[]>(
     teil && teil.beschaedigungsarten.length > 0 ? teil.beschaedigungsarten : [LEERE_ZEILE],
@@ -53,13 +54,19 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
 
   function speichere() {
     starte(async () => {
-      const ergebnis = await speichereFotoTeil(teil?.id, { name, seiten, beschaedigungsarten: zeilen })
+      const ergebnis = await speichereFotoTeil(teil?.id, {
+        name,
+        seiten,
+        erkennungsmerkmal,
+        beschaedigungsarten: zeilen,
+      })
       const meldung = ausErgebnis(ergebnis)
       if (meldung) melde(meldung)
       if (!ergebnis.fehler) {
         if (!teil) {
           // Neuanlage geglückt: Maske für den nächsten Eintrag leeren.
           setzeName('')
+          setzeErkennungsmerkmal('')
           setzeSeiten([])
           setzeZeilen([LEERE_ZEILE])
         } else {
@@ -84,6 +91,7 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
   function verwerfe() {
     if (!teil) return
     setzeName(teil.name)
+    setzeErkennungsmerkmal(teil.erkennungsmerkmal ?? '')
     setzeSeiten(teil.seiten)
     setzeZeilen(teil.beschaedigungsarten.length > 0 ? teil.beschaedigungsarten : [LEERE_ZEILE])
     setzeBearbeiten(false)
@@ -123,6 +131,18 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
           disabled={laeuft}
           placeholder="z. B. Seitenwand"
           onChange={(e) => setzeName(e.target.value)}
+        />
+      </div>
+
+      <div className="feld" style={{ marginTop: 10 }}>
+        <label htmlFor={`teil-merkmal-${teil?.id ?? 'neu'}`}>Erkennungsmerkmal</label>
+        <input
+          id={`teil-merkmal-${teil?.id ?? 'neu'}`}
+          type="text"
+          value={erkennungsmerkmal}
+          disabled={laeuft}
+          placeholder="Wie unterscheidet sich dieses Teil optisch von Nachbarteilen? Optional, aber hilfreich bei leicht verwechselbaren Teilen."
+          onChange={(e) => setzeErkennungsmerkmal(e.target.value)}
         />
       </div>
 

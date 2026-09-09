@@ -21,6 +21,8 @@ const beschaedigungsartSchema = z.object({ begriff: z.string(), hinweis: z.strin
 export interface FotoTeilEingabe {
   name: string
   seiten: Seite[]
+  /** Wie sich das Teil optisch von Nachbarteilen abgrenzt. Optional. */
+  erkennungsmerkmal: string | null
   beschaedigungsarten: Beschaedigungsart[]
 }
 
@@ -49,6 +51,7 @@ export async function ladeLexikon(): Promise<FotoTeil[]> {
       // Enum-Werte aus Postgres — schon durch `fotoTeilSeiteEnum` begrenzt,
       // eine erneute Prüfung wäre nur eine Wiederholung derselben Garantie.
       seiten: z.seiten.filter((s): s is Seite => (SEITEN as readonly string[]).includes(s)),
+      erkennungsmerkmal: z.erkennungsmerkmal,
       beschaedigungsarten,
     }
   })
