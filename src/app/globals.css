@@ -3221,6 +3221,111 @@ body {
   .foto-buehne-bild img { max-height: 58vh; }
 }
 
+/* ------------------------------------------------------------------ *
+ * Fotoassistent
+ *
+ * Der Kasten sitzt ueber dem Raster, nicht darin: er gehoert zum ganzen
+ * Fotosatz, nicht zu einem Bild. Flaeche `--surface-alt` statt `--surface`,
+ * damit er sich vom Raster abhebt, ohne einen zweiten Rahmen zu brauchen.
+ *
+ * Der Pruefmodus benutzt die vorhandene `.foto-buehne` weiter. Ein zweiter
+ * Dialog mit eigener Abdunklung, eigener Breite und eigenem Verhalten waere
+ * dieselbe Sache ein zweites Mal — und beim naechsten Umbau die Stelle, die
+ * jemand vergisst.
+ * ------------------------------------------------------------------ */
+
+.assistent {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.assistent-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.assistent-knoepfe {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/*
+  Der Pflichtfotosatz als Reihe von Pillen. Die Bedeutung haengt nicht an
+  der Farbe allein: das Zeichen davor sagt dasselbe noch einmal, und fuer
+  den Screenreader steht "fehlt" bzw. "vorhanden" ausgeschrieben dahinter.
+*/
+.pflichtsatz {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.pflichtsatz li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-mid);
+}
+
+.pflichtsatz li.da span[aria-hidden] {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.pflichtsatz li.fehlt {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/*
+  Im Pruefmodus stehen Feld, Haekchen und Knoepfe untereinander statt in
+  einer Reihe: das Beschreibungsfeld braucht die volle Breite, und die
+  Knoepfe sollen immer an derselben Stelle liegen, damit der Durchgang zur
+  Gewohnheit wird und man nicht bei jedem Bild sucht.
+*/
+.assistent-formular {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistent-formular .foto-haekchen,
+.assistent-formular .assistent-knoepfe {
+  width: 100%;
+}
+
+/*
+  `.foto-beschriftung .feld` traegt `flex: 1 1 260px` — sinnvoll in der
+  Reihe der Grossansicht, wo 260px die **Breite** meinen. Hier steht das
+  Formular als Spalte, und dieselbe Angabe wurde zur Hoehe: das Feld wuchs
+  auf 260 Pixel und riss ein leeres Loch zwischen Beschreibung und Haken.
+*/
+.assistent-formular .feld {
+  flex: 0 0 auto;
+}
+
+.assistent-formular .assistent-knoepfe {
+  justify-content: flex-end;
+}
+
 /* Benutzerverwaltung: eine Zeile je Recht */
 .recht-zeile {
   display: flex;

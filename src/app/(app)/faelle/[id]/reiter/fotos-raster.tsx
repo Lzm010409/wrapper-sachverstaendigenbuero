@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import type { Foto } from '@/fotos/ansicht'
 import { beschrifteFoto } from '@/fotos/aktionen'
+import type { Fotoanalyse } from '@/fotos/vorschlag'
+import { Fotoassistent } from './foto-assistent'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis, fehler as alsFehler } from '@/melden/typen'
 
@@ -43,10 +45,14 @@ export function Fotoraster({
   fallId,
   fotos,
   schreibenErlaubt,
+  analyse,
+  kiEingerichtet,
 }: {
   fallId: string
   fotos: Foto[]
   schreibenErlaubt: boolean
+  analyse: Fotoanalyse | null
+  kiEingerichtet: boolean
 }) {
   const [filter, setzeFilter] = useState<Filter>('alle')
   const [offen, setzeOffen] = useState<number | null>(null)
@@ -67,6 +73,21 @@ export function Fotoraster({
 
   return (
     <div>
+      {/*
+        Der Schlüssel hängt am Zeitpunkt des Laufs: nach einer neuen Analyse
+        baut React den Assistenten neu auf, und sein innerer Stand — was
+        übernommen und was verworfen wurde — beginnt von vorn. Ohne das
+        stünde nach dem zweiten Lauf noch der Fortschritt des ersten da.
+      */}
+      <Fotoassistent
+        key={analyse?.erstelltAm ?? 'ohne-analyse'}
+        fallId={fallId}
+        fotos={fotos}
+        analyse={analyse}
+        schreibenErlaubt={schreibenErlaubt}
+        kiEingerichtet={kiEingerichtet}
+      />
+
       <div className="foto-leiste">
         <div className="foto-filter" role="group" aria-label="Fotos filtern">
           {FILTER.map((f) => {

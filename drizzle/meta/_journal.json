@@ -85,6 +85,13 @@
       "when": 1788855567341,
       "tag": "0011_wbw_zyklen",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788933259135,
+      "tag": "0012_foto_analyse",
+      "breakpoints": true
     }
   ]
 }

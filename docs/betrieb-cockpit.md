@@ -434,6 +434,44 @@ der Benutzer bekommt eine Meldung darüber.
 Nach einem Neustart ist der Speicher leer und füllt sich beim nächsten
 Öffnen wieder; das kostet einmal etwa anderthalb Sekunden je Reiteraufruf.
 
+## Der Fotoassistent
+
+Im Reiter **Fotos** steht über dem Raster der Kasten „Fotoassistent". Ein
+Klick auf **Fotos analysieren** lässt das Sprachmodell jedes Bild ansehen und
+zu jedem einen Beschreibungsvorschlag samt Kategorie liefern.
+
+**Übernommen wird nichts von allein.** Die Vorschläge stehen still da, bis
+jemand sie durchgeht: **Vorschläge durchgehen** öffnet den Prüfmodus — ein
+Bild gross, der Vorschlag darunter, Pfeiltasten zum Blättern, die
+Eingabetaste übernimmt. Erst dieses Übernehmen schreibt nach autoiXpert, und
+zwar nur mit dem Recht „Nach autoiXpert zurückschreiben" **und**
+`AUTOIXPERT_SCHREIBEN=erlaubt`. Ohne beides stehen die Vorschläge lesbar da
+und der Knopf ist gesperrt.
+
+**Vorgeschlagen wird nur, wo noch nichts steht.** Was der Sachverständige
+selbst beschriftet hat, bleibt unangetastet — analysiert wird es trotzdem,
+denn sonst wüsste die Lückenmeldung nichts davon.
+
+**Die Zeile mit den Pillen ist der Pflichtfotosatz:** Kennzeichen,
+Fahrgestellnummer, Tachostand, die vier Fahrzeugecken, Schadendetail,
+Innenraum und Reifen. Ein Kreuz auf gelbem Grund heisst: zu dieser Aufnahme
+gibt es im Fotosatz kein Bild.
+
+**Was das kostet.** Analysiert wird auf dem Vorschaubild (400 × 300), also
+rund 160 Bildtoken je Foto. Ein Fall mit 67 Fotos liegt bei etwa 11.000
+Token auf dem schnellen Modell — Bruchteile eines Cents. Der Lauf holt ein
+Paket von zwölf Bildern je Aufruf; der Fortschritt steht im Knopf.
+
+**Was dabei das Haus verlässt.** Die Vorschaubilder gehen an Anthropic —
+dasselbe Bild, das im Raster steht, nur eben ausser Haus. Bei 400 × 300
+Bildpunkten sind Kennzeichen und Fahrgestellnummer darauf nicht lesbar, und
+das Modell ist angewiesen, keine Zahlen zu nennen, die es nicht sieht. Wer
+das grundsätzlich nicht will, lässt den Knopf stehen: ohne ihn geht kein
+einziges Bild hinaus.
+
+**Ohne `ANTHROPIC_API_KEY`** ist der Knopf gesperrt, mit einem Hinweis
+darauf. Der Fotos-Reiter selbst funktioniert davon unberührt weiter.
+
 ## Wenn ein Benutzer einen Fehler meldet
 
 Der Benutzer sieht auf der Fehlerseite eine Kennung, etwa `2512298898`. Sie

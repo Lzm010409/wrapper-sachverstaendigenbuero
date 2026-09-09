@@ -443,6 +443,43 @@ export const wbwLauf = pgTable(
 )
 
 /**
+ * Was der Fotoassistent zu den Bildern eines Falls vorgeschlagen hat.
+ *
+ * **Eine Zeile je Fall, nicht je Lauf.** Ein zweiter Lauf ersetzt den
+ * ersten: die Vorschläge sind kein Nachweis, sondern ein Arbeitsstand, und
+ * zwei Stände nebeneinander wären nur die Frage, welcher gilt. Was
+ * übernommen wurde, steht ohnehin in autoiXpert — dort, wo es hingehört.
+ *
+ * `vorschlaege` enthält **alle** analysierten Fotos, auch die längst
+ * beschrifteten. Der Prüfmodus zeigt davon nur die offenen; die
+ * Vollständigkeitsprüfung braucht dagegen die Kategorie jedes Bildes, sonst
+ * meldete sie eine Lücke, die der Sachverständige selbst schon gefüllt hat.
+ */
+export const fotoAnalyse = pgTable(
+  'foto_analyse',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    fallId: uuid()
+      .notNull()
+      .references(() => fall.id, { onDelete: 'cascade' }),
+    /** Ein Eintrag je Foto: Kategorie, Beschreibungsvorschlag, Häkchen, Stand. */
+    vorschlaege: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /**
+     * Die Fotos, zu denen kein Vorschlag zustande kam — als Liste ihrer IDs,
+     * nicht als Zahl. Der Grund ist der Lauf selbst: er holt sich Paket für
+     * Paket die Fotos, die noch keinen Vorschlag haben. Stünde hier bloss
+     * eine Anzahl, käme ein Bild, das sich nicht laden lässt, in jedem
+     * weiteren Paket wieder mit und verbrauchte dort einen Platz — vierzig
+     * Runden lang.
+     */
+    ohneVorschlag: jsonb().notNull().default(sql`'[]'::jsonb`),
+    angestossenVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('foto_analyse_fall_idx').on(t.fallId)],
+)
+
+/**
  * Eine Meldung, die den Blick überdauern muss.
  *
  * Was am Bildschirm passiert, sagt die Oberfläche selbst. Was **im
