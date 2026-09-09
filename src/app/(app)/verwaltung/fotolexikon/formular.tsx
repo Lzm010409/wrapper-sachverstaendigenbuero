@@ -12,6 +12,14 @@ import { ausErgebnis } from '@/melden/typen'
  * **Warum eine Zeile immer stehen bleibt.** Ohne Beschädigungsart hat die KI
  * nichts zur Auswahl (`speichereFotoTeil` weist das serverseitig ab); die
  * letzte Zeile lässt sich deshalb nicht entfernen, nur leeren.
+ *
+ * **Warum ein bestehender Eintrag eingeklappt startet.** Mit jedem Teil
+ * wächst die Liste um eine volle Maske aus Namensfeld, vier Kästchen und
+ * mindestens einer Beschädigungsart-Zeile — bei einer Handvoll Teilen schon
+ * unübersichtlich. Eingeklappt zeigt eine Zeile, was zum Zusammensetzen
+ * gebraucht wird; aufgeklappt wird nur, was gerade bearbeitet wird. Die
+ * Maske für ein neues Teil bleibt davon ausgenommen — sie ist die einzige,
+ * die ohnehin leer ist und sofort ausgefüllt werden soll.
  */
 
 interface ZeileEingabe {
@@ -22,6 +30,7 @@ interface ZeileEingabe {
 const LEERE_ZEILE: ZeileEingabe = { begriff: '', hinweis: '' }
 
 export function TeilFormular({ teil }: { teil?: FotoTeil }) {
+  const [bearbeiten, setzeBearbeiten] = useState(!teil)
   const [name, setzeName] = useState(teil?.name ?? '')
   const [seiten, setzeSeiten] = useState<Seite[]>(teil?.seiten ?? [])
   const [zeilen, setzeZeilen] = useState<ZeileEingabe[]>(
@@ -47,11 +56,16 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
       const ergebnis = await speichereFotoTeil(teil?.id, { name, seiten, beschaedigungsarten: zeilen })
       const meldung = ausErgebnis(ergebnis)
       if (meldung) melde(meldung)
-      if (!ergebnis.fehler && !teil) {
-        // Neuanlage geglückt: Maske für den nächsten Eintrag leeren.
-        setzeName('')
-        setzeSeiten([])
-        setzeZeilen([LEERE_ZEILE])
+      if (!ergebnis.fehler) {
+        if (!teil) {
+          // Neuanlage geglückt: Maske für den nächsten Eintrag leeren.
+          setzeName('')
+          setzeSeiten([])
+          setzeZeilen([LEERE_ZEILE])
+        } else {
+          // Geänderter Eintrag: zuklappen, dieselbe Ruhe wie die übrigen Zeilen.
+          setzeBearbeiten(false)
+        }
       }
     })
   }
@@ -66,7 +80,37 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
     })
   }
 
+  /** Verwirft unabgespeicherte Änderungen und klappt wieder zu. */
+  function verwerfe() {
+    if (!teil) return
+    setzeName(teil.name)
+    setzeSeiten(teil.seiten)
+    setzeZeilen(teil.beschaedigungsarten.length > 0 ? teil.beschaedigungsarten : [LEERE_ZEILE])
+    setzeBearbeiten(false)
+  }
+
   const kannSpeichern = name.trim().length > 0 && zeilen.some((z) => z.begriff.trim())
+
+  if (teil && !bearbeiten) {
+    const seitenText = teil.seiten.length > 0 ? teil.seiten.join('/') : 'ohne Seite'
+    const begriffe = teil.beschaedigungsarten.map((b) => b.begriff).join(', ') || '—'
+    return (
+      <div
+        className="karte"
+        style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong>{teil.name}</strong>{' '}
+          <span className="unterzeile" style={{ margin: 0 }}>
+            · {seitenText} · {begriffe}
+          </span>
+        </div>
+        <button type="button" className="knopf-schlicht" onClick={() => setzeBearbeiten(true)}>
+          Bearbeiten
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="karte">
@@ -147,9 +191,14 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
         {teil ? (
-          <button type="button" className="gefahr" disabled={laeuft} onClick={loesche}>
-            Löschen
-          </button>
+          <>
+            <button type="button" className="gefahr" disabled={laeuft} onClick={loesche}>
+              Löschen
+            </button>
+            <button type="button" className="knopf-schlicht" disabled={laeuft} onClick={verwerfe}>
+              Zuklappen
+            </button>
+          </>
         ) : null}
         <button
           type="button"
