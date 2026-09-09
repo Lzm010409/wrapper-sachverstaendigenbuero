@@ -142,8 +142,10 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
           ))}
         </div>
         <p className="unterzeile" style={{ margin: 0 }}>
-          Keine angekreuzt: das Teil bekommt im Satz keine Seite, z. B. „Heckverkleidung
-          plastisch verformt&quot;.
+          Mehrere ankreuzen, wenn beide Seiten vorkommen können — ein Eintrag „Scheinwerfer&quot;
+          mit links und rechts angekreuzt reicht für beide, kein zweiter Eintrag nötig. Keine
+          angekreuzt: das Teil bekommt im Satz keine Seite, z. B. „Heckverkleidung plastisch
+          verformt&quot;.
         </p>
       </div>
 

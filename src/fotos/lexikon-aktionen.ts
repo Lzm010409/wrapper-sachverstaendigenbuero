@@ -51,7 +51,12 @@ export async function speichereFotoTeil(
     }
   }
   if (await nameVergeben(eingabe.name, id)) {
-    return { fehler: `„${eingabe.name}" gibt es im Lexikon schon.` }
+    return {
+      fehler:
+        `„${eingabe.name}" gibt es im Lexikon schon — ein Teil steht nur einmal in der Liste. ` +
+        'Für eine weitere Seite oder Beschädigungsart diesen bestehenden Eintrag aufklappen ' +
+        'und ergänzen, statt einen zweiten mit demselben Namen anzulegen.',
+    }
   }
 
   await speichereTeil(eingabe, benutzer.id, id)
