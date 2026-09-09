@@ -38,9 +38,14 @@ export default async function Verwaltung() {
             einzeln zu- und abschalten, sperren
           </p>
         </div>
-        <Link href="/verwaltung/protokoll" className="knopf-schlicht">
-          Fehlerprotokoll
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link href="/verwaltung/kontakte" className="knopf-schlicht">
+            Doppelte Kontakte
+          </Link>
+          <Link href="/verwaltung/protokoll" className="knopf-schlicht">
+            Fehlerprotokoll
+          </Link>
+        </div>
       </div>
 
       <div className="karte" style={{ marginBottom: 16 }}>

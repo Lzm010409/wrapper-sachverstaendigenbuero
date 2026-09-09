@@ -518,6 +518,32 @@ doppelt liegt. Aufräumen lässt sie sich nur in sevDesk selbst.
 Gebucht, gemahnt und storniert wird in sevDesk und in den n8n-Workflows,
 die das schon tun.
 
+## Doppelte Kontakte in sevDesk
+
+**Verwaltung → Doppelte Kontakte.** Die Seite gruppiert die sevDesk-
+Kontakte nach einem Vergleichsnamen: kleingeschrieben, ohne Umlaute, ohne
+Rechtsform, ohne Interpunktion. „Salt & Pictures GmbH" und „Salt und
+Pictures GmbH" landen damit nebeneinander.
+
+**Die Ursache steht im n8n-Workflow.** „Neuer Rechnungsworfklow" sucht den
+Kontakt über `customerName` — exakt. Trifft er nicht, legt der nächste
+Knoten einen neuen an. Am 09.07.2025 sind so hintereinander sechs leere
+Kontakte „Arndt Automobile GmbH" entstanden (Kundennummern 8598–8604).
+Solange dieser Workflow unverändert bleibt, entstehen neue Dubletten.
+
+**Was die Zahlen bedeuten.** Die Spalte „Belege" zählt alles, was an einem
+Kontakt hängt — Rechnungen, Belege, Aufträge, Positionen. Eine gelb
+hinterlegte Zeile trägt **keinen einzigen** Beleg; nur solche Einträge
+liessen sich über die Schnittstelle gefahrlos entfernen. Steht dort
+„unbekannt", war die Zahl nicht abrufbar — dann bitte nichts löschen.
+
+**Warum es keinen Knopf gibt.** Die sevDesk-Schnittstelle kennt kein
+Zusammenführen (geprüft am 09.09.2026: es gibt `GET`, `PUT` und `DELETE`
+auf `/Contact`, mehr nicht), und festgeschriebene Rechnungen lassen sich
+nicht auf einen anderen Kontakt umhängen. Gruppen, in denen mehrere
+Einträge Belege tragen, sind deshalb mit „nur in sevDesk zusammenführbar"
+gekennzeichnet — dort hilft nur die sevDesk-Oberfläche.
+
 ## Wenn ein Benutzer einen Fehler meldet
 
 Der Benutzer sieht auf der Fehlerseite eine Kennung, etwa `2512298898`. Sie

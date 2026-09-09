@@ -3411,6 +3411,72 @@ body {
   justify-content: flex-end;
 }
 
+/* ------------------------------------------------------------------ *
+ * Doppelte Kontakte
+ *
+ * Eine Tabelle je Gruppe statt einer langen Liste: die Frage lautet nicht
+ * "welche Kontakte gibt es", sondern "welche von diesen dreien ist die
+ * richtige" — und die beantwortet man nur nebeneinander.
+ * ------------------------------------------------------------------ */
+
+.dubletten {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dublettengruppe h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dublettenkopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dublettentabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dublettentabelle th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 4px 8px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dublettentabelle td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.dublettentabelle tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+  Leere Eintraege abgesetzt, aber nicht ausgegraut: sie sind das, worauf es
+  ankommt — die, die man loeschen koennte. Ausgegraut lesen sich Zeilen wie
+  "erledigt".
+*/
+.dublettentabelle tr.ohne-beleg td {
+  background: var(--warn-soft);
+}
+
+.dublettentabelle tr.ohne-beleg td:first-child {
+  border-left: 3px solid var(--warn);
+  padding-left: 8px;
+}
+
 /* Benutzerverwaltung: eine Zeile je Recht */
 .recht-zeile {
   display: flex;
