@@ -26,12 +26,13 @@ import { protokolliereWarnung } from '@/protokoll'
  *
  * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut.** Ist im Haus ein
  * Teil hinterlegt (Seite, Beschädigungsarten mit Begriff), muss das Modell
- * für jedes erkannte Teil einen eigenen Treffer (Teil, Seite,
- * Beschädigungsart) liefern, nur aus dieser Liste — bis zu drei je Foto,
- * falls mehrere Teile beschädigt sind. Der Satz wird serverseitig aus allen
- * gültigen Treffern zusammengesetzt (`zusammensetzen` in `lexikon.ts`),
- * nicht vom Modell formuliert. Ein nicht gelistetes Teil bleibt freier Text
- * wie zuvor.
+ * für das eine erkannte Teil genau einen Treffer (Teil, Seite,
+ * Beschädigungsart) liefern, nur aus dieser Liste — nie mehr als einen je
+ * Foto, auch wenn mehrere Teile zu sehen sind: ein Foto zeigt einen Schaden,
+ * nicht eine Liste. Der Satz wird serverseitig aus dem Treffer zusammengesetzt
+ * (`zusammensetzen` in `lexikon.ts`), nicht vom Modell formuliert. Ein nicht
+ * gelistetes Teil bleibt freier Text wie zuvor — für ein gelistetes Teil darf
+ * das Modell nie selbst formulieren, auch nicht zusätzlich zum Treffer.
  *
  * **Was bei einem Fehler passiert.** Ein gescheitertes Paket nimmt die
  * übrigen nicht mit; seine Fotos bleiben schlicht ohne Vorschlag. Der
@@ -82,7 +83,8 @@ const vorschlagSchema = z.object({
     `zusammensetzen()` in `beschriftePaket` — dort steht auch das aktuelle
     Lexikon zur Verfügung. Grosszügig statt hart begrenzt: `safeParse` soll
     bei einem Ausreisser nicht das ganze Paket kippen — die in `bauWerkzeug`
-    beschriebene Drei-Grenze wird erst danach per `.slice(0, 3)` erzwungen.
+    beschriebene Ein-Treffer-Grenze wird erst danach per `.slice(0, 1)`
+    erzwungen, falls sich das Modell trotz Vorgabe nicht daran hält.
   */
   treffer: z.array(trefferSchema).default([]),
   /*
@@ -122,10 +124,11 @@ function bauWerkzeug(teile: readonly FotoTeil[]) {
   const trefferEigenschaften = {
     type: 'array' as const,
     description:
-      'Erkannte Fahrzeugteile aus dem Teile-Lexikon im Auftrag, je eines pro sichtbarem ' +
-      'Schaden. Leer lassen, wenn keines der gelisteten Teile zu sehen ist — dann zählt ' +
-      'allein das Feld beschreibung. Höchstens drei Einträge; mehr passt ohnehin nicht in ' +
-      'eine Bildunterschrift.',
+      'Das eine erkannte Fahrzeugteil aus dem Teile-Lexikon im Auftrag, sofern eines mit ' +
+      'sichtbarem Schaden zu sehen ist. Leer lassen, wenn keines der gelisteten Teile zu ' +
+      'sehen ist — dann zählt allein das Feld beschreibung. Höchstens EIN Eintrag, auch ' +
+      'wenn mehrere Teile im Bild erkennbar wären: ein Foto zeigt einen Schaden. Wähle in ' +
+      'diesem Fall das Teil, das im Vordergrund oder am deutlichsten beschädigt ist.',
     items: {
       type: 'object' as const,
       additionalProperties: false,
@@ -220,11 +223,22 @@ Grundsätze:
   links, Kratzer über die gesamte Breite".
 - Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
 - Für treffer gilt ausschliesslich das Teile-Lexikon weiter unten im
-  Auftrag, sofern eines mitgeschickt wurde. Erkennst du eines oder mehrere
-  der dort gelisteten Teile beschädigt, gib zu jedem einen eigenen Eintrag
-  in treffer zurück (höchstens drei) — nie einen eigenen Begriff, auch wenn
-  er naheliegt. Ist keines der gelisteten Teile zu sehen, lass treffer leer
-  und beschreibe wie gewohnt frei im Feld beschreibung.
+  Auftrag, sofern eines mitgeschickt wurde. Erkennst du eines der dort
+  gelisteten Teile beschädigt, trage GENAU EINEN Eintrag in treffer ein —
+  auch wenn mehrere Teile im Bild zu sehen sind, wähle nur das eine
+  deutlichste. teil und beschaedigungsart müssen dabei Zeichen für Zeichen
+  aus der Liste für GENAU DIESES Teil stammen, nie aus der eines anderen
+  Teils und nie ein eigener, naheliegender Begriff. Ist keines der
+  gelisteten Teile zu sehen, lass treffer leer und beschreibe wie gewohnt
+  frei im Feld beschreibung.
+- Sobald ein Treffer eingetragen ist, wird beschreibung verworfen und der
+  Satz stattdessen aus dem Lexikon zusammengesetzt. Formuliere für ein
+  gelistetes Teil deshalb NIE selbst in beschreibung — weder statt eines
+  Treffers noch zusätzlich dazu. Beispiel für falsch: du schreibst
+  "Kotflügel rechts leicht verbeult" in beschreibung, obwohl der Kotflügel
+  im Lexikon steht und dort "deformiert" heisst. Richtig ist, stattdessen
+  {teil: "Kotflügel", seite: "rechts", beschaedigungsart: "deformiert"} in
+  treffer einzutragen — der Satz entsteht daraus von selbst.
 - Keine Bewertung des Schadens, keine Reparaturempfehlung, keine Vermutung
   über die Ursache. Das ist die Arbeit des Sachverständigen.
 - Keine Einleitung, kein "Dieses Bild zeigt", kein Punkt am Ende.
@@ -373,11 +387,12 @@ export async function beschriftePaket(
     const vorschlag = nachId.get(bild.fotoId)
     if (!vorschlag) continue
 
-    // Passt ein Treffer zu einem gelisteten Teil, gilt sein Wortlaut —
-    // mehrere gültige Treffer werden zu einem Satz verbunden. Bleibt keiner
-    // übrig, bleibt es beim freien Text des Modells (kein gelistetes Teil,
-    // oder das Modell hat sich trotz Vorgabe nicht an das Lexikon gehalten).
-    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 3).map((t) => ({
+    // Passt der Treffer zu einem gelisteten Teil, gilt sein Wortlaut. Bleibt
+    // keiner übrig, bleibt es beim freien Text des Modells (kein gelistetes
+    // Teil, oder das Modell hat sich trotz Vorgabe nicht an das Lexikon
+    // gehalten). `.slice(0, 1)` erzwingt serverseitig, was der Auftragstext
+    // nur bitten kann: nie mehr als ein Treffer je Foto.
+    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
       teil: t.teil,
       seite: istSeite(t.seite) ? t.seite : null,
       begriff: t.beschaedigungsart,

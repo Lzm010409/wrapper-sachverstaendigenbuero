@@ -206,7 +206,10 @@ describe('beschriftePaket', () => {
     expect(vorschlag?.beschreibung).toBe('Kotflügel rechts deformiert')
   })
 
-  it('verbindet zwei Treffer eines Fotos zu einem Satz', async () => {
+  it('übernimmt nur den ersten Treffer, auch wenn das Modell mehrere liefert', async () => {
+    // Genau ein Teil je Foto ist die Vorgabe — hält sich das Modell trotzdem
+    // nicht daran, erzwingt der Server die Grenze, statt einen Satz aus
+    // mehreren Teilen zusammenzusetzen.
     const TUER: FotoTeil = {
       id: 't2',
       name: 'Tür',
@@ -231,7 +234,7 @@ describe('beschriftePaket', () => {
 
     const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL, TUER], [bild('a')])
 
-    expect(vorschlag?.beschreibung).toBe('Kotflügel links deformiert, Tür links verkratzt')
+    expect(vorschlag?.beschreibung).toBe('Kotflügel links deformiert')
   })
 
   it('fällt auf den freien Text zurück, wenn kein Teil erkannt wurde', async () => {
