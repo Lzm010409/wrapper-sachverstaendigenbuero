@@ -3,6 +3,7 @@ import {
   EINTRAG_SORTIERFELDER,
   ladeAbschnitte,
   sucheEintraege,
+  zaehleEintraege,
   zaehleNachStatus,
   type Bereich,
   type EintragSortierfeld,
@@ -11,6 +12,8 @@ import {
 import { StatusPille } from '@/app/(app)/bibliothek/status-pille'
 import { Suchleiste } from './suchleiste'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 import { Sortierleiste } from '@/app/teile/sortierleiste'
 import { leseSortierung } from '@/app/teile/sortierung'
 
@@ -46,6 +49,8 @@ export default async function BibliothekSeite({
     bereich?: string
     status?: string
     abschnitt?: string
+    seite?: string
+    groesse?: string
     sortiert?: string
     richtung?: string
   }>
@@ -63,14 +68,15 @@ export default async function BibliothekSeite({
     status: istStatus(p.status) ? p.status : undefined,
     abschnitt: p.abschnitt,
   }
-
+  const { seite, groesse, versatz } = leseSeite(p.seite, p.groesse)
   const sortierung = leseSortierung<EintragSortierfeld>(
     { sortiert: p.sortiert, richtung: p.richtung },
     EINTRAG_SORTIERFELDER.map((f) => f.wert),
   )
 
-  const [eintraege, abschnitte, nachStatus] = await Promise.all([
-    sucheEintraege(filter, sortierung ?? undefined),
+  const [eintraege, gesamt, abschnitte, nachStatus] = await Promise.all([
+    sucheEintraege(filter, sortierung ?? undefined, groesse, versatz),
+    zaehleEintraege(filter),
     // Ohne den Abschnitt selbst: sonst bliebe in der Auswahlliste nur der
     // gerade gewählte Abschnitt übrig, und ein Wechsel wäre nicht mehr
     // möglich.
@@ -101,7 +107,7 @@ export default async function BibliothekSeite({
       <Suchleiste
         abschnitte={abschnitte}
         bereichsnamen={BEREICHSNAMEN}
-        trefferzahl={eintraege.length}
+        trefferzahl={gesamt}
       />
 
       {eintraege.length === 0 ? (
@@ -163,6 +169,8 @@ export default async function BibliothekSeite({
           })}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

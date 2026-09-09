@@ -120,5 +120,9 @@ function baue(aktuell: URLSearchParams, aenderungen: Record<string, string>): st
     if (wert) neu.set(schluessel, wert)
     else neu.delete(schluessel)
   }
+  // Ein geänderter Filter macht die vorherige Seite ungültig — sie könnte
+  // jetzt über das Ende der (kleineren) Trefferliste hinausragen. `groesse`
+  // bleibt stehen: die gewählte Seitengröße ist kein Filter.
+  neu.delete('seite')
   return neu.toString()
 }

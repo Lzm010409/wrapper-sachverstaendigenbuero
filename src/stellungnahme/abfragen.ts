@@ -219,6 +219,8 @@ function stellungnahmeSortierAusdruck(feld: StellungnahmeSortierfeld): SQL {
 export async function ladeStellungnahmen(
   filter?: Stellungnahmenfilter,
   sortierung?: Sortierstand<StellungnahmeSortierfeld>,
+  hoechstens = 100,
+  versatz = 0,
 ) {
   const wo = stellungnahmenBedingungen(filter)
   const ordnung = sortierung
@@ -245,7 +247,8 @@ export async function ladeStellungnahmen(
     .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
     .where(wo.length > 0 ? and(...wo) : undefined)
     .orderBy(ordnung)
-    .limit(100)
+    .limit(hoechstens)
+    .offset(versatz)
 }
 
 /**

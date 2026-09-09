@@ -192,6 +192,7 @@ export function ladeFaelle(
   filter?: Fallfilter,
   sortierung?: Sortierstand<FallSortierfeld>,
   hoechstens = 100,
+  versatz = 0,
 ) {
   const wo = bedingungen(filter)
   const ordnung = sortierung
@@ -212,6 +213,7 @@ export function ladeFaelle(
     .where(wo.length > 0 ? and(...wo) : undefined)
     .orderBy(ordnung)
     .limit(hoechstens)
+    .offset(versatz)
 }
 
 /**

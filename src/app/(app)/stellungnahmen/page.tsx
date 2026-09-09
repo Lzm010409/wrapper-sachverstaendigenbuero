@@ -17,6 +17,8 @@ import { Loeschknopf } from './loeschknopf'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 import { Sortierleiste } from '@/app/teile/sortierleiste'
 import { leseSortierung } from '@/app/teile/sortierung'
 
@@ -78,13 +80,14 @@ export default async function StellungnahmenSeite({
     bis: wert(roh.bis),
   }
   const gefiltert = stellungnahmenfilterGesetzt(filter)
+  const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
   const sortierung = leseSortierung<StellungnahmeSortierfeld>(
     { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
     STELLUNGNAHME_SORTIERFELDER.map((f) => f.wert),
   )
 
   const [liste, gesamt, faelle, werkzeuge] = await Promise.all([
-    ladeStellungnahmen(filter, sortierung ?? undefined),
+    ladeStellungnahmen(filter, sortierung ?? undefined, groesse, versatz),
     zaehleStellungnahmen(filter),
     ladeFaelle(),
     werkzeugeVorhanden(),
@@ -144,7 +147,6 @@ export default async function StellungnahmenSeite({
 
       <Filterleiste
         weitereAb={2}
-        treffer={liste.length < gesamt ? `${liste.length} von ${gesamt} gezeigt` : undefined}
         zusatzParameter={{ sortiert: sortierung?.feld, richtung: sortierung?.richtung }}
         felder={[
           { art: 'suche', name: 'suche', platzhalter: 'Betreff, Empfänger oder Aktenzeichen' },
@@ -251,6 +253,8 @@ export default async function StellungnahmenSeite({
           ))}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

@@ -106,6 +106,13 @@ function grundbedingungen(filter: Suchfilter): SQL[] {
   return bedingungen
 }
 
+/** Die Filterbedingungen mitsamt Abschnitt — für Liste und Zählung dieselben. */
+function vollstaendigeBedingungen(filter: Suchfilter): SQL[] {
+  const bedingungen = grundbedingungen(filter)
+  if (filter.abschnitt) bedingungen.push(eq(eintrag.abschnitt, filter.abschnitt))
+  return bedingungen
+}
+
 /** Unverifizierte Belege eines Eintrags — geteilt zwischen Auswahl und Sortierung. */
 function belegeUnverifiziertAusdruck() {
   return sql<number>`(
@@ -159,10 +166,10 @@ function eintragSortierAusdruck(feld: EintragSortierfeld): SQL {
 export async function sucheEintraege(
   filter: Suchfilter,
   sortierung?: Sortierstand<EintragSortierfeld>,
+  hoechstens = 50,
+  versatz = 0,
 ) {
-  const bedingungen = grundbedingungen(filter)
-  if (filter.abschnitt) bedingungen.push(eq(eintrag.abschnitt, filter.abschnitt))
-
+  const bedingungen = vollstaendigeBedingungen(filter)
   const wo = bedingungen.length > 0 ? and(...bedingungen) : undefined
 
   // Eine gewählte Sortierung ersetzt die Standardreihenfolge vollständig —
@@ -198,8 +205,23 @@ export async function sucheEintraege(
     .from(eintrag)
     .where(wo)
     .orderBy(...ordnung)
+    .limit(hoechstens)
+    .offset(versatz)
 
   return zeilen
+}
+
+/**
+ * Wie viele Einträge der Filter trifft.
+ *
+ * Getrennt von der Liste, weil die jetzt bei `hoechstens` abschneidet — die
+ * Kopfzeile und die Seitennavigation brauchen die ungekappte Zahl.
+ */
+export async function zaehleEintraege(filter: Suchfilter): Promise<number> {
+  const bedingungen = vollstaendigeBedingungen(filter)
+  const wo = bedingungen.length > 0 ? and(...bedingungen) : undefined
+  const zeilen = await db.select({ anzahl: count() }).from(eintrag).where(wo)
+  return zeilen[0]?.anzahl ?? 0
 }
 
 /**

@@ -18,6 +18,8 @@ import { Geldpille } from '@/app/teile/geldpille'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 import { Sortierleiste } from '@/app/teile/sortierleiste'
 import { leseSortierung } from '@/app/teile/sortierung'
 import { SkelettListe } from '@/app/teile/skelett'
@@ -50,13 +52,14 @@ export default async function FaelleSeite({
     baujahr: wert(roh.baujahr),
   }
   const gefiltert = filterGesetzt(filter)
+  const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
   const sortierung = leseSortierung<FallSortierfeld>(
     { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
     FALL_SORTIERFELDER.map((f) => f.wert),
   )
 
   const [faelle, gesamt, marken] = await Promise.all([
-    ladeFaelle(filter, sortierung ?? undefined),
+    ladeFaelle(filter, sortierung ?? undefined, groesse, versatz),
     zaehleGefilterte(filter),
     vorhandeneMarken(),
   ])
@@ -97,9 +100,6 @@ export default async function FaelleSeite({
 
       <Filterleiste
         weitereAb={2}
-        treffer={
-          faelle.length < gesamt ? `${faelle.length} von ${gesamt} gezeigt` : undefined
-        }
         zusatzParameter={{ sortiert: sortierung?.feld, richtung: sortierung?.richtung }}
         felder={[
           {
@@ -149,6 +149,8 @@ export default async function FaelleSeite({
           <FaelleZeilen faelle={faelle} />
         </Suspense>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }
