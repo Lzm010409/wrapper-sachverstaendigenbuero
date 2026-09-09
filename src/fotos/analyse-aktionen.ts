@@ -11,7 +11,7 @@ import { gutachtenSchema } from '@/autoixpert/typen'
 import { kiVerfuegbar } from '@/ki/client'
 import { beschriftePaket, naechstesPaket, type Fahrzeugkontext } from './assistent'
 import { holeVorschaubilder } from './vorschaubilder'
-import { ladeAnalyse, setzeStand, speichereAnalyse } from './analyse-ablage'
+import { ladeAnalyse, loescheAnalyse, setzeStand, speichereAnalyse } from './analyse-ablage'
 import { ladeLexikon } from './lexikon-ablage'
 import { beschrifteFoto } from './aktionen'
 import type { Fotovorschlag } from './vorschlag'
@@ -138,6 +138,29 @@ export async function analysiereFotos(fallId: string): Promise<Analysefortschrit
       ? { fehler: 'Zu diesen Fotos kam kein Vorschlag zurück. Bitte später noch einmal versuchen.' }
       : {}),
   }
+}
+
+/**
+ * Wirft die gespeicherte Analyse eines Falls weg — der nächste Lauf fängt
+ * für alle Fotos wieder bei null an.
+ *
+ * **Wofür das gebraucht wird.** `analysiereFotos` lässt jedes Foto mit
+ * Vorschlag aus, gleich welchen Stands — auch ein verworfener zählt als
+ * „schon dran gewesen" und bekäme sonst nie einen zweiten Versuch. Ändert
+ * sich das Fotolexikon oder will man nach einer schlechten Serie neu
+ * anfangen, braucht es deshalb einen Schnitt, keinen Umweg über 67 Mal
+ * „Verwerfen".
+ *
+ * **Was dabei nicht verloren geht.** Was schon nach autoiXpert übernommen
+ * wurde, steht dort unverändert weiter — dieser Weg schreibt nirgendwo nach
+ * aussen. Ein neuer Lauf schlägt für diese Fotos einfach noch einmal etwas
+ * vor; nicht mehr, nicht weniger.
+ */
+export async function setzeAnalyseZurueck(fallId: string): Promise<Aktionsergebnis> {
+  await verlangeBenutzer()
+  await loescheAnalyse(fallId)
+  revalidatePath(`/faelle/${fallId}`)
+  return { hinweis: 'Analyse zurückgesetzt.' }
 }
 
 /**

@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import type { Foto } from '@/fotos/ansicht'
 import type { Fotoanalyse, Fotovorschlag } from '@/fotos/vorschlag'
 import { PFLICHT, kategoriename, luecken, type Kategorie } from '@/fotos/kategorien'
-import { analysiereFotos, uebernimmVorschlag, verwirfVorschlag } from '@/fotos/analyse-aktionen'
+import {
+  analysiereFotos,
+  setzeAnalyseZurueck,
+  uebernimmVorschlag,
+  verwirfVorschlag,
+} from '@/fotos/analyse-aktionen'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis, fehler as alsFehler, erfolg } from '@/melden/typen'
 
@@ -45,6 +50,7 @@ export function Fotoassistent({
 }) {
   const { melde } = useMelder()
   const [laeuft, setzeLaeuft] = useState(false)
+  const [setztZurueck, setzeSetztZurueck] = useState(false)
   const [stand, setzeStand] = useState<{ beschriftet: number; gesamt: number } | null>(null)
   const [erledigt, setzeErledigt] = useState<Erledigt>({})
   const [pruefung, setzePruefung] = useState<Fotovorschlag[] | null>(null)
@@ -84,6 +90,33 @@ export function Fotoassistent({
     }
   }
 
+  async function zuruecksetzen() {
+    if (
+      !window.confirm(
+        'Die gespeicherte Analyse dieses Falls verwerfen? Ein neuer Lauf schlägt für alle ' +
+          'Fotos wieder etwas vor. Schon nach autoiXpert übernommene Beschriftungen bleiben ' +
+          'davon unberührt — nur die hiesigen Vorschläge gehen verloren.',
+      )
+    ) {
+      return
+    }
+    setzeSetztZurueck(true)
+    try {
+      const ergebnis = await setzeAnalyseZurueck(fallId)
+      const meldung = ausErgebnis(ergebnis)
+      if (meldung) melde(meldung)
+      // Die Vorschläge, auf die sich diese drei Stände bezogen, gibt es
+      // nicht mehr — sonst zeigte der Prüfmodus tote Einträge an.
+      setzeErledigt({})
+      setzeStand(null)
+      setzePruefung(null)
+    } catch (ausnahme) {
+      melde(alsFehler(ausnahme instanceof Error ? ausnahme.message : 'Das Zurücksetzen ging nicht.'))
+    } finally {
+      setzeSetztZurueck(false)
+    }
+  }
+
   return (
     <div className="assistent">
       <div className="assistent-kopf">
@@ -101,7 +134,17 @@ export function Fotoassistent({
               {offene.length} Vorschläge durchgehen
             </button>
           ) : null}
-          <button type="button" className="knopf" onClick={starte} disabled={laeuft || !kiEingerichtet}>
+          <button
+            type="button"
+            className="knopf"
+            onClick={starte}
+            disabled={laeuft || setztZurueck || !kiEingerichtet}
+            title={
+              analyse
+                ? 'Ergänzt nur Fotos ohne Vorschlag. Für einen kompletten Neustart erst zurücksetzen.'
+                : undefined
+            }
+          >
             {laeuft
               ? stand
                 ? `Beschriftet ${stand.beschriftet} von ${stand.gesamt} …`
@@ -110,6 +153,17 @@ export function Fotoassistent({
                 ? 'Erneut analysieren'
                 : 'Fotos analysieren'}
           </button>
+          {analyse ? (
+            <button
+              type="button"
+              className="knopf-schlicht"
+              onClick={zuruecksetzen}
+              disabled={laeuft || setztZurueck}
+              title="Verwirft alle gespeicherten Vorschläge dieses Falls und beginnt beim nächsten Lauf neu."
+            >
+              {setztZurueck ? 'Wird zurückgesetzt …' : 'Zurücksetzen'}
+            </button>
+          ) : null}
         </div>
       </div>
 

@@ -101,6 +101,18 @@ export async function speichereAnalyse(
  * ein Vorschlag, der noch einmal auftaucht. Eine Sperre auf der Zeile wäre
  * dafür der grössere Aufwand als der Schaden.
  */
+/**
+ * Wirft die gespeicherte Analyse eines Falls komplett weg.
+ *
+ * Betrifft nur, was hier lokal steht. Was schon nach autoiXpert übernommen
+ * wurde, bleibt dort unverändert stehen — dieser Weg schreibt nirgendwo nach
+ * aussen, er vergisst nur, welche Vorschläge diese Anwendung schon gemacht
+ * hatte.
+ */
+export async function loescheAnalyse(fallId: string): Promise<void> {
+  await db.delete(fotoAnalyse).where(eq(fotoAnalyse.fallId, fallId))
+}
+
 export async function setzeStand(
   fallId: string,
   fotoId: string,
