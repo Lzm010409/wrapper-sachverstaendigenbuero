@@ -11,6 +11,8 @@ import { gutachtenSchema } from '@/autoixpert/typen'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 
 /** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
 function wert(roh: string | string[] | undefined): string | undefined {
@@ -40,9 +42,10 @@ export default async function FaelleSeite({
     baujahr: wert(roh.baujahr),
   }
   const gefiltert = filterGesetzt(filter)
+  const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
 
   const [faelle, gesamt, marken] = await Promise.all([
-    ladeFaelle(filter),
+    ladeFaelle(filter, groesse, versatz),
     zaehleGefilterte(filter),
     vorhandeneMarken(),
   ])
@@ -81,9 +84,6 @@ export default async function FaelleSeite({
 
       <Filterleiste
         weitereAb={2}
-        treffer={
-          faelle.length < gesamt ? `${faelle.length} von ${gesamt} gezeigt` : undefined
-        }
         felder={[
           {
             art: 'suche',
@@ -174,6 +174,8 @@ export default async function FaelleSeite({
           })}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

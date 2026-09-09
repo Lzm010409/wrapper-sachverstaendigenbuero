@@ -102,8 +102,8 @@ export interface Suchfilter {
   tage?: number
 }
 
-/** Die Fehlerliste, jüngste zuerst. */
-export async function ereignisse(filter: Suchfilter = {}, hoechstens = 100): Promise<Ereigniszeile[]> {
+/** Die Bedingungen eines Filters. Ausgelagert, damit Liste und Zählung dieselben nehmen. */
+function ereignisBedingungen(filter: Suchfilter): SQL[] {
   const bedingungen: SQL[] = []
 
   const suche = filter.suche?.trim()
@@ -126,12 +126,24 @@ export async function ereignisse(filter: Suchfilter = {}, hoechstens = 100): Pro
     bedingungen.push(gte(ereignis.erstelltAm, new Date(Date.now() - filter.tage * 86_400_000)))
   }
 
+  return bedingungen
+}
+
+/** Die Fehlerliste, jüngste zuerst. */
+export async function ereignisse(
+  filter: Suchfilter = {},
+  hoechstens = 100,
+  versatz = 0,
+): Promise<Ereigniszeile[]> {
+  const bedingungen = ereignisBedingungen(filter)
+
   const zeilen = await db
     .select()
     .from(ereignis)
     .where(bedingungen.length > 0 ? and(...bedingungen) : undefined)
     .orderBy(desc(ereignis.erstelltAm))
     .limit(hoechstens)
+    .offset(versatz)
 
   return zeilen.map((z) => ({
     id: z.id,
@@ -145,4 +157,19 @@ export async function ereignisse(filter: Suchfilter = {}, hoechstens = 100): Pro
     zusammenhang: (z.zusammenhang as Record<string, unknown> | null) ?? null,
     erstelltAm: z.erstelltAm.toISOString(),
   }))
+}
+
+/**
+ * Wie viele Ereignisse der Filter trifft.
+ *
+ * Getrennt von der Liste, weil die bei `hoechstens` abschneidet — dieselbe
+ * Begründung wie bei den Fällen und Stellungnahmen.
+ */
+export async function zaehleEreignisse(filter: Suchfilter = {}): Promise<number> {
+  const bedingungen = ereignisBedingungen(filter)
+  const zeilen = await db
+    .select({ anzahl: sql<number>`count(*)`.mapWith(Number) })
+    .from(ereignis)
+    .where(bedingungen.length > 0 ? and(...bedingungen) : undefined)
+  return zeilen[0]?.anzahl ?? 0
 }

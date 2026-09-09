@@ -172,7 +172,11 @@ function stellungnahmenBedingungen(filter: Stellungnahmenfilter = {}) {
   return alle
 }
 
-export async function ladeStellungnahmen(filter?: Stellungnahmenfilter) {
+export async function ladeStellungnahmen(
+  filter?: Stellungnahmenfilter,
+  hoechstens = 100,
+  versatz = 0,
+) {
   const wo = stellungnahmenBedingungen(filter)
   return db
     .select({
@@ -195,7 +199,8 @@ export async function ladeStellungnahmen(filter?: Stellungnahmenfilter) {
     .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
     .where(wo.length > 0 ? and(...wo) : undefined)
     .orderBy(desc(stellungnahme.erstelltAm))
-    .limit(100)
+    .limit(hoechstens)
+    .offset(versatz)
 }
 
 /**

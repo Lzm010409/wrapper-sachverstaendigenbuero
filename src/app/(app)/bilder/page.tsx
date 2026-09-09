@@ -1,7 +1,15 @@
-import { alleThemen, nochNichtUebernommen, sucheBilder } from '@/bilder/bibliothek'
+import {
+  alleThemen,
+  nochNichtUebernommen,
+  sucheBilder,
+  zaehleBilder,
+  zaehleNochNichtUebernommen,
+} from '@/bilder/bibliothek'
 import { Bildkarte, Bildaufnahme } from './bildkarte'
 import { Suchleiste } from './suchleiste'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 
 /**
  * Die Bildbibliothek.
@@ -11,17 +19,12 @@ import { verlangeAnmeldung } from '@/auth/wache'
  * wieder da. Der übliche Weg dorthin führt nicht über Vorratshaltung,
  * sondern über die Arbeit: unten stehen die Bilder aus Schreiben, die noch
  * nicht übernommen sind.
+ *
+ * Zwei unabhängige Listen auf einer Seite, zwei unabhängige
+ * Seitennavigationen: die Bibliothek blättert über `seite`/`groesse`, die
+ * noch nicht übernommenen Bilder über `seiteOffen`/`groesseOffen` — sonst
+ * risse ein Klick auf „Weiter" in der einen Liste die andere mit.
  */
-
-/**
- * Die Obergrenzen, die `sucheBilder` und `nochNichtUebernommen` von sich aus
- * setzen. Sie stehen hier noch einmal, weil die Kopfzeile sonst eine
- * gekappte Liste als Gesamtzahl ausgäbe: bei 73 Bildern in der Datenbank
- * behauptete sie „60 Bilder in der Bibliothek", und wer sein Bild nicht
- * findet, hält es für nicht vorhanden.
- */
-const GRENZE_BIBLIOTHEK = 60
-const GRENZE_OFFEN = 40
 
 /**
  * Ein Suchparameter kann doppelt in der Adresse stehen — `?q=a&q=b`. Next.js
@@ -37,7 +40,14 @@ function ersterWert(wert: string | string[] | undefined): string {
 export default async function BilderSeite({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; thema?: string | string[] }>
+  searchParams: Promise<{
+    q?: string | string[]
+    thema?: string | string[]
+    seite?: string | string[]
+    groesse?: string | string[]
+    seiteOffen?: string | string[]
+    groesseOffen?: string | string[]
+  }>
 }) {
   // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
   // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
@@ -48,16 +58,18 @@ export default async function BilderSeite({
   const roh = await searchParams
   const q = ersterWert(roh.q)
   const thema = ersterWert(roh.thema)
+  const bib = leseSeite(roh.seite, roh.groesse)
+  const offen = leseSeite(roh.seiteOffen, roh.groesseOffen)
 
-  const [bilder, themen, offene] = await Promise.all([
-    sucheBilder(q, thema),
+  const [bilder, gesamtBib, themen, offene, gesamtOffen] = await Promise.all([
+    sucheBilder(q, thema, bib.groesse, bib.versatz),
+    zaehleBilder(q, thema),
     alleThemen(q),
-    nochNichtUebernommen(),
+    nochNichtUebernommen(offen.groesse, offen.versatz),
+    zaehleNochNichtUebernommen(),
   ])
 
   const gesucht = Boolean(q || thema)
-  const gekappt = bilder.length >= GRENZE_BIBLIOTHEK
-  const offeneGekappt = offene.length >= GRENZE_OFFEN
 
   return (
     <>
@@ -65,15 +77,9 @@ export default async function BilderSeite({
         <div>
           <h1>Bildbibliothek</h1>
           <p className="unterzeile">
-            {gekappt ? 'mindestens ' : ''}
-            {bilder.length} {bilder.length === 1 ? 'Bild' : 'Bilder'}
+            {gesamtBib} {gesamtBib === 1 ? 'Bild' : 'Bilder'}
             {gesucht ? ' gefunden' : ' in der Bibliothek'}
-            {offene.length > 0
-              ? ` · ${offeneGekappt ? 'mindestens ' : ''}${offene.length} aus Schreiben noch nicht übernommen`
-              : ''}
-            {gekappt || offeneGekappt
-              ? ' — die Liste endet hier; grenze die Suche ein, um den Rest zu sehen'
-              : ''}
+            {gesamtOffen > 0 ? ` · ${gesamtOffen} aus Schreiben noch nicht übernommen` : ''}
           </p>
         </div>
       </div>
@@ -93,11 +99,14 @@ export default async function BilderSeite({
           </p>
         </div>
       ) : (
-        <div className="bildgitter">
-          {bilder.map((b) => (
-            <Bildkarte key={b.id} bild={b} />
-          ))}
-        </div>
+        <>
+          <div className="bildgitter">
+            {bilder.map((b) => (
+              <Bildkarte key={b.id} bild={b} />
+            ))}
+          </div>
+          <Pagination seite={bib.seite} groesse={bib.groesse} gesamt={gesamtBib} />
+        </>
       )}
 
       {offene.length > 0 ? (
@@ -116,6 +125,13 @@ export default async function BilderSeite({
               <Bildkarte key={b.id} bild={b} />
             ))}
           </div>
+          <Pagination
+            seite={offen.seite}
+            groesse={offen.groesse}
+            gesamt={gesamtOffen}
+            seiteParam="seiteOffen"
+            groesseParam="groesseOffen"
+          />
         </section>
       ) : null}
     </>

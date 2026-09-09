@@ -119,7 +119,7 @@ function bedingungen(filter: Fallfilter = {}): SQL[] {
 }
 
 /** Die zuletzt abgerufenen Fälle, eingeschränkt durch den Filter. */
-export function ladeFaelle(filter?: Fallfilter, hoechstens = 100) {
+export function ladeFaelle(filter?: Fallfilter, hoechstens = 100, versatz = 0) {
   const wo = bedingungen(filter)
   return db
     .select({
@@ -133,6 +133,7 @@ export function ladeFaelle(filter?: Fallfilter, hoechstens = 100) {
     .where(wo.length > 0 ? and(...wo) : undefined)
     .orderBy(desc(fall.abgerufenAm))
     .limit(hoechstens)
+    .offset(versatz)
 }
 
 /**

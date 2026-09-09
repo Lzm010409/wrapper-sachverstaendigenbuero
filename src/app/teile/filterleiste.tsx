@@ -89,6 +89,9 @@ export function Filterleiste({ felder, weitereAb, treffer }: FilterleisteEigensc
   function entferne(name: string) {
     const naechste = new URLSearchParams(parameter.toString())
     naechste.delete(name)
+    // Ein geänderter Filter macht die vorherige Seite ungültig — sie könnte
+    // jetzt über das Ende der (grösseren) Trefferliste hinausragen.
+    naechste.delete('seite')
     router.replace(naechste.size > 0 ? `${pfad}?${naechste}` : pfad)
   }
 

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import {
   ladeAbschnitte,
   sucheEintraege,
+  zaehleEintraege,
   zaehleNachStatus,
   type Bereich,
   type EintragStatus,
@@ -9,6 +10,8 @@ import {
 import { StatusPille } from '@/app/(app)/bibliothek/status-pille'
 import { Suchleiste } from './suchleiste'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 
 const BEREICHSNAMEN: Record<Bereich, string> = {
   kalkulation: 'Kalkulation',
@@ -37,7 +40,14 @@ function auszug(text: string | null, laenge = 190): string {
 export default async function BibliothekSeite({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; bereich?: string; status?: string; abschnitt?: string }>
+  searchParams: Promise<{
+    q?: string
+    bereich?: string
+    status?: string
+    abschnitt?: string
+    seite?: string
+    groesse?: string
+  }>
 }) {
   // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
   // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
@@ -52,9 +62,11 @@ export default async function BibliothekSeite({
     status: istStatus(p.status) ? p.status : undefined,
     abschnitt: p.abschnitt,
   }
+  const { seite, groesse, versatz } = leseSeite(p.seite, p.groesse)
 
-  const [eintraege, abschnitte, nachStatus] = await Promise.all([
-    sucheEintraege(filter),
+  const [eintraege, gesamt, abschnitte, nachStatus] = await Promise.all([
+    sucheEintraege(filter, groesse, versatz),
+    zaehleEintraege(filter),
     // Ohne den Abschnitt selbst: sonst bliebe in der Auswahlliste nur der
     // gerade gewählte Abschnitt übrig, und ein Wechsel wäre nicht mehr
     // möglich.
@@ -83,7 +95,7 @@ export default async function BibliothekSeite({
       <Suchleiste
         abschnitte={abschnitte}
         bereichsnamen={BEREICHSNAMEN}
-        trefferzahl={eintraege.length}
+        trefferzahl={gesamt}
       />
 
       {eintraege.length === 0 ? (
@@ -145,6 +157,8 @@ export default async function BibliothekSeite({
           })}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

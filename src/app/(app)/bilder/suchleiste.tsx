@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 /**
  * Suche und Themenfilter der Bildbibliothek.
@@ -19,6 +19,7 @@ export function Suchleiste({
   themen: { thema: string; anzahl: number }[]
 }) {
   const router = useRouter()
+  const parameter = useSearchParams()
   const [laeuft, starte] = useTransition()
   const [suche, setzeSuche] = useState(begriff)
 
@@ -41,9 +42,16 @@ export function Suchleiste({
 
   const ziel = (q: string, t: string) => {
     eigenesZiel.current = q
-    const p = new URLSearchParams()
+    // `seiteOffen`/`groesseOffen` bleiben stehen: die Suche wirkt nur auf die
+    // Bibliothek, nicht auf die Bilder aus Schreiben darunter (siehe Hinweis
+    // im Abschnitt). `seite`/`groesse` fallen weg — ein geänderter Filter
+    // macht die vorherige Bibliotheksseite ungültig.
+    const p = new URLSearchParams(parameter.toString())
+    p.delete('seite')
     if (q) p.set('q', q)
+    else p.delete('q')
     if (t) p.set('thema', t)
+    else p.delete('thema')
     const rest = p.toString()
     return rest ? `/bilder?${rest}` : '/bilder'
   }

@@ -15,6 +15,8 @@ import { Loeschknopf } from './loeschknopf'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 
 /**
  * Die Beschriftung einer Zeile.
@@ -74,9 +76,10 @@ export default async function StellungnahmenSeite({
     bis: wert(roh.bis),
   }
   const gefiltert = stellungnahmenfilterGesetzt(filter)
+  const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
 
   const [liste, gesamt, faelle, werkzeuge] = await Promise.all([
-    ladeStellungnahmen(filter),
+    ladeStellungnahmen(filter, groesse, versatz),
     zaehleStellungnahmen(filter),
     ladeFaelle(),
     werkzeugeVorhanden(),
@@ -134,7 +137,6 @@ export default async function StellungnahmenSeite({
 
       <Filterleiste
         weitereAb={2}
-        treffer={liste.length < gesamt ? `${liste.length} von ${gesamt} gezeigt` : undefined}
         felder={[
           { art: 'suche', name: 'suche', platzhalter: 'Betreff, Empfänger oder Aktenzeichen' },
           {
@@ -240,6 +242,8 @@ export default async function StellungnahmenSeite({
           ))}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }
