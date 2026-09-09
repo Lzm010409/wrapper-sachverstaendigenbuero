@@ -6,6 +6,7 @@ import {
   reportToWbwParams,
   toEzMonat,
 } from "@/wbw/params";
+import { ezToleranzFuer, kmToleranzFuer } from "@/wbw/toleranz";
 
 const report: Gutachten = {
   id: "r1",
@@ -70,10 +71,32 @@ describe("reportToWbwParams", () => {
   it("setzt die Voreinstellungen des Skills", () => {
     const params = reportToWbwParams(report);
     expect(params.radiusKm).toBe(200);
-    expect(params.kmToleranz).toBe(25000);
-    expect(params.ezToleranzJahre).toBe(1);
     expect(params.leistungToleranzKw).toBe(10);
     expect(params.wbwOpts).toEqual({ eurProKm: 0.1, eurProEzMonat: 120 });
+  });
+
+  it("belegt die Toleranzen aus dem Fahrzeug vor, nicht mit festen Zahlen", () => {
+    /*
+      65.000 km liegen unter der Schwelle: 20 % davon sind 13.000, also bleibt
+      es bei den 25.000 der alten Vorgabe. Die EZ-Toleranz haengt am Alter und
+      damit am heutigen Tag — geprueft wird deshalb die Verdrahtung, die
+      Stufen selbst stehen in `toleranz.test.ts` mit festem Datum.
+    */
+    const params = reportToWbwParams(report);
+    expect(params.kmToleranz).toBe(kmToleranzFuer(65000));
+    expect(params.kmToleranz).toBe(25000);
+    expect(params.ezToleranzJahre).toBe(ezToleranzFuer("07/2021"));
+  });
+
+  it("weitet die km-Toleranz bei hoher Laufleistung", () => {
+    // Der Sharan vom 08.09.2026: 162.390 km statt 65.000.
+    const vielGelaufen = { ...report, car: { ...report.car, mileage_meter: 162390 } };
+    expect(reportToWbwParams(vielGelaufen).kmToleranz).toBe(32000);
+  });
+
+  it("laesst dem Sachverstaendigen den Vorrang", () => {
+    expect(reportToWbwParams(report, { kmToleranz: 15000 }).kmToleranz).toBe(15000);
+    expect(reportToWbwParams(report, { ezToleranzJahre: 5 }).ezToleranzJahre).toBe(5);
   });
 });
 

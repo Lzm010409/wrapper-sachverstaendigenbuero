@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import {
   filterGesetzt,
@@ -8,9 +9,11 @@ import {
 } from '@/autoixpert/abfragen'
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
+import { ladePhasenFuerListe } from '@/fall/vorgang'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { SkelettListe } from '@/app/teile/skelett'
 
 /** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
 function wert(roh: string | string[] | undefined): string | undefined {
@@ -124,56 +127,63 @@ export default async function FaelleSeite({
           </p>
         </div>
       ) : (
-        <div className="liste">
-          {faelle.map((f) => {
-            const geprueft = gutachtenSchema.safeParse(f.daten)
-            const d = geprueft.success ? leseFalldaten(geprueft.data) : null
-
-            return (
-              <Link key={f.id} href={`/faelle/${f.id}`} className="zeile">
-                <span className="zeile-nummer">{f.aktenzeichen ?? '—'}</span>
-                <span>
-                  <span className="zeile-titel">
-                    {/* Bei unlesbaren Daten wäre „Ohne Anspruchsteller" eine
-                        Behauptung über etwas, das gar nicht gelesen wurde. */}
-                    {geprueft.success
-                      ? (d?.anspruchsteller?.name ?? 'Ohne Anspruchsteller')
-                      : 'Falldaten nicht lesbar'}
-                    {d?.fahrzeug.kennzeichen ? ` · ${d.fahrzeug.kennzeichen}` : ''}
-                  </span>
-                  <span className="zeile-meta">
-                    {d?.gutachtenTyp ? <span>{d.gutachtenTyp}</span> : null}
-                    {d?.fahrzeug.hersteller ? (
-                      <span>
-                        {d.fahrzeug.hersteller} {d.fahrzeug.modell}
-                      </span>
-                    ) : null}
-                    {d?.versicherung?.name ? <span>{d.versicherung.name}</span> : null}
-                  </span>
-                </span>
-                <span className="zeile-rechts">
-                  {!geprueft.success ? (
-                    <span className="marke-pille m-warn">unlesbar</span>
-                  ) : d?.zustand ? (
-                    <span
-                      className={`marke-pille ${
-                        d.zustand === 'abgeschlossen' ? 'm-freigegeben' : 'm-entwurf'
-                      }`}
-                    >
-                      {d.zustand}
-                    </span>
-                  ) : null}
-                  <span className="treffer-zahl">
-                    {f.abgerufenAm
-                      ? new Date(f.abgerufenAm).toLocaleDateString('de-DE')
-                      : ''}
-                  </span>
-                </span>
-              </Link>
-            )
-          })}
-        </div>
+        // Eigene Suspense-Grenze: die Liste selbst kommt sofort aus der
+        // Datenbank, nur die Pipedrive-Phasen brauchen einen Netzaufruf.
+        // Ohne diese Grenze wartet die ganze Liste auf Pipedrive — genau der
+        // Fehler, den der Vorgang-Reiter schon einmal gemacht hat.
+        <Suspense fallback={<SkelettListe zeilen={faelle.length} titel="Die Fälle" />}>
+          <FaelleZeilen faelle={faelle} />
+        </Suspense>
       )}
     </>
+  )
+}
+
+async function FaelleZeilen({ faelle }: { faelle: Awaited<ReturnType<typeof ladeFaelle>> }) {
+  const phasen = await ladePhasenFuerListe(faelle.map((f) => f.aktenzeichen))
+
+  return (
+    <div className="liste">
+      {faelle.map((f) => {
+        const geprueft = gutachtenSchema.safeParse(f.daten)
+        const d = geprueft.success ? leseFalldaten(geprueft.data) : null
+        const phase = f.aktenzeichen ? phasen.get(f.aktenzeichen) : undefined
+
+        return (
+          <Link key={f.id} href={`/faelle/${f.id}`} className="zeile">
+            <span className="zeile-nummer">{f.aktenzeichen ?? '—'}</span>
+            <span>
+              <span className="zeile-titel">
+                {/* Bei unlesbaren Daten wäre „Ohne Anspruchsteller" eine
+                    Behauptung über etwas, das gar nicht gelesen wurde. */}
+                {geprueft.success
+                  ? (d?.anspruchsteller?.name ?? 'Ohne Anspruchsteller')
+                  : 'Falldaten nicht lesbar'}
+                {d?.fahrzeug.kennzeichen ? ` · ${d.fahrzeug.kennzeichen}` : ''}
+              </span>
+              <span className="zeile-meta">
+                {d?.gutachtenTyp ? <span>{d.gutachtenTyp}</span> : null}
+                {d?.fahrzeug.hersteller ? (
+                  <span>
+                    {d.fahrzeug.hersteller} {d.fahrzeug.modell}
+                  </span>
+                ) : null}
+                {d?.versicherung?.name ? <span>{d.versicherung.name}</span> : null}
+              </span>
+            </span>
+            <span className="zeile-rechts">
+              {!geprueft.success ? (
+                <span className="marke-pille m-warn">unlesbar</span>
+              ) : phase ? (
+                <span className="marke-pille m-akzent">{phase}</span>
+              ) : null}
+              <span className="treffer-zahl">
+                {f.abgerufenAm ? new Date(f.abgerufenAm).toLocaleDateString('de-DE') : ''}
+              </span>
+            </span>
+          </Link>
+        )
+      })}
+    </div>
   )
 }

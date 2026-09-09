@@ -203,6 +203,8 @@ export async function erzeugeBelege(optionen: {
   }
 
   const dateien: Belegdatei[] = []
+  /** Belege, deren Druck scheiterte — sie fehlen, der Rest geht trotzdem. */
+  const nichtGedruckt: { name: string; grund: string }[] = []
 
   // --- Einzelbelege ---------------------------------------------------------
   if (mitEinzelbelegen) {
@@ -217,7 +219,15 @@ export async function erzeugeBelege(optionen: {
     )
     for (const [i, f] of fahrzeuge.entries()) {
       const name = namen[i]!
-      dateien.push(await schreibe(ziel, name, belegseite(kopf, [f], name), 'einzelbeleg'))
+      const datei = await versucheSchreiben(
+        ziel,
+        name,
+        belegseite(kopf, [f], name),
+        'einzelbeleg',
+        undefined,
+        nichtGedruckt,
+      )
+      if (datei) dateien.push(datei)
     }
   }
 
@@ -231,12 +241,70 @@ export async function erzeugeBelege(optionen: {
 
   for (const [portal, gruppe] of nachPortal) {
     const name = paketname(portal)
-    dateien.push(
-      await schreibe(ziel, name, belegseite(kopf, gruppe, name), 'portalpaket', portal),
+    const datei = await versucheSchreiben(
+      ziel,
+      name,
+      belegseite(kopf, gruppe, name),
+      'portalpaket',
+      portal,
+      nichtGedruckt,
+    )
+    if (datei) dateien.push(datei)
+  }
+
+  /*
+    Ein gescheiterter Druck kostet seinen Beleg, nicht alle. Am 08.09.2026
+    brach `erzeugeBelege` beim ersten Fehlschlag ab: im Gutachtenordner landete
+    nichts, obwohl sechs Fahrzeuge im Korb lagen und die Seiten längst
+    gerendert waren. Was sich drucken lässt, geht jetzt hinaus; was fehlt,
+    steht im Hinweis.
+  */
+  if (nichtGedruckt.length > 0) {
+    hinweise.push(
+      (nichtGedruckt.length === 1
+        ? 'Ein Beleg liess sich nicht drucken und fehlt im Ordner: '
+        : `${nichtGedruckt.length} Belege liessen sich nicht drucken und fehlen im Ordner: `) +
+        nichtGedruckt.map((n) => n.name).join(', ') +
+        `. Grund: ${nichtGedruckt[0]!.grund}`,
+    )
+    protokolliereWarnung('wbw.belege', 'Belege liessen sich nicht drucken.', {
+      anzahl: nichtGedruckt.length,
+      grund: nichtGedruckt[0]!.grund,
+    })
+  }
+
+  if (dateien.length === 0) {
+    throw new Error(
+      `Kein einziger Beleg liess sich drucken. ${nichtGedruckt[0]?.grund ?? ''}`.trim(),
     )
   }
 
   return { dateien, hinweise }
+}
+
+/**
+ * Schreibt einen Beleg und verschluckt einen gescheiterten Druck.
+ *
+ * Der Fehlschlag wird festgehalten, nicht geworfen: ein Browser, der bei
+ * einem Beleg aussteigt, darf nicht die übrigen fünf mitnehmen.
+ */
+async function versucheSchreiben(
+  ziel: string,
+  name: string,
+  html: string,
+  art: Belegdatei['art'],
+  portal: string | undefined,
+  gescheitert: { name: string; grund: string }[],
+): Promise<Belegdatei | null> {
+  try {
+    return await schreibe(ziel, name, html, art, portal)
+  } catch (fehler) {
+    gescheitert.push({
+      name,
+      grund: fehler instanceof Error ? fehler.message.slice(0, 300) : String(fehler),
+    })
+    return null
+  }
 }
 
 async function schreibe(

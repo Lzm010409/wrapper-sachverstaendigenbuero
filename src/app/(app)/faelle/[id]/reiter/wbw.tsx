@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Gutachten } from '@/autoixpert/typen'
 import { fehlendeAngaben, reportToWbwParams, type WbwEingaben } from '@/wbw/params'
 import type { KalkulationStand } from '@/fall/kalkulation'
@@ -10,6 +10,7 @@ import type { Portal } from '@/wbw/lauf'
 import { WbwLauf } from './wbw-lauf'
 import type { WbwVorschlag } from '@/wbw/vorschlag'
 import type { Merkmal } from '@/wbw/ausstattung'
+import { pruefeModellname, type Modellpruefung } from '@/wbw/aktionen'
 
 /**
  * Der Reiter „Wiederbeschaffungswert".
@@ -72,7 +73,54 @@ export function WbwReiter({
   const [eingaben, setzeEingaben] = useState<WbwEingaben>(() => ausVorschlag(vorschlag))
   const [kopiert, setzeKopiert] = useState(false)
 
+  /*
+    Ob AutoScout24 den Suchbegriff kennt. Bisher stand das erst im Protokoll
+    eines laufenden Auftrags — nach fünf Minuten Wartezeit und zu spät, um das
+    Feld noch zu ändern. Am 08.09.2026 kostete „Highline BMT" das Portal
+    vollständig: unbekannter Name, Suche über die ganze Marke, null Treffer in
+    beiden Zyklen.
+  */
+  const [modellpruefung, setzeModellpruefung] = useState<Modellpruefung | null>(null)
+  const [pruefungLaeuft, setzePruefungLaeuft] = useState(false)
+  const zuletztGeprueft = useRef<string>('')
+
   const params = useMemo(() => reportToWbwParams(gutachten, eingaben), [gutachten, eingaben])
+  const modellwert = eingaben.modell ?? params.subject.modell
+  const markeWert = params.subject.marke
+
+  const baureiheWert = vorschlag?.baureihe ?? null
+
+  const pruefeModell = useCallback(
+    async (marke: string, modell: string) => {
+      const schluessel = `${marke}|${modell}`.toLowerCase()
+      // Der Abruf geht an das Portal und darf nicht an jedem Fokuswechsel
+      // hängen. Dieselbe Frage wird nur einmal gestellt.
+      if (!marke.trim() || !modell.trim() || zuletztGeprueft.current === schluessel) return
+      zuletztGeprueft.current = schluessel
+      setzePruefungLaeuft(true)
+      try {
+        const antwort = await pruefeModellname(marke, modell, baureiheWert)
+        setzeModellpruefung(antwort)
+        // Ein Abruffehler ist keine Antwort — beim nächsten Verlassen des
+        // Feldes darf dieselbe Frage noch einmal gestellt werden.
+        if (antwort.fehler) zuletztGeprueft.current = ''
+      } finally {
+        setzePruefungLaeuft(false)
+      }
+    },
+    [baureiheWert],
+  )
+
+  useEffect(() => {
+    // Beim Öffnen einmal fragen — der vorbelegte Wert ist der, mit dem sonst
+    // gesucht würde. Nur wenn AutoScout24 überhaupt mitsucht.
+    if (!portale.includes('autoscout24')) return
+    void pruefeModell(markeWert, modellwert)
+    // Absichtlich nur beim ersten Rendern und bei Portalwechsel: das Tippen im
+    // Feld löst die Prüfung über `onBlur` aus, nicht bei jedem Zeichen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portale.includes('autoscout24')])
+
   const fehlt = fehlendeAngaben(params)
   const text = JSON.stringify(params, null, 2)
 
@@ -130,14 +178,27 @@ export function WbwReiter({
               <input
                 id="wbw-modell"
                 type="text"
-                value={eingaben.modell ?? params.subject.modell}
+                value={modellwert}
                 onChange={(e) => setze('modell', e.target.value)}
+                onBlur={() => {
+                  if (portale.includes('autoscout24')) void pruefeModell(markeWert, modellwert)
+                }}
               />
               <span className="unterzeile">
                 {vorschlag?.modell
                   ? `Aus der Kalkulation: „${vorschlag.modell.beleg}“. Im Gutachten steht nur die Baureihe „${gutachten.car?.model ?? '—'}“ — eine Suche danach mischt Motorvarianten.`
                   : 'Aus dem Gutachten. Steht dort die Baureihe, wird der Korb beliebig.'}
               </span>
+              <Modellhinweis
+                pruefung={modellpruefung}
+                laeuft={pruefungLaeuft}
+                marke={markeWert}
+                modell={modellwert}
+                waehle={(name) => {
+                  setze('modell', name)
+                  void pruefeModell(markeWert, name)
+                }}
+              />
             </div>
 
             <dl className="kv" style={{ gridTemplateColumns: 'minmax(140px,auto) 1fr' }}>
@@ -305,7 +366,7 @@ export function WbwReiter({
                   id="wbw-kmtol"
                   type="number"
                   step={1000}
-                  value={eingaben.kmToleranz ?? 25000}
+                  value={eingaben.kmToleranz ?? params.kmToleranz}
                   onChange={(e) => setze('kmToleranz', Number(e.target.value))}
                 />
               </div>
@@ -401,6 +462,84 @@ function ausVorschlag(vorschlag: WbwVorschlag | null): WbwEingaben {
 }
 
 /** Die kleine Marke hinter einem Feldnamen: woher der Wert kommt. */
+/**
+ * Was AutoScout24 zu dem Suchbegriff sagt — vor dem Lauf, nicht danach.
+ *
+ * Nur der unbekannte Name bekommt eine Warnung. Ein aufgelöster Name wird
+ * knapp bestätigt, damit erkennbar ist, dass geprüft wurde; ein Abruffehler
+ * sagt genau das und behauptet nicht, das Modell sei unbekannt.
+ */
+function Modellhinweis({
+  pruefung,
+  laeuft,
+  marke,
+  modell,
+  waehle,
+}: {
+  pruefung: Modellpruefung | null
+  laeuft: boolean
+  marke: string
+  modell: string
+  waehle: (name: string) => void
+}) {
+  if (laeuft) {
+    return (
+      <span className="unterzeile" style={{ display: 'block', marginTop: 4 }}>
+        AutoScout24 wird nach „{modell}“ gefragt …
+      </span>
+    )
+  }
+  if (!pruefung) return null
+
+  if (pruefung.fehler) {
+    return (
+      <span className="unterzeile" style={{ display: 'block', marginTop: 4 }}>
+        Die Modellliste von AutoScout24 war nicht erreichbar — der Suchbegriff bleibt ungeprüft.
+      </span>
+    )
+  }
+
+  if (pruefung.bekannt) {
+    return (
+      <span className="unterzeile" style={{ display: 'block', marginTop: 4 }}>
+        {pruefung.quelle === 'baureihe'
+          ? `AutoScout24 kennt „${modell}“ nicht — gesucht wird über die Baureihe „${pruefung.aufgeloest}“.`
+          : `AutoScout24 führt das als „${pruefung.aufgeloest}“.`}
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <span className="marke-pille m-warn">
+        AutoScout24 kennt „{modell}“ nicht
+        {pruefung.anzahl > 0 ? ` — unter ${pruefung.anzahl} Modellen von ${marke}` : ''}
+      </span>
+      <span className="unterzeile" style={{ display: 'block', marginTop: 3 }}>
+        Auch die Baureihe trifft keines seiner Modelle. Das Portal lässt einen unbekannten Namen
+        stillschweigend fallen und sucht über die ganze Marke. Mit den engen Toleranzen des ersten
+        Zyklus kommt dabei meist nichts zurück — der Korb stammt dann allein aus den übrigen
+        Portalen.
+      </span>
+      {pruefung.vorschlaege.length > 0 ? (
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+          {pruefung.vorschlaege.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="marke-pille m-akzent"
+              style={{ cursor: 'pointer', border: 0 }}
+              onClick={() => waehle(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 function Herkunft({ angabe }: { angabe?: { quelle: 'gutachten' | 'dat' } | null }) {
   if (!angabe || angabe.quelle !== 'dat') return null
   return <span className="marke-pille m-akzent">DAT</span>

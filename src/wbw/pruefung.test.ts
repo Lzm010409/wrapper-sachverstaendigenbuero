@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   brauchbare,
   inPakete,
+  PRUEF_WERKZEUG,
   pruefePaket,
   ungeprueft,
   vorbelegt,
   type Inseratsangabe,
+  type Pruefauftrag,
   type Pruefurteil,
 } from './pruefung'
 
@@ -22,16 +24,33 @@ afterEach(() => {
   ruf.mockReset()
 })
 
-const AUFTRAG = {
+const AUFTRAG: Pruefauftrag = {
   subjekt: {
     marke: 'Mercedes-Benz',
     modell: 'E 53 AMG',
+    baureihe: 'E-Klasse',
     variante: '4Matic+',
     ez: '06/2021',
     kilometerstand: 42000,
     leistungKw: 320,
+    bauart: 'Limousine',
   },
   sollAusstattung: ['Panoramadach', 'Standheizung'],
+}
+
+/* Der Lauf vom 08.09.2026: gesucht war ein Sharan, im Korb landete ein Golf. */
+const SHARAN: Pruefauftrag = {
+  subjekt: {
+    marke: 'Volkswagen',
+    modell: 'Highline BMT',
+    baureihe: 'Sharan (7N1)',
+    variante: '',
+    ez: '12/2010',
+    kilometerstand: 162390,
+    leistungKw: 110,
+    bauart: 'Van',
+  },
+  sollAusstattung: ['Einparkhilfe', 'Klimaanlage'],
 }
 
 function inserat(id: string, mehr: Partial<Inseratsangabe> = {}): Inseratsangabe {
@@ -135,6 +154,20 @@ describe('Ein Paket prüfen', () => {
     expect(ergebnis[0]?.begruendung.length).toBe(300)
   })
 
+  it('rettet einen Wert ausserhalb von 0 bis 100, statt das Paket zu verlieren', async () => {
+    // Die Schnittstelle kann die Grenze bei `strict` nicht erzwingen. Ein
+    // einzelner Ausreisser darf nicht 25 Inserate ungeprüft lassen.
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { vergleichbarkeit: 140 }), urteil('b', { vergleichbarkeit: -5 })],
+    })
+
+    const ergebnis = await pruefePaket(AUFTRAG, [inserat('a'), inserat('b')])
+
+    expect(ergebnis[0]?.vergleichbarkeit).toBe(100)
+    expect(ergebnis[1]?.vergleichbarkeit).toBe(0)
+    expect(ergebnis.every((u) => u.ungeprueft)).toBe(false)
+  })
+
   it('ruft für eine leere Liste gar nicht erst auf', async () => {
     expect(await pruefePaket(AUFTRAG, [])).toEqual([])
     expect(ruf).not.toHaveBeenCalled()
@@ -147,6 +180,155 @@ describe('Ein Paket prüfen', () => {
     const inhalt = ruf.mock.calls[0]?.[0].inhalt[0]
     expect(inhalt?.text?.length).toBeLessThan(4000)
     expect(inhalt?.text).toContain('…')
+  })
+})
+
+describe('Modell und Bauart', () => {
+  /*
+    Am 08.09.2026 stand ein VW Golf VI im Korb einer VW-Sharan-Suche, bewertet
+    mit „aufnehmen · 60". Zwei Gründe, beide hier abgedeckt:
+
+    1. Die Prüfung bekam „Highline BMT" als Modell — die Ausstattungslinie.
+       Weder „Sharan" noch „Van" gingen je hinaus, also konnte das Modell die
+       Abweichung gar nicht sehen.
+    2. Der Karosseriefilter des Plugins konnte nicht greifen: Kleinanzeigen
+       liefert kein Bauart-Feld, und `detectKarosserie` findet im Titel
+       „Golf 6 VI 1.4 TSI DSG | Bj. 2011 | gepflegt" nichts. Unbekannte Bauart
+       lässt die Pipeline bewusst durch. Auf diesem Portal ist das Sprachmodell
+       die einzige Stelle, die die Bauart überhaupt bestimmen kann.
+  */
+  it('gibt Baureihe und Bauart des Subjekts mit hinaus', async () => {
+    ruf.mockResolvedValue({ urteile: [urteil('a')] })
+
+    await pruefePaket(SHARAN, [inserat('a')])
+
+    const text = ruf.mock.calls[0]?.[0].inhalt[0]?.text ?? ''
+    expect(text).toContain('Sharan (7N1)')
+    expect(text).toContain('Van')
+  })
+
+  it('verwirft ein Fahrzeug mit abweichender Bauart, auch wenn das Modell es aufnehmen will', async () => {
+    ruf.mockResolvedValue({
+      urteile: [
+        urteil('a', {
+          empfehlung: 'aufnehmen',
+          vergleichbarkeit: 60,
+          erkanntesModell: 'VW Golf VI',
+          erkannteBauart: 'Limousine',
+        }),
+      ],
+    })
+
+    const ergebnis = await pruefePaket(SHARAN, [inserat('a')])
+
+    expect(ergebnis[0]?.empfehlung).toBe('verwerfen')
+    expect(ergebnis[0]?.auffaelligkeiten).toContain('falsches_modell')
+  })
+
+  it('verwirft, was das Modell selbst als falsches Modell erkennt', async () => {
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { empfehlung: 'aufnehmen', auffaelligkeiten: ['falsches_modell'] })],
+    })
+
+    const ergebnis = await pruefePaket(SHARAN, [inserat('a')])
+
+    expect(ergebnis[0]?.empfehlung).toBe('verwerfen')
+  })
+
+  it('lässt eine unbekannte Bauart stehen, statt sie zu verwerfen', async () => {
+    // Unsicher heisst „pruefen". Ein dürftiger Titel ist kein Ausschlussgrund —
+    // sonst fiele auf Kleinanzeigen die Hälfte des Marktes weg.
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { empfehlung: 'aufnehmen', erkannteBauart: 'unbekannt' })],
+    })
+
+    const ergebnis = await pruefePaket(SHARAN, [inserat('a')])
+
+    expect(ergebnis[0]?.empfehlung).toBe('aufnehmen')
+  })
+
+  it('greift nicht, wenn die Bauart des Subjekts selbst unbekannt ist', async () => {
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { empfehlung: 'aufnehmen', erkannteBauart: 'Kombi' })],
+    })
+
+    const ergebnis = await pruefePaket(
+      { ...SHARAN, subjekt: { ...SHARAN.subjekt, bauart: null } },
+      [inserat('a')],
+    )
+
+    expect(ergebnis[0]?.empfehlung).toBe('aufnehmen')
+  })
+
+  it('rettet eine unbekannte Bauart-Bezeichnung, statt das Paket zu verlieren', async () => {
+    ruf.mockResolvedValue({
+      urteile: [urteil('a', { erkannteBauart: 'Raumgleiter' })],
+    })
+
+    const ergebnis = await pruefePaket(SHARAN, [inserat('a')])
+
+    expect(ergebnis[0]?.erkannteBauart).toBe('unbekannt')
+    expect(ergebnis[0]?.ungeprueft).toBeFalsy()
+  })
+})
+
+describe('Die Werkzeugdefinition', () => {
+  /*
+    Am 08.09.2026 scheiterte jedes Prüfpaket mit
+    „tools.0.custom: For 'integer' type, properties maximum, minimum are not
+    supported". Grund: `strict: true` lässt nur einen Teil von JSON Schema zu —
+    Zahlengrenzen (`minimum`, `maximum`, `multipleOf`), Textlängen
+    (`minLength`, `maxLength`) und Feldmuster gehören nicht dazu. Die Grenzen
+    stehen deshalb im Beschreibungstext und werden hier geprüft, nicht dort.
+  */
+  const VERBOTEN = [
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'multipleOf',
+    'minLength',
+    'maxLength',
+    'pattern',
+    'minItems',
+    'maxItems',
+    'uniqueItems',
+  ]
+
+  function schluessel(wert: unknown, pfad = 'input_schema'): string[] {
+    if (Array.isArray(wert)) return wert.flatMap((e, i) => schluessel(e, `${pfad}[${i}]`))
+    if (wert === null || typeof wert !== 'object') return []
+    return Object.entries(wert).flatMap(([name, inhalt]) => [
+      ...(VERBOTEN.includes(name) ? [`${pfad}.${name}`] : []),
+      ...schluessel(inhalt, `${pfad}.${name}`),
+    ])
+  }
+
+  it('nutzt keine Schlüsselwörter, die `strict` ablehnt', () => {
+    expect(PRUEF_WERKZEUG.strict).toBe(true)
+    expect(schluessel(PRUEF_WERKZEUG.input_schema)).toEqual([])
+  })
+
+  function offeneObjekte(wert: unknown, pfad = 'input_schema'): string[] {
+    if (Array.isArray(wert)) return wert.flatMap((e, i) => offeneObjekte(e, `${pfad}[${i}]`))
+    if (wert === null || typeof wert !== 'object') return []
+    const knoten = wert as Record<string, unknown>
+    const tiefer = Object.entries(knoten).flatMap(([name, inhalt]) =>
+      offeneObjekte(inhalt, `${pfad}.${name}`),
+    )
+    if (knoten.type !== 'object') return tiefer
+    const felder = Object.keys((knoten.properties ?? {}) as Record<string, unknown>)
+    const verlangt = (knoten.required ?? []) as string[]
+    const fehlt = [
+      ...(knoten.additionalProperties === false ? [] : [`${pfad}: additionalProperties`]),
+      ...felder.filter((f) => !verlangt.includes(f)).map((f) => `${pfad}: required.${f}`),
+    ]
+    return [...fehlt, ...tiefer]
+  }
+
+  it('schliesst jedes Objekt und verlangt jedes Feld', () => {
+    // Beides fordert `strict`; fehlt eines, lehnt die Schnittstelle ebenso ab.
+    expect(offeneObjekte(PRUEF_WERKZEUG.input_schema)).toEqual([])
   })
 })
 

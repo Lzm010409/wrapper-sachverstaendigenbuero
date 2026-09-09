@@ -103,3 +103,55 @@ describe('getriebeAusDat', () => {
     expect(getriebeAusDat(null)).toBeNull()
   })
 })
+
+/*
+  Der Sharan-Fall vom 08.09.2026. Die DAT lieferte als Untertyp „Highline BMT"
+  — die Ausstattungslinie samt Effizienzzusatz, kein Fahrzeug. Als Suchbegriff
+  kostete das AutoScout24 vollständig: unbekannter Name, Suche über die ganze
+  Marke, null Treffer in beiden Zyklen.
+*/
+const VXS_SHARAN = `<vxs:Dossiers>
+  <vxs:ManufacturerName>Volkswagen</vxs:ManufacturerName>
+  <vxs:BaseModelName>Sharan (7N1)(05.2010->2015)</vxs:BaseModelName>
+  <vxs:SubModelName>Highline BMT</vxs:SubModelName>
+  <vxs:PowerKw>110.0</vxs:PowerKw>
+  <vxs:MileageOdometer>162390</vxs:MileageOdometer>
+  <vxs:InitialRegistration>2010-12-01+01:00</vxs:InitialRegistration>
+  <vxs:GearBoxType>manual</vxs:GearBoxType>
+  <vxs:VehicleDoors>5</vxs:VehicleDoors>
+  <vxs:Color>Toffeebraun Metallic</vxs:Color>
+</vxs:Dossiers>`
+
+describe('vorschlagAusVxs — Linie statt Modell im Untertyp', () => {
+  const v = vorschlagAusVxs(
+    gutachten({
+      make: 'Volkswagen',
+      model: 'Sharan (7N1)(05.2010->2015)',
+      shape: 'van',
+      performance_kw: 110,
+      mileage_meter: 162390,
+      first_registration_date: '2010-12-01',
+    }),
+    leseVxs(VXS_SHARAN),
+  )
+
+  it('fällt auf die Baureihe zurück, wenn nur eine Linie im Untertyp steht', () => {
+    // „Sharan (7N1)" löst AutoScout24 über den längsten Wortpräfix zu „Sharan"
+    // auf — „Highline BMT" liess es unter 119 VW-Modellen fallen.
+    expect(v.modell?.wert).toBe('Sharan (7N1)')
+    expect(v.baureihe).toBe('Sharan (7N1)')
+  })
+
+  it('zeigt weiter, was die DAT geschrieben hat', () => {
+    // Sonst sähe niemand, dass der Suchbegriff nicht aus der Kalkulation kommt.
+    expect(v.modell?.beleg).toBe('Highline BMT')
+  })
+
+  it('schreibt die Linie ins Variantenfeld, wo sie den Korb filtert', () => {
+    expect(v.linie).toBe('Highline')
+  })
+
+  it('behält die Bauart aus dem Gutachten', () => {
+    expect(v.bauart).toBe('Van')
+  })
+})
