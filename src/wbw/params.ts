@@ -1,4 +1,5 @@
 import type { Gutachten } from "@/autoixpert/typen";
+import { ezToleranzFuer, kmToleranzFuer } from './toleranz'
 
 /**
  * Eingabedatei des WBW-Plugins (params.json).
@@ -88,8 +89,15 @@ export function reportToWbwParams(report: Gutachten, eingaben: WbwEingaben = {})
     plz: eingaben.plz ?? report.claimant?.zip ?? "",
     zentrum: null,
     radiusKm: eingaben.radiusKm ?? 200,
-    kmToleranz: eingaben.kmToleranz ?? 25000,
-    ezToleranzJahre: eingaben.ezToleranzJahre ?? 1,
+    /*
+      Die Vorbelegung kommt aus dem Fahrzeug, nicht aus einer festen Zahl:
+      ±25.000 km sind bei 40.000 km Laufleistung weit und bei 162.390 km eng.
+      Im Lauf vom 08.09.2026 fielen 33 von 48 Fahrzeugen an genau diesen
+      Toleranzen. Was der Sachverständige einträgt, hat weiter Vorrang.
+    */
+    kmToleranz: eingaben.kmToleranz ?? kmToleranzFuer(mileage),
+    ezToleranzJahre:
+      eingaben.ezToleranzJahre ?? ezToleranzFuer(toEzMonat(car.first_registration_date ?? undefined)),
     leistungToleranzKw: eingaben.leistungToleranzKw ?? 10,
     maxItemsProPortal: eingaben.maxItemsProPortal ?? 40,
     kleinanzeigenLocId: null,

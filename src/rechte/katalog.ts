@@ -34,8 +34,10 @@ export const RECHTE = [
   'autoixpert.schreiben',
   'wbw.kostenpflichtig',
   'versand.vermerken',
+  'sevdesk.zusammenfuehren',
   'benutzer.verwalten',
   'protokoll.lesen',
+  'fotolexikon.verwalten',
 ] as const
 
 export type Recht = (typeof RECHTE)[number]
@@ -89,6 +91,15 @@ export const BESCHREIBUNGEN: Rechtebeschreibung[] = [
       '„Als versendet markieren" ist eine Aussage über die Aussenwelt und Grundlage für Fristen.',
   },
   {
+    recht: 'sevdesk.zusammenfuehren',
+    name: 'Kontakte in sevDesk zusammenführen',
+    erklaerung:
+      'Rechnungen und Belege eines doppelten Kontakts auf einen anderen umhängen und den ' +
+      'leeren Kontakt löschen. Wirkt in der Buchhaltung, nicht nur hier. Jeder Schritt steht ' +
+      'im Umhängeprotokoll und lässt sich zurücknehmen, solange die Rechnung nicht ' +
+      'festgeschrieben wurde.',
+  },
+  {
     recht: 'benutzer.verwalten',
     name: 'Benutzer verwalten',
     erklaerung: 'Zugänge anlegen, Rollen setzen, Rechte vergeben, Konten sperren.',
@@ -99,6 +110,13 @@ export const BESCHREIBUNGEN: Rechtebeschreibung[] = [
     erklaerung:
       'Die Fehlerliste der Anwendung einsehen. Sie enthält keine personenbezogenen Daten, ' +
       'aber sie zeigt, was im Haus schiefgeht.',
+  },
+  {
+    recht: 'fotolexikon.verwalten',
+    name: 'Fotolexikon pflegen',
+    erklaerung:
+      'Teile, Seiten und Beschädigungsarten für den Fotoassistenten anlegen, ändern und ' +
+      'löschen. Legt fest, in welchem Wortlaut die KI Schäden künftig beschriftet.',
   },
 ]
 

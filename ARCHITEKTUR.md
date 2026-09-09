@@ -9,7 +9,7 @@ Stand: 07.09.2026.
 | --- | --- | --- |
 | autoiXpert | führend für Falldaten **und** Rechnungen | lesend und schreibend (`GET`, `PATCH`, Upload) |
 | Pipedrive | führend für den Prozessstatus (Phase, Labels) | nur lesend |
-| sevDesk | Buchhaltung, nachgelagert | noch nicht angebunden |
+| sevDesk | führend für den Zahlungsstand | nur lesend (`GET /Invoice`) |
 | n8n | Automatisierungsschicht, bleibt Backend | Aufruf vorhandener Webhooks |
 | OneDrive | Ablage der Gutachtenordner | über n8n |
 | Kleinanzeigen | Vergleichsfahrzeuge für den Wiederbeschaffungswert | lesend, direkt aus dem Cockpit |

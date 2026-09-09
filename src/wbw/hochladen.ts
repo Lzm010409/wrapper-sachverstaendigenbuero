@@ -10,6 +10,7 @@ import { leseErgebnis } from './ergebnis'
 import { erzeugeBelege, type Belegdatei } from './belege'
 import { gespeicherteAuswahl } from './korb'
 import type { Pruefurteil } from './urteil'
+import { druckerVorhanden } from './drucker'
 
 /**
  * Der Weg der Belege in den Gutachtenordner.
@@ -90,6 +91,21 @@ export async function ladeBelegeHoch(
     return {
       ...leer,
       fehler: 'Es ist kein Korb übernommen. Bitte zuerst Fahrzeuge anhaken und übernehmen.',
+    }
+  }
+
+  /*
+    Vor der Arbeit fragen, nicht danach. Am 08.09.2026 rendert der Lauf erst
+    sechs Belege samt eingebetteter Bilder und scheiterte dann am ersten
+    Druckversuch — die Prüfung dafür gab es längst (`druckerVorhanden`), sie
+    wurde nur nirgends aufgerufen.
+  */
+  if (!(await druckerVorhanden())) {
+    return {
+      ...leer,
+      fehler:
+        'Im Abbild ist kein Browser installiert; ohne ihn lassen sich die Belege nicht als ' +
+        'PDF drucken. Erwartet wird Chromium unter dem Pfad aus WBW_CHROME.',
     }
   }
 

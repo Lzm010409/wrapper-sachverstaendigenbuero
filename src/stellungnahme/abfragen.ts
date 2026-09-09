@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, desc, eq, inArray, ne, or, ilike, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, or, ilike, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   eintrag,
@@ -10,6 +10,7 @@ import {
   stellungnahme,
 } from '@/db/schema'
 import type { Bibliothekseintrag } from './treffer'
+import type { Sortierstand } from '@/app/teile/sortierung'
 
 /**
  * Lädt die für die Auswahlmaske verwendbaren Bibliothekseinträge.
@@ -172,8 +173,60 @@ function stellungnahmenBedingungen(filter: Stellungnahmenfilter = {}) {
   return alle
 }
 
-export async function ladeStellungnahmen(filter?: Stellungnahmenfilter) {
+/** Zahl der Positionen einer Stellungnahme — geteilt zwischen Auswahl und Sortierung. */
+function positionenAusdruck() {
+  return sql<number>`(
+    select count(*) from ${position} p
+    where p.stellungnahme_id = ${sql.identifier('stellungnahme')}.${sql.identifier('id')}
+  )`
+}
+
+/** Wonach sich die Schreibenliste sortieren lässt. */
+export type StellungnahmeSortierfeld =
+  | 'erstelltAm'
+  | 'fallAktenzeichen'
+  | 'betreff'
+  | 'positionen'
+  | 'auswertungsstand'
+  | 'versendetAm'
+
+export const STELLUNGNAHME_SORTIERFELDER: { wert: StellungnahmeSortierfeld; text: string }[] = [
+  { wert: 'erstelltAm', text: 'Angelegt' },
+  { wert: 'fallAktenzeichen', text: 'Aktenzeichen' },
+  { wert: 'betreff', text: 'Betreff' },
+  { wert: 'positionen', text: 'Positionen' },
+  { wert: 'auswertungsstand', text: 'Stand' },
+  { wert: 'versendetAm', text: 'Versendet' },
+]
+
+function stellungnahmeSortierAusdruck(feld: StellungnahmeSortierfeld): SQL {
+  switch (feld) {
+    case 'fallAktenzeichen':
+      return sql`${fall.aktenzeichen}`
+    case 'betreff':
+      return sql`${stellungnahme.betreff}`
+    case 'positionen':
+      return positionenAusdruck()
+    case 'auswertungsstand':
+      return sql`${stellungnahme.auswertungsstand}`
+    case 'versendetAm':
+      return sql`${stellungnahme.versendetAm}`
+    default:
+      return sql`${stellungnahme.erstelltAm}`
+  }
+}
+
+export async function ladeStellungnahmen(
+  filter?: Stellungnahmenfilter,
+  sortierung?: Sortierstand<StellungnahmeSortierfeld>,
+) {
   const wo = stellungnahmenBedingungen(filter)
+  const ordnung = sortierung
+    ? sortierung.richtung === 'absteigend'
+      ? desc(stellungnahmeSortierAusdruck(sortierung.feld))
+      : asc(stellungnahmeSortierAusdruck(sortierung.feld))
+    : desc(stellungnahme.erstelltAm)
+
   return db
     .select({
       id: stellungnahme.id,
@@ -186,15 +239,12 @@ export async function ladeStellungnahmen(filter?: Stellungnahmenfilter) {
       auswertungsProzent: stellungnahme.auswertungsProzent,
       pruefberichtDateiname: stellungnahme.pruefberichtDateiname,
       fallAktenzeichen: fall.aktenzeichen,
-      positionen: sql<number>`(
-        select count(*) from ${position} p
-        where p.stellungnahme_id = ${sql.identifier('stellungnahme')}.${sql.identifier('id')}
-      )`.mapWith(Number),
+      positionen: positionenAusdruck().mapWith(Number),
     })
     .from(stellungnahme)
     .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
     .where(wo.length > 0 ? and(...wo) : undefined)
-    .orderBy(desc(stellungnahme.erstelltAm))
+    .orderBy(ordnung)
     .limit(100)
 }
 

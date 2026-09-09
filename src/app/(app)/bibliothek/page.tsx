@@ -1,14 +1,18 @@
 import Link from 'next/link'
 import {
+  EINTRAG_SORTIERFELDER,
   ladeAbschnitte,
   sucheEintraege,
   zaehleNachStatus,
   type Bereich,
+  type EintragSortierfeld,
   type EintragStatus,
 } from '@/bibliothek/abfragen'
 import { StatusPille } from '@/app/(app)/bibliothek/status-pille'
 import { Suchleiste } from './suchleiste'
 import { verlangeAnmeldung } from '@/auth/wache'
+import { Sortierleiste } from '@/app/teile/sortierleiste'
+import { leseSortierung } from '@/app/teile/sortierung'
 
 const BEREICHSNAMEN: Record<Bereich, string> = {
   kalkulation: 'Kalkulation',
@@ -37,7 +41,14 @@ function auszug(text: string | null, laenge = 190): string {
 export default async function BibliothekSeite({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; bereich?: string; status?: string; abschnitt?: string }>
+  searchParams: Promise<{
+    q?: string
+    bereich?: string
+    status?: string
+    abschnitt?: string
+    sortiert?: string
+    richtung?: string
+  }>
 }) {
   // Vor allem anderen: ohne Anmeldung wird hier nichts geladen und
   // nichts gerendert. Die Pruefung im Layout kam zu spaet - die Seite
@@ -53,8 +64,13 @@ export default async function BibliothekSeite({
     abschnitt: p.abschnitt,
   }
 
+  const sortierung = leseSortierung<EintragSortierfeld>(
+    { sortiert: p.sortiert, richtung: p.richtung },
+    EINTRAG_SORTIERFELDER.map((f) => f.wert),
+  )
+
   const [eintraege, abschnitte, nachStatus] = await Promise.all([
-    sucheEintraege(filter),
+    sucheEintraege(filter, sortierung ?? undefined),
     // Ohne den Abschnitt selbst: sonst bliebe in der Auswahlliste nur der
     // gerade gewählte Abschnitt übrig, und ein Wechsel wäre nicht mehr
     // möglich.
@@ -79,6 +95,8 @@ export default async function BibliothekSeite({
           </p>
         </div>
       </div>
+
+      <Sortierleiste felder={EINTRAG_SORTIERFELDER} />
 
       <Suchleiste
         abschnitte={abschnitte}

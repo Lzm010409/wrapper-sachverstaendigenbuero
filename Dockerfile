@@ -79,6 +79,13 @@ RUN apt-get update && \
 # Pfad — aber nur, solange das Paket den Namen behält.
 ENV WBW_CHROME=/usr/bin/chromium
 
+# Nachweis, dass der Browser wirklich im Abbild liegt und startet. Ohne diese
+# Zeile liefe ein Abbild ohne Chromium klaglos durch und scheiterte erst,
+# wenn jemand nach einer WBW-Recherche die Belege ablegen will — am
+# 08.09.2026 genau so geschehen, mit einer Meldung, die auf
+# `google-chrome-stable` zeigte statt auf die fehlende Installation.
+RUN "$WBW_CHROME" --version
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000

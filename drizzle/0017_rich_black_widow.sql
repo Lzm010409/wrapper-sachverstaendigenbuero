@@ -1,0 +1,1 @@
+ALTER TABLE "foto_teil" ADD COLUMN "erkennungsmerkmal" text;
