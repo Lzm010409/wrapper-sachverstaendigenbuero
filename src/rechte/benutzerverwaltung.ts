@@ -1,9 +1,10 @@
 import 'server-only'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, type AnyColumn } from 'drizzle-orm'
 import { db } from '@/db'
 import { benutzer, benutzerRecht } from '@/db/schema'
 import { rechteVon } from './pruefen'
 import { RECHTE, type Recht, type Rolle } from './katalog'
+import type { Sortierstand } from '@/app/teile/sortierung'
 
 /**
  * Die Datenschicht der Benutzerverwaltung.
@@ -30,9 +31,43 @@ export interface Benutzerzeile {
   abweichungen: { recht: string; gewaehrt: boolean }[]
 }
 
-export async function alleBenutzer(): Promise<Benutzerzeile[]> {
+/** Wonach sich die Benutzerliste sortieren lässt — alles eigene Spalten von `benutzer`. */
+export type BenutzerSortierfeld = 'name' | 'email' | 'rolle' | 'aktiv' | 'letzteAnmeldung'
+
+export const BENUTZER_SORTIERFELDER: { wert: BenutzerSortierfeld; text: string }[] = [
+  { wert: 'name', text: 'Name' },
+  { wert: 'email', text: 'E-Mail' },
+  { wert: 'rolle', text: 'Rolle' },
+  { wert: 'aktiv', text: 'Status' },
+  { wert: 'letzteAnmeldung', text: 'Letzte Anmeldung' },
+]
+
+function benutzerSortierSpalte(feld: BenutzerSortierfeld): AnyColumn {
+  switch (feld) {
+    case 'email':
+      return benutzer.email
+    case 'rolle':
+      return benutzer.rolle
+    case 'aktiv':
+      return benutzer.aktiv
+    case 'letzteAnmeldung':
+      return benutzer.letzteAnmeldung
+    default:
+      return benutzer.name
+  }
+}
+
+export async function alleBenutzer(
+  sortierung?: Sortierstand<BenutzerSortierfeld>,
+): Promise<Benutzerzeile[]> {
+  const ordnung = sortierung
+    ? sortierung.richtung === 'absteigend'
+      ? desc(benutzerSortierSpalte(sortierung.feld))
+      : asc(benutzerSortierSpalte(sortierung.feld))
+    : asc(benutzer.name)
+
   const [zeilen, abweichungen] = await Promise.all([
-    db.select().from(benutzer).orderBy(asc(benutzer.name)),
+    db.select().from(benutzer).orderBy(ordnung),
     db
       .select({
         benutzerId: benutzerRecht.benutzerId,

@@ -138,6 +138,9 @@ export const benutzer = pgTable(
   (t) => [
     uniqueIndex('benutzer_email_idx').on(sql`lower(${t.email})`),
     uniqueIndex('benutzer_entra_idx').on(t.entraOid),
+    // Keine eigenen Sortier-Indizes: die Benutzerverwaltung listet die
+    // Zugänge dieses einen Büros vollständig, ohne Grenze — ein Sortierfeld
+    // sortiert hier eine Handvoll Zeilen.
   ],
 )
 
@@ -264,6 +267,11 @@ export const eintrag = pgTable(
   },
   (t) => [
     uniqueIndex('eintrag_bereich_nummer_idx').on(t.bereich, t.nummer),
+    // `bereich` und `status` sind bereits indiziert und decken die
+    // wählbaren Sortierfelder mit ab, die eigene Spalten sind. `titel` und
+    // die abgeleitete Zählung (Marker) bleiben bei ~70 Einträgen ohne
+    // eigenen Index — dieselbe Größenordnungs-Abwägung wie bei der
+    // Volltextsuche in `bibliothek/abfragen.ts`.
     index('eintrag_status_idx').on(t.status),
     index('eintrag_bereich_idx').on(t.bereich),
   ],
@@ -386,6 +394,16 @@ export const fall = pgTable(
   (t) => [
     index('fall_aktenzeichen_idx').on(t.aktenzeichen),
     index('fall_autoixpert_idx').on(t.autoixpertId),
+    /*
+     * `abgerufenAm` ist die Standardsortierung der Fallliste (siehe
+     * `ladeFaelle` in `abfragen.ts`) und eine ihrer wählbaren Sortierfelder
+     * — mit `ORDER BY … LIMIT 100` ist der Index hier der eine, der sich
+     * bei „einige tausend Fälle" schon lohnt. Die übrigen Sortierfelder
+     * liegen im JSON-Feld `daten`; ein Ausdrucksindex je JSON-Pfad wäre bei
+     * dieser Größenordnung mehr Pflegeaufwand, als er einbringt — siehe die
+     * Begründung an `Fallfilter`.
+     */
+    index('fall_abgerufen_idx').on(t.abgerufenAm),
   ],
 )
 
@@ -604,7 +622,13 @@ export const stellungnahme = pgTable(
     erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
     versendetAm: timestamp({ withTimezone: true }),
   },
-  (t) => [index('stellungnahme_fall_idx').on(t.fallId)],
+  (t) => [
+    index('stellungnahme_fall_idx').on(t.fallId),
+    // Standardsortierung und häufigste Sortierwahl der Schreibenliste
+    // (siehe `ladeStellungnahmen` in `abfragen.ts`) — derselbe Grund wie
+    // bei `fall_abgerufen_idx`.
+    index('stellungnahme_erstellt_idx').on(t.erstelltAm),
+  ],
 )
 
 /** Eine Kürzungsposition aus dem Prüfbericht. */
