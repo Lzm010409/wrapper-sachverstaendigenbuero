@@ -70,6 +70,7 @@ knapp, und alle fünf Sekunden zu fragen ist Lärm.
 | Variable | Folge, solange sie fehlt |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Prüfberichte lassen sich nicht auswerten, Abschnitte nicht ausformulieren. Alles Übrige läuft. |
+| `SEVDESK_API_TOKEN` | Kein Zahlungsstand — die Geldampel bleibt leer, der Reiter „Vorgang" sagt es. Alles Übrige läuft. |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` | Kein Microsoft-Knopf in der Anmeldung; es gilt nur die Passwortanmeldung. |
 
 Coolify gibt Geheimnisse über seine API **nicht** heraus — die Werte der
@@ -138,6 +139,7 @@ Weg sicher — aber genau das lässt sich nicht versprechen.
 | `AUTOIXPERT_API_TOKEN` | Fälle aus autoiXpert laden |
 | `AUTOIXPERT_BASIS_URL` | `https://app.autoixpert.de/externalApi/v1` — **mit `/v1`**, sonst laufen alle Pfade ins Leere |
 | `PIPEDRIVE_API_TOKEN` | Phase, Schadenhöhe und sevDesk-Verweis im Reiter „Vorgang" |
+| `SEVDESK_API_TOKEN` | Zahlungsstand der Rechnungen — die Geldampel in Liste und Vorgang |
 
 **Abrufregel gegen autoiXpert** — Voreinstellung ist die enge Fassung, es muss
 nichts gesetzt werden:
@@ -471,6 +473,50 @@ einziges Bild hinaus.
 
 **Ohne `ANTHROPIC_API_KEY`** ist der Knopf gesperrt, mit einem Hinweis
 darauf. Der Fotos-Reiter selbst funktioniert davon unberührt weiter.
+
+## Die Geldampel
+
+In der Fälle-Liste steht neben der Pipedrive-Phase eine zweite Marke: der
+Zahlungsstand aus sevDesk. Im Reiter **Vorgang** steht derselbe Stand
+ausführlich — Betrag, davon bezahlt, was noch offen ist, Fälligkeit,
+Rechnungsnummern.
+
+**Wie Rechnung und Akte zueinander finden.** Über die Rechnungsnummer: sie
+ist das Aktenzeichen mit einer laufenden Nummer dahinter (`0926/2081TG01`
+zur Akte `0926/2081TG`). Der Umweg über den Pipedrive-Deal entfällt damit,
+und Fälle ohne Deal fallen nicht durchs Raster. Die alte Schreibweise mit
+Unterstrich (`1222_693TG`) wird ebenso gefunden.
+
+**Die Zustände:** *Entwurf · Offen · Überfällig · Teilbezahlt · Bezahlt* —
+und *Keine Rechnung*, wenn zum Aktenzeichen nichts in sevDesk liegt. In der
+Liste wird der letzte Fall nicht angezeigt; er ist bei einem frischen Fall
+der Normalzustand.
+
+**Überfällig heisst: das Zahlungsziel der Rechnung ist vorbei** — das aus
+sevDesk, nicht ein eigenes. Achtung: der Rechnungstext spricht von 14 Tagen,
+`timeToPay` steht im Rechnungsworkflow auf 30. Die Ampel folgt sevDesk; der
+Widerspruch gehört im n8n-Workflow „Neuer Rechnungsworfklow" geradegezogen.
+
+**„Widerspruch"** erscheint, wo Pipedrive und sevDesk sich nicht einig sind
+— ein Deal auf „Bezahlt", zu dem kein Geld gebucht ist, oder umgekehrt Geld,
+das in Pipedrive noch nicht angekommen ist. Das ist das eigentliche
+Fundstück: solche Fälle findet sonst niemand.
+
+**Wie der Stand zustande kommt.** Die Rechnungen liegen als Spiegel in der
+Datenbank. Abgeglichen wird beim Blick in die Liste, höchstens einmal je
+Minute, und nur das, was sich seit dem letzten Mal geändert hat. Der erste
+Lauf holt alles — am 09.09.2026 waren das 1444 Rechnungen in zwei Anfragen,
+knapp vier Sekunden. Danach ist es eine Anfrage mit einer Handvoll Zeilen.
+Unter der Karte im Reiter „Vorgang" steht, wann zuletzt abgeglichen wurde.
+
+**Doppelt vergebene Rechnungsnummern** kommen vor (am 09.09.2026 einmal:
+`0823/936TG01`, einmal bezahlt und einmal offen angelegt). Die Ampel zählt
+sie einmal — den weitesten Zustand — und sagt darunter, dass die Nummer
+doppelt liegt. Aufräumen lässt sie sich nur in sevDesk selbst.
+
+**Geschrieben wird nichts.** Der Client hat keine schreibende Methode.
+Gebucht, gemahnt und storniert wird in sevDesk und in den n8n-Workflows,
+die das schon tun.
 
 ## Wenn ein Benutzer einen Fehler meldet
 

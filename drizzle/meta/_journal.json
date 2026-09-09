@@ -92,6 +92,13 @@
       "when": 1788933259135,
       "tag": "0012_foto_analyse",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788934329389,
+      "tag": "0013_rechnungsspiegel",
+      "breakpoints": true
     }
   ]
 }

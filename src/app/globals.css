@@ -940,6 +940,12 @@ button.haupt:disabled:hover {
 .m-warn::before {
   background: var(--warn);
 }
+.m-gut::before {
+  background: var(--good);
+}
+.m-krit::before {
+  background: var(--crit);
+}
 
 /*
  * Die Klassen bleiben, ihre Füllung nicht: Fläche und Schrift sind für alle

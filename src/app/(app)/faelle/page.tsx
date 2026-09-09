@@ -10,6 +10,9 @@ import {
 import { leseFalldaten } from '@/autoixpert/felder'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import { ladePhasenFuerListe } from '@/fall/vorgang'
+import { ladeAmpeln } from '@/geld/stand'
+import { widerspruch } from '@/geld/ampel'
+import { Geldpille } from '@/app/teile/geldpille'
 import { ImportFormular } from './import-formular'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Filterleiste } from '@/app/teile/filterleiste'
@@ -140,7 +143,12 @@ export default async function FaelleSeite({
 }
 
 async function FaelleZeilen({ faelle }: { faelle: Awaited<ReturnType<typeof ladeFaelle>> }) {
-  const phasen = await ladePhasenFuerListe(faelle.map((f) => f.aktenzeichen))
+  // Beide Quellen nebeneinander: Pipedrive und sevDesk wissen nichts
+  // voneinander, und nacheinander gefragt addierten sich ihre Wartezeiten.
+  const [phasen, zahlung] = await Promise.all([
+    ladePhasenFuerListe(faelle.map((f) => f.aktenzeichen)),
+    ladeAmpeln(faelle.map((f) => f.aktenzeichen)),
+  ])
 
   return (
     <div className="liste">
@@ -148,6 +156,10 @@ async function FaelleZeilen({ faelle }: { faelle: Awaited<ReturnType<typeof lade
         const geprueft = gutachtenSchema.safeParse(f.daten)
         const d = geprueft.success ? leseFalldaten(geprueft.data) : null
         const phase = f.aktenzeichen ? phasen.get(f.aktenzeichen) : undefined
+        const ampel = f.aktenzeichen ? zahlung.ampeln.get(f.aktenzeichen) : undefined
+        // Der Widerspruch ist das eigentliche Fundstück: eine Phase, die
+        // etwas anderes behauptet als das Geld auf dem Konto.
+        const streit = ampel ? widerspruch(ampel.stand, phase) : null
 
         return (
           <Link key={f.id} href={`/faelle/${f.id}`} className="zeile">
@@ -176,6 +188,14 @@ async function FaelleZeilen({ faelle }: { faelle: Awaited<ReturnType<typeof lade
                 <span className="marke-pille m-warn">unlesbar</span>
               ) : phase ? (
                 <span className="marke-pille m-akzent">{phase}</span>
+              ) : null}
+              {ampel && ampel.stand !== 'ohne_rechnung' ? (
+                <Geldpille stand={ampel.stand} offenCent={ampel.offenCent} />
+              ) : null}
+              {streit ? (
+                <span className="marke-pille m-warn" title={streit}>
+                  Widerspruch
+                </span>
               ) : null}
               <span className="treffer-zahl">
                 {f.abgerufenAm ? new Date(f.abgerufenAm).toLocaleDateString('de-DE') : ''}

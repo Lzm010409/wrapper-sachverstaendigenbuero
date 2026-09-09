@@ -480,6 +480,65 @@ export const fotoAnalyse = pgTable(
 )
 
 /**
+ * Der Spiegel der sevDesk-Rechnungen.
+ *
+ * **Warum gespiegelt und nicht bei jedem Blick geholt.** Am 09.09.2026
+ * lagen 1444 Rechnungen im Konto; eine Seite davon sind 2,4 MB und rund
+ * eine Sekunde. Das bei jedem Aufruf der Fallliste zu holen wäre absurd.
+ * Abgeglichen wird deshalb inkrementell: sevDesk liefert nach
+ * Änderungszeitpunkt sortiert, und geholt wird nur, was seit dem letzten
+ * Mal jünger ist — im Alltag eine Handvoll Zeilen.
+ *
+ * **Warum es kein Wasserzeichenfeld gibt.** Der Stand des Abgleichs ist
+ * `max(geaendertAm)` über diese Tabelle. Ein zweiter Ort, an dem dasselbe
+ * steht, wäre der Ort, der irgendwann nicht mehr stimmt.
+ *
+ * **Was der Spiegel nicht kann:** eine in sevDesk gelöschte Rechnung
+ * bemerken. Sie taucht in keiner Änderungsliste mehr auf und bliebe hier
+ * stehen. Für die Ampel ist das verschmerzbar — gelöscht wird an
+ * Ausgangsrechnungen praktisch nie, und storniert wird über den Zustand.
+ */
+export const rechnung = pgTable(
+  'rechnung',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /**
+     * Die Kennung der Rechnung in sevDesk — der Schlüssel des Spiegels.
+     * Nicht die Nummer: die kann doppelt vergeben sein (am Konto belegt
+     * am 09.09.2026), und ein Spiegel, der zwei echte Rechnungen zu einer
+     * verschmilzt, verliert genau den Fehler, den man sehen will.
+     */
+    sevdeskId: text().notNull(),
+    /** Die Rechnungsnummer aus sevDesk, z. B. `0926/2081TG01`. */
+    nummer: text().notNull(),
+    /**
+     * Das Aktenzeichen ohne laufende Nummer und ohne Trennzeichen. Darüber
+     * finden Fall und Rechnung zueinander, ohne dass jemand `/` und `_`
+     * von Hand vergleichen muss.
+     */
+    schluessel: text().notNull(),
+    /** 50 Entwurf, 100 offen, 200 versendet, 750 teilbezahlt, 1000 bezahlt. */
+    status: integer().notNull(),
+    /** In Cent. Als Gleitkommazahl summierte sich sonst ein Rundungsfehler auf. */
+    bruttoCent: integer().notNull().default(0),
+    bezahltCent: integer().notNull().default(0),
+    rechnungsdatum: timestamp({ withTimezone: true }),
+    zahldatum: timestamp({ withTimezone: true }),
+    zahlungszielTage: integer(),
+    mahnstufe: integer(),
+    /** Wann sevDesk die Rechnung zuletzt geändert hat. */
+    geaendertAm: timestamp({ withTimezone: true }).notNull(),
+    abgeglichenAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('rechnung_sevdesk_idx').on(t.sevdeskId),
+    index('rechnung_nummer_idx').on(t.nummer),
+    index('rechnung_schluessel_idx').on(t.schluessel),
+    index('rechnung_geaendert_idx').on(t.geaendertAm),
+  ],
+)
+
+/**
  * Eine Meldung, die den Blick überdauern muss.
  *
  * Was am Bildschirm passiert, sagt die Oberfläche selbst. Was **im

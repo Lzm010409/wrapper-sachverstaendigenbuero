@@ -11,6 +11,9 @@ import {
   type Schreiben,
 } from '@/fall/ansicht'
 import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
+import { ladeAmpel } from '@/geld/stand'
+import { widerspruch } from '@/geld/ampel'
+import { Geldpille, euroAusCent } from '@/app/teile/geldpille'
 import { ladeVorgangsschritte } from '@/fall/vorgangsschritte'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
@@ -401,6 +404,20 @@ async function VorgangReiter({
         </div>
 
         <div className="block">
+          <div className="block-label">Rechnung</div>
+          <div className="karte">
+            {/*
+              Eigene Suspense-Grenze wie bei Pipedrive: der erste Abgleich
+              mit sevDesk holt 1444 Rechnungen und dauert Sekunden. Ohne die
+              Grenze wartete der ganze Reiter darauf.
+            */}
+            <Suspense fallback={<Balken breite={60} />}>
+              <Zahlungskarte aktenzeichen={aktenzeichen} phase={phaseVon(vorgang)} />
+            </Suspense>
+          </div>
+        </div>
+
+        <div className="block">
           <div className="block-label">Herkunft</div>
           <div className="karte">
             <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
@@ -595,5 +612,127 @@ function VorgangsschritteSkelett() {
         <Balken breite={62} />
       </div>
     </div>
+  )
+}
+
+/* ---------------- Der Zahlungsstand aus sevDesk ---------------- */
+
+function phaseVon(vorgang: VorgangAnsicht): string | undefined {
+  return vorgang.stand === 'gefunden' ? vorgang.deal?.phase : undefined
+}
+
+/**
+ * Was in sevDesk zu diesem Aktenzeichen an Rechnungen liegt.
+ *
+ * Gefunden werden sie über die Rechnungsnummer: sie ist das Aktenzeichen
+ * mit einer laufenden Nummer dahinter. Der Umweg über den Pipedrive-Deal
+ * entfällt damit — und mit ihm die Fälle, die keinen Deal haben und sonst
+ * unbeobachtet blieben.
+ */
+async function Zahlungskarte({
+  aktenzeichen,
+  phase,
+}: {
+  aktenzeichen: string | null
+  phase: string | undefined
+}) {
+  const { eingerichtet, ampel, spiegel } = await ladeAmpel(aktenzeichen)
+
+  if (!eingerichtet) {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        sevDesk ist auf diesem Server nicht eingerichtet — <code>SEVDESK_API_TOKEN</code> fehlt.
+      </p>
+    )
+  }
+  if (!ampel || ampel.stand === 'ohne_rechnung') {
+    return (
+      <>
+        <p style={{ margin: 0 }}>Zu diesem Aktenzeichen liegt in sevDesk keine Rechnung.</p>
+        <Streitfall text={widerspruch('ohne_rechnung', phase)} />
+        <Abgleichstand abgeglichenAm={spiegel.abgeglichenAm} />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div style={{ marginBottom: 10 }}>
+        <Geldpille stand={ampel.stand} offenCent={ampel.offenCent} />
+      </div>
+      <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
+        <dt>Rechnungsbetrag</dt>
+        <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.bruttoCent)}</dd>
+        <dt>Davon bezahlt</dt>
+        <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.bezahltCent)}</dd>
+        {/*
+          Bei „bezahlt" bleibt der Restbetrag weg. sevDesk bucht mitunter
+          einen Cent weniger als die Rechnung ausweist (855,49 zu 855,50);
+          „Noch offen 0,01 €" unter der Marke „Bezahlt" ist kein Hinweis,
+          sondern Rauschen.
+        */}
+        {ampel.offenCent > 0 && ampel.stand !== 'bezahlt' ? (
+          <>
+            <dt>Noch offen</dt>
+            <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.offenCent)}</dd>
+          </>
+        ) : null}
+        {ampel.faelligAm && ampel.stand !== 'bezahlt' ? (
+          <>
+            <dt>Fällig am</dt>
+            <dd style={{ textAlign: 'left' }}>
+              {ampel.faelligAm.toLocaleDateString('de-DE')}
+            </dd>
+          </>
+        ) : null}
+        {ampel.zahldatum ? (
+          <>
+            <dt>Bezahlt am</dt>
+            <dd style={{ textAlign: 'left' }}>{ampel.zahldatum.toLocaleDateString('de-DE')}</dd>
+          </>
+        ) : null}
+        {ampel.mahnstufe ? (
+          <>
+            <dt>Mahnstufe</dt>
+            <dd style={{ textAlign: 'left' }}>{ampel.mahnstufe}</dd>
+          </>
+        ) : null}
+        <dt>{ampel.nummern.length === 1 ? 'Rechnungsnummer' : 'Rechnungsnummern'}</dt>
+        <dd style={{ textAlign: 'left', fontFamily: 'var(--mono)', fontSize: 12 }}>
+          {ampel.nummern.join(', ')}
+        </dd>
+      </dl>
+      <Streitfall text={widerspruch(ampel.stand, phase)} />
+      {ampel.doppelt.length > 0 ? (
+        <Streitfall
+          text={`In sevDesk liegt ${ampel.doppelt.length === 1 ? 'die Rechnungsnummer' : 'die Rechnungsnummern'} ${ampel.doppelt.join(', ')} mehrfach. Gezählt wurde sie nur einmal — bitte in sevDesk aufräumen.`}
+        />
+      ) : null}
+      <Abgleichstand abgeglichenAm={spiegel.abgeglichenAm} />
+    </>
+  )
+}
+
+function Streitfall({ text }: { text: string | null }) {
+  if (!text) return null
+  return (
+    <div style={{ marginTop: 10 }}>
+      <Meldung art="warnung">{text}</Meldung>
+    </div>
+  )
+}
+
+/**
+ * Wann zuletzt mit sevDesk gesprochen wurde.
+ *
+ * Eine Aussage über Geld ohne ihr Alter ist eine halbe Aussage — wer sie
+ * liest, soll sehen, ob sie von heute früh oder von letzter Woche ist.
+ */
+function Abgleichstand({ abgeglichenAm }: { abgeglichenAm: Date | null }) {
+  if (!abgeglichenAm) return null
+  return (
+    <p className="unterzeile" style={{ margin: '10px 0 0' }}>
+      Stand: {abgeglichenAm.toLocaleString('de-DE')}
+    </p>
   )
 }
