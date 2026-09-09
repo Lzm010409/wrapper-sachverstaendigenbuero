@@ -84,10 +84,12 @@ export async function ladeDubletten(): Promise<Dublettengruppe[]> {
   const kandidaten = gruppiere(kontakte).flatMap((g) => g.kontakte)
   if (kandidaten.length === 0) return []
 
-  const mitBelegen: Kontakt[] = []
-  for (const kandidat of kandidaten) {
-    mitBelegen.push({ ...kandidat, belege: await belegzahl(kandidat.id) })
-  }
+  // Nebeneinander: es sind so viele Anfragen, wie es Dubletten gibt — am
+  // 09.09.2026 neunzehn. Nacheinander waren das gemessene Sekunden, in
+  // denen die Seite leer blieb.
+  const mitBelegen = await Promise.all(
+    kandidaten.map(async (kandidat) => ({ ...kandidat, belege: await belegzahl(kandidat.id) })),
+  )
   return gruppiere(mitBelegen)
 }
 

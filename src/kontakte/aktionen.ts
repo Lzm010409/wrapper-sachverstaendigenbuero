@@ -8,8 +8,7 @@ import { kontaktumhang } from '@/db/schema'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { holeAnhaenge, istLeer } from '@/sevdesk/anhaenge'
 import { dublettenvermerk, haengeUm, loescheKontakt, markiere } from '@/sevdesk/schreiben'
-import { ladeDubletten } from '@/sevdesk/kontakte'
-import { planeSchritte, probeschritt, type Objektart, type Plan } from './plan'
+import { planeSchritte, probeschritt, type Kontaktanhaenge, type Objektart, type Plan } from './plan'
 import { protokolliereFehler } from '@/protokoll'
 import type { Aktionsergebnis } from '@/melden/typen'
 
@@ -28,11 +27,37 @@ import type { Aktionsergebnis } from '@/melden/typen'
  * Protokoll und ist mit einem Klick zurückzuholen.
  */
 
-export interface Vorschau {
-  plan: Plan | null
-  siegerAnzeige: string
-  verliererAnzeigen: Record<string, string>
-  fehler?: string
+/**
+ * Was an einem Kontakt hängt — ein Aufruf je Kontakt.
+ *
+ * **Warum je Kontakt und nicht für die ganze Gruppe.** Die Vorschau der
+ * Arndt-Gruppe waren vorher rund 68 Anfragen an sevDesk in einem einzigen
+ * Aufruf: erst die Kontaktliste samt Belegzähler für alle 19 Einträge,
+ * dann sechs Abfragen je Kontakt. Das dauerte knapp eine Minute, und die
+ * Oberfläche hatte in dieser Minute nichts zu sagen — sie konnte gar
+ * nichts sagen, weil sie auf **eine** Antwort wartete.
+ *
+ * Jetzt holt die Oberfläche einen Kontakt nach dem anderen und zählt
+ * dabei mit. Den Plan rechnet sie anschliessend selbst aus: `planeSchritte`
+ * ist reine Rechnerei ohne Netz und läuft im Browser genauso.
+ */
+export async function leseAnhaenge(
+  kontaktId: string,
+  anzeige: string,
+): Promise<{ anhaenge: Kontaktanhaenge | null; fehler?: string }> {
+  await verlangeRecht('sevdesk.zusammenfuehren')
+  try {
+    return { anhaenge: await holeAnhaenge(kontaktId, anzeige) }
+  } catch (fehler) {
+    const kennung = protokolliereFehler('kontakte.anhaenge', 'Die Anhänge waren nicht lesbar.', fehler, {
+      dienst: 'sevdesk',
+      kontaktId,
+    })
+    return {
+      anhaenge: null,
+      fehler: `${fehler instanceof Error ? fehler.message : String(fehler)} (Kennung ${kennung})`,
+    }
+  }
 }
 
 export interface Schrittbericht {
@@ -49,57 +74,6 @@ export interface Umhangbericht {
   fehler?: string
 }
 
-/** Liest frisch, was an den Kontakten hängt, und baut daraus den Plan. */
-async function planeFrisch(siegerId: string, verliererIds: string[]) {
-  const dubletten = await ladeDubletten()
-  const namen = new Map<string, string>()
-  for (const gruppe of dubletten) {
-    for (const kontakt of gruppe.kontakte) namen.set(kontakt.id, kontakt.anzeige)
-  }
-
-  const sieger = await holeAnhaenge(siegerId, namen.get(siegerId) ?? siegerId)
-  const verlierer = []
-  for (const id of verliererIds) {
-    verlierer.push(await holeAnhaenge(id, namen.get(id) ?? id))
-  }
-  return { plan: planeSchritte(sieger, verlierer), sieger, verlierer }
-}
-
-/** Was passieren würde. Liest nur. */
-export async function zeigeVorschau(
-  siegerId: string,
-  verliererIds: string[],
-): Promise<Vorschau> {
-  await verlangeRecht('sevdesk.zusammenfuehren')
-
-  if (!siegerId || verliererIds.length === 0) {
-    return { plan: null, siegerAnzeige: '', verliererAnzeigen: {}, fehler: 'Bitte einen Kontakt zum Bleiben und mindestens einen zum Zusammenführen wählen.' }
-  }
-  if (verliererIds.includes(siegerId)) {
-    return { plan: null, siegerAnzeige: '', verliererAnzeigen: {}, fehler: 'Der bleibende Kontakt kann nicht zugleich zusammengeführt werden.' }
-  }
-
-  try {
-    const { plan, sieger, verlierer } = await planeFrisch(siegerId, verliererIds)
-    return {
-      plan,
-      siegerAnzeige: sieger.anzeige,
-      verliererAnzeigen: Object.fromEntries(verlierer.map((v) => [v.kontaktId, v.anzeige])),
-    }
-  } catch (fehler) {
-    const kennung = protokolliereFehler('kontakte.vorschau', 'Die Vorschau ist gescheitert.', fehler, {
-      dienst: 'sevdesk',
-      siegerId,
-    })
-    return {
-      plan: null,
-      siegerAnzeige: '',
-      verliererAnzeigen: {},
-      fehler: `${fehler instanceof Error ? fehler.message : String(fehler)} (Kennung ${kennung})`,
-    }
-  }
-}
-
 /**
  * Hängt alles um. Löscht nichts.
  *
@@ -108,6 +82,7 @@ export async function zeigeVorschau(
  */
 export async function fuehreZusammen(
   siegerId: string,
+  siegerAnzeige: string,
   verliererIds: string[],
 ): Promise<Umhangbericht> {
   const benutzer = await verlangeRecht('sevdesk.zusammenfuehren')
@@ -117,11 +92,15 @@ export async function fuehreZusammen(
   }
 
   let plan: Plan
-  let siegerAnzeige: string
   try {
-    const frisch = await planeFrisch(siegerId, verliererIds)
-    plan = frisch.plan
-    siegerAnzeige = frisch.sieger.anzeige
+    // Frisch gelesen, nicht aus der Vorschau uebernommen: zwischen dem
+    // Blick und dem Klick kann jemand in sevDesk eine Rechnung angelegt
+    // haben.
+    const [sieger, ...verlierer] = await Promise.all([
+      holeAnhaenge(siegerId, siegerAnzeige),
+      ...verliererIds.map((id) => holeAnhaenge(id, id)),
+    ])
+    plan = planeSchritte(sieger!, verlierer)
   } catch (fehler) {
     return {
       vorgang: null,

@@ -72,11 +72,31 @@ function bezeichnung(roh: z.infer<typeof anhangSchema>): string {
 
 const ARTEN: Objektart[] = ['Invoice', 'Voucher', 'Order', 'CreditNote']
 
+/**
+ * Was an einem Kontakt hängt — sechs Abfragen, nebeneinander.
+ *
+ * **Warum hier nebeneinander und anderswo nacheinander.** Es sind genau
+ * sechs Anfragen zu **einem** Kontakt, ausgelöst von einem Menschen, der
+ * auf das Ergebnis wartet. Nacheinander waren das gemessene sechs Sekunden
+ * je Kontakt und für die Arndt-Gruppe knapp eine Minute — eine Wartezeit,
+ * in der die Oberfläche nichts zu sagen hatte. Die Ratenbegrenzung von
+ * sevDesk sieht sechs gleichzeitige Lesezugriffe nicht einmal.
+ */
 export async function holeAnhaenge(kontaktId: string, anzeige: string): Promise<Kontaktanhaenge> {
+  const [belege, roheAdressen, roheWege] = await Promise.all([
+    Promise.all(
+      ARTEN.map(async (art) => ({
+        art,
+        eintraege: objekte(await holeJson(`/${art}?limit=1000&${kontaktfilter(kontaktId)}`)),
+      })),
+    ),
+    holeJson(`/Contact/${encodeURIComponent(kontaktId)}/getAddresses`).then(objekte),
+    holeJson(`/Contact/${encodeURIComponent(kontaktId)}/getCommunicationWays`).then(objekte),
+  ])
+
   const anhaenge: Anhang[] = []
-  for (const art of ARTEN) {
-    const roh = await holeJson(`/${art}?limit=1000&${kontaktfilter(kontaktId)}`)
-    for (const eintrag of objekte(roh)) {
+  for (const { art, eintraege } of belege) {
+    for (const eintrag of eintraege) {
       const geprueft = anhangSchema.safeParse(eintrag)
       if (!geprueft.success) continue
       anhaenge.push({
@@ -90,7 +110,7 @@ export async function holeAnhaenge(kontaktId: string, anzeige: string): Promise<
   }
 
   const adressen: Adresse[] = []
-  for (const eintrag of objekte(await holeJson(`/Contact/${encodeURIComponent(kontaktId)}/getAddresses`))) {
+  for (const eintrag of roheAdressen) {
     const geprueft = adresseSchema.safeParse(eintrag)
     if (!geprueft.success) continue
     adressen.push({
@@ -102,9 +122,7 @@ export async function holeAnhaenge(kontaktId: string, anzeige: string): Promise<
   }
 
   const wege: Weg[] = []
-  for (const eintrag of objekte(
-    await holeJson(`/Contact/${encodeURIComponent(kontaktId)}/getCommunicationWays`),
-  )) {
+  for (const eintrag of roheWege) {
     const geprueft = wegSchema.safeParse(eintrag)
     if (!geprueft.success) continue
     const wert = geprueft.data.value?.trim()
@@ -124,9 +142,8 @@ export async function holeAnhaenge(kontaktId: string, anzeige: string): Promise<
  * Erlaubnis zum Löschen erzeugen.
  */
 export async function istLeer(kontaktId: string): Promise<boolean> {
-  for (const art of ARTEN) {
-    const roh = await holeJson(`/${art}?limit=1&${kontaktfilter(kontaktId)}`)
-    if (objekte(roh).length > 0) return false
-  }
-  return true
+  const zahlen = await Promise.all(
+    ARTEN.map(async (art) => objekte(await holeJson(`/${art}?limit=1&${kontaktfilter(kontaktId)}`)).length),
+  )
+  return zahlen.every((n) => n === 0)
 }

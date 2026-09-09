@@ -3463,6 +3463,20 @@ body {
   border-bottom: 0;
 }
 
+/*
+  Der Fuss einer Gruppe: links der Stand, rechts der Knopf. Der Stand steht
+  bewusst dort und nicht in einer Einblendung — bei acht Kontakten waeren
+  das acht Einblendungen, von denen keine stehen bliebe.
+*/
+.gruppenfuss {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  min-height: 34px;
+}
+
 /* Was schon geloescht ist, tritt zurueck — es ist nur noch Beleg dafuer, dass es weg ist. */
 .dublettentabelle tr.geloescht td {
   opacity: 0.5;
