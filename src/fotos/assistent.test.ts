@@ -135,6 +135,22 @@ describe('beschriftePaket', () => {
     expect(await beschriftePaket(FAHRZEUG, [], [bild('a')])).toEqual([])
   })
 
+  it('rettet eine Sicherheit ausserhalb von 0 bis 100, statt das Paket zu verlieren', async () => {
+    // Die Schnittstelle kann die Grenze bei `strict` nicht erzwingen. Ein
+    // einzelner Ausreisser darf nicht das ganze Paket ungeprüft lassen.
+    ruf.mockResolvedValue(
+      antwort([
+        { id: 'a', kategorie: 'schaden', beschreibung: 'Stossfänger', sicherheit: 140 },
+        { id: 'b', kategorie: 'reifen', beschreibung: 'Reifen vorne links', sicherheit: -5 },
+      ]),
+    )
+
+    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [bild('a'), bild('b')])
+
+    expect(vorschlaege.find((v) => v.fotoId === 'a')?.sicherheit).toBe(100)
+    expect(vorschlaege.find((v) => v.fotoId === 'b')?.sicherheit).toBe(0)
+  })
+
   it('gibt bei einem Fehler des Modells nichts zurück, statt zu werfen', async () => {
     ruf.mockRejectedValue(new Error('Zeitlimit'))
 

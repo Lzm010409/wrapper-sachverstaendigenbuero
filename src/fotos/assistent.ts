@@ -59,11 +59,29 @@ const vorschlagSchema = z.object({
   id: z.string(),
   kategorie: z.enum(KATEGORIESCHLUESSEL as [Kategorie, ...Kategorie[]]),
   beschreibung: z.string(),
-  sicherheit: z.number().min(0).max(100),
+  /*
+    Geklemmt, nicht abgelehnt. `strict` kann `minimum`/`maximum` nicht
+    erzwingen (siehe WERKZEUG), die Grenze steht also nur im
+    Beschreibungstext. Ein einzelner Ausreisser würde sonst über
+    `safeParse` das ganze Paket kippen — bis zu zwölf Fotos ohne
+    Vorschlag wegen einer 105.
+  */
+  sicherheit: z.number().transform((wert) => Math.min(100, Math.max(0, wert))),
 })
 
 const antwortSchema = z.object({ vorschlaege: z.array(vorschlagSchema) })
 
+/**
+ * Die Werkzeugdefinition des Fotoassistenten.
+ *
+ * **`strict: true` kennt nur einen Teil von JSON Schema.** Zahlengrenzen
+ * (`minimum`, `maximum`, `multipleOf`), Textlängen, Muster und
+ * Mengenangaben für Listen weist die Schnittstelle mit einem 400 ab — der
+ * Aufruf kommt gar nicht erst beim Modell an (vgl. `PRUEF_WERKZEUG` in
+ * `wbw/pruefung.ts`, wo derselbe Fehler am 08.09.2026 auffiel). Grenzen
+ * gehören deshalb in den Beschreibungstext, und die Nachprüfung macht das
+ * Zod-Schema oben.
+ */
 const WERKZEUG = {
   name: 'fotos_beschriften',
   description:
@@ -96,9 +114,9 @@ const WERKZEUG = {
             },
             sicherheit: {
               type: 'integer',
-              minimum: 0,
-              maximum: 100,
-              description: 'Wie sicher die Kategorie ist. Unter 50, wenn das Bild unklar ist.',
+              description:
+                'Ganze Zahl von 0 bis 100 — wie sicher die Kategorie ist. Unter 50, wenn ' +
+                'das Bild unklar ist.',
             },
           },
           required: ['id', 'kategorie', 'beschreibung', 'sicherheit'],
