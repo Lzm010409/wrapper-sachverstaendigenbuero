@@ -86,6 +86,61 @@ ist eine plausible Zahl.
 
 Die Feldkarte rechnet für Kleinanzeigen deshalb `kW = PS / 1,35962`.
 
+### Die Attributschlüssel bei Kleinanzeigen
+
+Die Filterleiste des Portals nennt die Schlüssel, die der Actor unter
+`attributeFilters` erwartet. Sie tragen ein Typkürzel: `_s` für Text, `_i` für
+Zahl, `_b` für Ja/Nein. Gegen die Datensätze aus Probelauf 1 gehalten, passen
+sie eins zu eins auf die deutschen Feldnamen in `attributes`:
+
+| Feld in `attributes` | Schlüssel | Werte |
+| --- | --- | --- |
+| Marke | `autos.marke_s` | `volkswagen`, `mercedes_benz`, `citroen`, `sonstige_autos` … |
+| Erstzulassung | `autos.ez_i` | Jahr, `1910`–`2026`, als `"von,bis"` |
+| Kilometerstand | `autos.km_i` | `5000`–`150000`, als `"von,bis"` |
+| Leistung | `autos.power_i` | **PS**, nicht kW — `34`–`252` |
+| Fahrzeugzustand | `autos.schaden_s` | `ja` / `nein` |
+| Kraftstoffart | `autos.fuel_s` | `benzin`, `diesel`, `lpg`, `hybrid` |
+| Getriebe | `autos.shift_s` | `automatik`, `manuell` |
+| Fahrzeugtyp | `autos.typ_s` | `kleinwagen`, `limousine`, `kombi`, `cabrio`, `suv`, `bus`, `coupe` |
+| Anzahl Türen | `autos.anzahl_tueren_s` | `2_3`, `4_5` |
+| HU bis | `autos.tuevy_i` | Jahr |
+| Schadstoffklasse | `autos.schadstoffklasse_s` | `euro4`, `euro5`, `euro6` |
+| Außenfarbe | `global.farbe` | — |
+
+Die Ausstattung sind Ja/Nein-Schlüssel, und jeder von ihnen entspricht genau
+einem deutschen Feldnamen aus dem Datensatz: `autos.trailer_coupling_b`
+(Anhängerkupplung), `autos.park_assistant_b` (Einparkhilfe),
+`autos.alluminium_rims_b` (Leichtmetallfelgen), `autos.xenon_led_light_b`,
+`autos.air_conditioning_b` (Klimaanlage), `autos.navi_b`,
+`autos.radio_tuner_b`, `autos.bluetooth_b`, `autos.handsfree_speaker_b`
+(Freisprecheinrichtung), `autos.sunroof_b` (Schiebedach/Panoramadach),
+`autos.seat_heating_b` (Sitzheizung), `autos.speed_control_b` (Tempomat),
+`autos.non_smoking_b` (Nichtraucher-Fahrzeug), `autos.abs_b`,
+`autos.full_service_history_b` (Scheckheftgepflegt).
+
+**Damit ist die halbe Übersetzungstabelle geschenkt.** Kleinanzeigen liefert
+die Ausstattung ohnehin deutsch; die Tabelle aus Abschnitt 3 wird nur für
+AutoScout24 und mobile.de gebraucht.
+
+**Zwei Dinge bleiben zu messen, statt sie zu glauben.**
+
+1. *Welche Schreibweise trägt.* Der Probelauf hat `autos.marke` und `autos.km`
+   **ohne** Kürzel gesetzt — so steht es in der Actor-Dokumentation — und die
+   Treffer lagen in der Spanne (Sharan 187.000 und 131.000 bei 130.000–195.000;
+   Berlingo 74.052, 61.123, 73.348 bei 50.000–100.000). Das ist ein Indiz, kein
+   Beweis: bei zwei bis drei Datensätzen kann das Zufall sein. Und ein
+   Schlüssel in der falschen Schreibweise filtert nach Schema **still** nicht.
+2. *Ob `autos.typ_s` als Eingabefilter taugt.* Bei AutoScout24 hat genau das
+   den Korb von zehn auf eins zusammengestrichen. Kleinanzeigen führt eine
+   eigene Sammelrubrik — der Berlingo mit Rollstuhlrampe kam als *„Andere
+   Fahrzeugtypen"* zurück, nicht als *„Van/Bus"*. Bis das gemessen ist, gilt
+   auch hier: Bauart nachträglich, nicht am Portal.
+
+`apify-probe-3.mjs` beantwortet beides: je Fall ein ungefilterter Lauf als
+Lineal, dann beide Schreibweisen unmittelbar danach, dann der Bauartfilter —
+aber nur in der Schreibweise, die vorher nachweislich getragen hat.
+
 ### Was `includeDetails` liefert
 
 | | Treffer | `equipment` | `description` | Unfallstatus | Koordinaten | PLZ |
@@ -128,10 +183,10 @@ Was gesetzt wird — und was ausdrücklich **nicht**:
 | --- | --- | --- | --- |
 | Modell | `make` + `model` | `make` + `model` (statt Freitext) | `attributeFilters` bzw. `startUrls` |
 | Umkreis | `lat`/`lon`/`radiusKm` | `zipCode`/`radiusKm` | `lat`/`lon`/`radiusKm` |
-| Laufleistung | `mileageTo` | `mileageMin`/`Max` | `autos.km` als `"min,max"` |
-| Baujahr | `yearFrom`/`To` | `yearMin`/`Max` | — |
-| Leistung | — | `powerMin`/`Max` | — |
-| Unfall | — | `damageStatus: EXCLUDE` | — |
+| Laufleistung | `mileageTo` | `mileageMin`/`Max` | `autos.km_i` als `"min,max"` |
+| Baujahr | `yearFrom`/`To` | `yearMin`/`Max` | `autos.ez_i` als `"min,max"` |
+| Leistung | — | `powerMin`/`Max` | `autos.power_i` (**in PS**) |
+| Unfall | — | `damageStatus: EXCLUDE` | `autos.schaden_s: nein` |
 | Ausschluss | — | `excludeKeywords` (Export, Bastler) | `whatExclude` |
 | Details | `includeDetails: true` | `includeDetails: true` | `includeDetails: true` |
 | **Bauart** | **nie** | **nie** | **nie** |
@@ -190,10 +245,14 @@ Oberfläche.
 
 - **Kleinanzeigen liefert wenig.** Zwei bis drei Treffer bei zehn
   angefragten. Ob das am `attributeFilters`-Weg liegt oder am Bestand, ist
-  ungemessen. Der Gegentest wäre derselbe Lauf über `startUrls`.
-- **Kein EZ-Filter bei Kleinanzeigen.** Der Schlüssel für die Erstzulassung
-  ist nicht dokumentiert und wurde nicht erraten. Im Probelauf kamen deshalb
-  Fahrzeuge von 2012 bis 2024 zurück.
+  ungemessen. Der Gegentest über `startUrls` steckt in `apify-probe-3.mjs`.
+- ~~Kein EZ-Filter bei Kleinanzeigen.~~ **Erledigt:** der Schlüssel heisst
+  `autos.ez_i` und nimmt Jahre. Dass er wirkt, ist noch ungemessen — im
+  Probelauf kamen ohne ihn Fahrzeuge von 2012 bis 2024 zurück, und genau
+  dieser Abstand ist jetzt das Lineal für den Gegentest.
+- **Die Schreibweise der Attributschlüssel ist ungemessen.** Actor-
+  Dokumentation (`autos.km`) und Portalformular (`autos.km_i`) widersprechen
+  einander, und die falsche Schreibweise scheitert lautlos.
 - **Die Bauart-Gruppierung ist ungemessen.** Dass Van, Station Wagon und
   Other für einen Sharan alle „Großraum" heissen müssen, ist aus zwanzig
   Datensätzen geschlossen, nicht aus hundert.
@@ -205,6 +264,7 @@ Oberfläche.
 | | Scheibe | Abnehmbar durch |
 | --- | --- | --- |
 | 1 | Probeläufe | ✅ abgeschlossen, 0,076 $ |
+| 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | Befund im Protokoll, rund 0,09 $ |
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | Vertrag hält, Tests grün |
 | 3 | Filter je Portal vollständig setzen | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
