@@ -1,6 +1,6 @@
 # Die WBW-Beschaffung über Apify
 
-Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus zwei echten
+Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus drei echten
 Probeläufen gegen die Actors, nicht aus deren Dokumentation. Was gemessen ist,
 steht mit Messwert da; was offen ist, steht als offen da.
 
@@ -20,8 +20,8 @@ führen einen Umkreisfilter, und er wirkt.
 
 ## Was gemessen wurde
 
-Zwei Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
-03/2021), Gesamtkosten **0,076 $**.
+Drei Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
+03/2021), Gesamtkosten **0,136 $**.
 
 ### Der Umkreis am Portal wirkt
 
@@ -123,23 +123,83 @@ einem deutschen Feldnamen aus dem Datensatz: `autos.trailer_coupling_b`
 die Ausstattung ohnehin deutsch; die Tabelle aus Abschnitt 3 wird nur für
 AutoScout24 und mobile.de gebraucht.
 
-**Zwei Dinge bleiben zu messen, statt sie zu glauben.**
+### Probelauf 3: was die Schlüssel wirklich tun
 
-1. *Welche Schreibweise trägt.* Der Probelauf hat `autos.marke` und `autos.km`
-   **ohne** Kürzel gesetzt — so steht es in der Actor-Dokumentation — und die
-   Treffer lagen in der Spanne (Sharan 187.000 und 131.000 bei 130.000–195.000;
-   Berlingo 74.052, 61.123, 73.348 bei 50.000–100.000). Das ist ein Indiz, kein
-   Beweis: bei zwei bis drei Datensätzen kann das Zufall sein. Und ein
-   Schlüssel in der falschen Schreibweise filtert nach Schema **still** nicht.
-2. *Ob `autos.typ_s` als Eingabefilter taugt.* Bei AutoScout24 hat genau das
-   den Korb von zehn auf eins zusammengestrichen. Kleinanzeigen führt eine
-   eigene Sammelrubrik — der Berlingo mit Rollstuhlrampe kam als *„Andere
-   Fahrzeugtypen"* zurück, nicht als *„Van/Bus"*. Bis das gemessen ist, gilt
-   auch hier: Bauart nachträglich, nicht am Portal.
+Zehn Läufe, zwei Fälle, **0,060 $**. Je Fall zuerst ein Lauf ganz ohne Filter
+als Lineal, dann beide Schreibweisen und `startUrls` unmittelbar danach.
 
-`apify-probe-3.mjs` beantwortet beides: je Fall ein ungefilterter Lauf als
-Lineal, dann beide Schreibweisen unmittelbar danach, dann der Bauartfilter —
-aber nur in der Schreibweise, die vorher nachweislich getragen hat.
+| Lauf | Sharan | davon ausserhalb km / EZ | Berlingo | davon ausserhalb km / EZ |
+| --- | --- | --- | --- | --- |
+| ohne Filter | 4 | 4 / 1 | 5 | 5 / 4 |
+| ohne Kürzel (`autos.km`) | 2 | **0 / 0** | 1 | **0 / 0** |
+| mit Kürzel (`autos.km_i`) | 2 | **0 / 0** | 1 | **0 / 0** |
+| `startUrls` | 2 | 0 / 0 | 1 | 0 / 0 |
+
+**Die Schlüssel filtern, und die Schreibweise ist gleichgültig.** Beide Formen
+lieferten in beiden Fällen dieselben Inserate — identische `listingId`. Der
+Actor übersetzt also selbst; auch `autos.ez`, das er gar nicht dokumentiert,
+kam mit Kürzel wie ohne durch. Das Lineal macht es beweiskräftig: ungefiltert
+lagen 4 von 4 beziehungsweise 5 von 5 Fahrzeugen ausserhalb der km-Spanne,
+gefiltert keines mehr.
+
+**`startUrls` ist nicht besser.** Dieselben Inserate, dieselbe Anzahl. Damit
+ist der offene Punkt beantwortet: die magere Ausbeute liegt **nicht** am
+`attributeFilters`-Weg. Wir nehmen `attributeFilters` mit Kürzel — die Form,
+die das Portal selbst in seine Adresse schreibt.
+
+### Der Bauartfilter kostet auch bei Kleinanzeigen ein echtes Fahrzeug
+
+| | ohne Bauartfilter | mit `autos.typ: bus` |
+| --- | --- | --- |
+| Sharan | 4 | **3** |
+| Berlingo | 5 | 5 |
+
+Beim Berlingo war er harmlos: er warf den *„Berlingo 75Ps Kastenwagen"*
+(`Andere Fahrzeugtypen`) hinaus und zog ein weiteres Van/Bus nach.
+
+Beim Sharan warf er den *„VW Sharan 2.0 Diesel 2010"* hinaus — einen echten
+Sharan, den der Verkäufer als **Kombi** eingetragen hat. Kein Grenzfall,
+sondern genau das Fahrzeug, das in den Korb gehört.
+
+Damit gilt die Regel dieses Papiers auch für Kleinanzeigen, aus einem zweiten
+Grund: bei AutoScout24 ist das Eingabevokabular falsch, bei Kleinanzeigen ist
+die Eingabe des Verkäufers falsch. **Die Bauart wird nachträglich gefiltert,
+nie am Portal.**
+
+### Zwei Funde, nach denen niemand gesucht hat
+
+**Kleinanzeigen liefert Gesuche.** Im ungefilterten Sharan-Lauf stand
+*„Gesucht: SHARAN 7-Sitzer 2.0TDI"* mit `adType: "WANTED"`, 11.000 € und
+20.000 km. Ein Wunschpreis eines Käufers, kein Angebot. Ungefiltert wäre er
+als Vergleichsfahrzeug in den Median gegangen. Der Actor führt dafür einen
+Schalter: `adType` muss auf `OFFERED` stehen, und im URL-Weg heisst dasselbe
+`anzeige:angebote`. Das ist **Pflicht**, kein Feinschliff.
+
+**Kleinanzeigen liefert nur den heutigen Tag.** Über alle drei Probeläufe
+hinweg tragen **31 von 31** Datensätzen dasselbe Einstelldatum — den Tag des
+Laufs. Und ohne jeden Filter kamen bei `maxResults: 10` nur 4 (Sharan)
+beziehungsweise 5 (Berlingo) Fahrzeuge zurück.
+
+Beides zusammen liest sich so: der Actor holt die erste, nach Datum sortierte
+Seite und filtert den Umkreis danach lokal. Was gestern eingestellt wurde,
+sieht er nicht. Für einen Wertermittlungskorb ist das der Unterschied zwischen
+dem Markt und dem, was heute Morgen zufällig inseriert wurde.
+
+**Gemessen ist das Symptom, nicht die Ursache.** Der Gegentest ist billig und
+steht aus: derselbe Lauf mit `maxResultsPerQuery` deutlich über 10, und einer
+über eine Startadresse mit Seitenzahl. Bis dahin ist Kleinanzeigen nicht die
+dritte gleichwertige Quelle, als die dieses Papier es bisher geführt hat.
+
+### Die Lehre: Filter müssen sich nachweisen
+
+Dreimal in dieser Sitzung ist derselbe Fehler aufgetreten — ein Filter, der
+lautlos nichts tut oder lautlos das Falsche tut. Deshalb bekommt die
+Beschaffung eine Selbstprüfung: **nach jedem Abruf wird gezählt, wie viele
+gelieferte Fahrzeuge die gesetzten Spannen verletzen.** Verletzt mehr als eine
+Handvoll sie, hat der Portalfilter nicht gegriffen; das steht dann im
+Protokoll, und der Nachfilter räumt auf. Genau diese Zählung hat den Befund
+oben erst beweiskräftig gemacht — sie kostet nichts und sie schläft nie.
+
 
 ### Was `includeDetails` liefert
 
@@ -181,20 +241,21 @@ Was gesetzt wird — und was ausdrücklich **nicht**:
 
 | | AutoScout24 | mobile.de | Kleinanzeigen |
 | --- | --- | --- | --- |
-| Modell | `make` + `model` | `make` + `model` (statt Freitext) | `attributeFilters` bzw. `startUrls` |
+| Modell | `make` + `model` | `make` + `model` (statt Freitext) | `query` + `autos.marke_s` |
 | Umkreis | `lat`/`lon`/`radiusKm` | `zipCode`/`radiusKm` | `lat`/`lon`/`radiusKm` |
 | Laufleistung | `mileageTo` | `mileageMin`/`Max` | `autos.km_i` als `"min,max"` |
 | Baujahr | `yearFrom`/`To` | `yearMin`/`Max` | `autos.ez_i` als `"min,max"` |
 | Leistung | — | `powerMin`/`Max` | `autos.power_i` (**in PS**) |
 | Unfall | — | `damageStatus: EXCLUDE` | `autos.schaden_s: nein` |
 | Ausschluss | — | `excludeKeywords` (Export, Bastler) | `whatExclude` |
+| Angebote | — | — | **`adType: OFFERED`** (sonst Gesuche) |
 | Details | `includeDetails: true` | `includeDetails: true` | `includeDetails: true` |
-| **Bauart** | **nie** | **nie** | **nie** |
+| **Bauart** | **nie** | **nie** | **nie** (kostet einen echten Sharan) |
 
-Kleinanzeigen bekommt `startUrls`, wo `attributeFilters` nicht trägt: laut
-Schema werden unbekannte Schlüssel *„sent as-is and may simply not narrow
-results"* — ein Tippfehler filtert dort **still** nicht. Die Suchadressen baut
-`build-search-urls.js` bereits.
+Kleinanzeigen bekommt `attributeFilters` mit Kürzel. `startUrls` liefert
+gemessen dasselbe und wird nicht gebraucht. Dass ein Tippfehler dort **still**
+nicht filtert, bleibt wahr — dagegen steht die Selbstprüfung, nicht der
+zweite Weg.
 
 ### 2. Feldkarte je Actor
 
@@ -243,19 +304,21 @@ Oberfläche.
 
 ## Was offen bleibt
 
-- **Kleinanzeigen liefert wenig.** Zwei bis drei Treffer bei zehn
-  angefragten. Ob das am `attributeFilters`-Weg liegt oder am Bestand, ist
-  ungemessen. Der Gegentest über `startUrls` steckt in `apify-probe-3.mjs`.
-- ~~Kein EZ-Filter bei Kleinanzeigen.~~ **Erledigt:** der Schlüssel heisst
-  `autos.ez_i` und nimmt Jahre. Dass er wirkt, ist noch ungemessen — im
-  Probelauf kamen ohne ihn Fahrzeuge von 2012 bis 2024 zurück, und genau
-  dieser Abstand ist jetzt das Lineal für den Gegentest.
-- **Die Schreibweise der Attributschlüssel ist ungemessen.** Actor-
-  Dokumentation (`autos.km`) und Portalformular (`autos.km_i`) widersprechen
-  einander, und die falsche Schreibweise scheitert lautlos.
+- **Kleinanzeigen sieht nur den heutigen Tag.** 31 von 31 Datensätzen tragen
+  das Einstelldatum des Laufs; ungefiltert kamen 4 und 5 statt der angefragten
+  10. Der Gegentest — `maxResultsPerQuery` deutlich höher, und eine
+  Startadresse mit Seitenzahl — steht aus und ist der wichtigste offene Punkt
+  dieses Papiers. Fällt er schlecht aus, ist Kleinanzeigen eine Ergänzung und
+  keine dritte gleichwertige Quelle.
+- ~~Kein EZ-Filter bei Kleinanzeigen.~~ **Erledigt:** `autos.ez_i`, gemessen
+  wirksam.
+- ~~Liegt die magere Ausbeute am `attributeFilters`-Weg?~~ **Erledigt:**
+  nein — `startUrls` liefert dieselben Inserate.
+- ~~Welche Schreibweise trägt?~~ **Erledigt:** beide, identisch.
 - **Die Bauart-Gruppierung ist ungemessen.** Dass Van, Station Wagon und
   Other für einen Sharan alle „Großraum" heissen müssen, ist aus zwanzig
-  Datensätzen geschlossen, nicht aus hundert.
+  Datensätzen geschlossen, nicht aus hundert. Der als **Kombi** eingetragene
+  Sharan zeigt, dass die Gruppe weit sein muss.
 - **Ein echter Lauf im Cockpit hat nie stattgefunden.** Alles hier stammt aus
   Einzelaufrufen der Actors, nicht aus der Pipeline.
 
@@ -264,8 +327,9 @@ Oberfläche.
 | | Scheibe | Abnehmbar durch |
 | --- | --- | --- |
 | 1 | Probeläufe | ✅ abgeschlossen, 0,076 $ |
-| 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | Befund im Protokoll, rund 0,09 $ |
+| 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | ✅ abgeschlossen, 0,060 $ |
+| 1c | Probelauf 4: sieht Kleinanzeigen mehr als den heutigen Tag? | Treffer mit älterem Einstelldatum |
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | Vertrag hält, Tests grün |
-| 3 | Filter je Portal vollständig setzen | Testfall: Subjekt → erwartetes Eingabeobjekt |
+| 3 | Filter je Portal vollständig setzen, Gesuche ausschliessen, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
 | 5 | Umhängen auf L0, Gesamtdeckel, Rückfall-Hinweis | ein echter Lauf im Cockpit |
