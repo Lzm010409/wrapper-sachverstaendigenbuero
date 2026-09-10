@@ -8,6 +8,7 @@ import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { clientAusUmgebung } from '@/autoixpert/client'
 import { gutachtenSchema } from '@/autoixpert/typen'
+import { bereitsMenschlichBeschriftet } from './vorbeschriftung'
 import { kiVerfuegbar } from '@/ki/client'
 import { beschriftePaket, naechstesPaket, type Fahrzeugkontext } from './assistent'
 import { holeVorschaubilder } from './vorschaubilder'
@@ -106,15 +107,21 @@ async function fuehreAnalyseAus(fallId: string, benutzerId: string): Promise<voi
     const fotos = await client.holeFotos(reportId)
     gesamt = fotos.length
 
-    if (fotos.length > 0) {
+    // Wer in autoiXpert schon eine echte Beschreibung hat, geht gar nicht
+    // erst zum Modell — weder Kosten noch ein Vorschlag, den ohnehin niemand
+    // zu sehen bekommt (siehe `bereitsMenschlichBeschriftet`).
+    const zuAnalysieren = fotos.filter((f) => !bereitsMenschlichBeschriftet(f))
+
+    if (zuAnalysieren.length > 0) {
       const kontext: Fahrzeugkontext = {
         marke: gutachten.car?.make ?? null,
         modell: gutachten.car?.model ?? null,
         kennzeichen: gutachten.car?.license_plate ?? null,
         schadenbeschreibung: gutachten.car?.damage_description ?? null,
       }
-      // Die Stilvorlage kommt aus dem Fall selbst: was der Sachverständige
-      // hier schon geschrieben hat, ist die beste Vorgabe für den Rest.
+      // Die Stilvorlage kommt aus dem ganzen Fall, nicht nur aus den noch
+      // offenen Fotos: gerade die schon von Hand beschrifteten sind die
+      // beste Vorgabe für den Hausstil.
       const stilbeispiele = fotos
         .map((f) => f.description?.trim())
         .filter((b): b is string => Boolean(b))
@@ -125,7 +132,7 @@ async function fuehreAnalyseAus(fallId: string, benutzerId: string): Promise<voi
       const gescheitert = new Set<string>()
 
       for (let runde = 0; runde < HOECHSTENS_RUNDEN; runde += 1) {
-        const offen = naechstesPaket(fotos, new Set(bekannt.keys()), gescheitert)
+        const offen = naechstesPaket(zuAnalysieren, new Set(bekannt.keys()), gescheitert)
         if (offen.length === 0) break
 
         const bilder = await holeVorschaubilder(client, reportId, offen.map((f) => f.id))
@@ -147,11 +154,14 @@ async function fuehreAnalyseAus(fallId: string, benutzerId: string): Promise<voi
 
     await beendeLauf(fallId, null)
     const stand = await ladeAnalyse(fallId)
+    const uebersprungen = fotos.length - zuAnalysieren.length
     await notiere({
       benutzerId,
       art: 'erfolg',
       titel: 'Fotoanalyse fertig',
-      text: `${stand?.vorschlaege.length ?? 0} von ${gesamt} Fotos beschriftet.`,
+      text:
+        `${stand?.vorschlaege.length ?? 0} von ${gesamt} Fotos beschriftet` +
+        (uebersprungen > 0 ? ` (${uebersprungen} hatten bereits eine Beschreibung).` : '.'),
       verweis: `/faelle/${fallId}?reiter=fotos`,
       quelle: 'fotos',
     })

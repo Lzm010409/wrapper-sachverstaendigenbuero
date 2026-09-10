@@ -37,9 +37,6 @@ import { ausErgebnis, fehler as alsFehler, info } from '@/melden/typen'
 
 const ABSTAND_MS = 2000
 
-/** Unterhalb dieser Sicherheit fällt ein Vorschlag im Prüfmodus optisch auf. */
-const UNSICHER_SCHWELLE = 50
-
 type Erledigt = Record<string, 'uebernommen' | 'verworfen'>
 
 export function Fotoassistent({
@@ -338,11 +335,10 @@ function Pruefmodus({
             ›
           </button>
           <span className="foto-buehne-titel">{kategoriename(vorschlag.kategorie)}</span>
-          {vorschlag.sicherheit < UNSICHER_SCHWELLE ? (
-            <span className="marke-pille m-warn">Sicherheit {vorschlag.sicherheit} %</span>
-          ) : (
-            <span className="unterzeile">Sicherheit {vorschlag.sicherheit} %</span>
-          )}
+          {/* Keine Warnfarbe mehr nötig: `assistent.ts` verwirft jeden
+              Vorschlag unter 50 % Sicherheit serverseitig, ein Wert unter
+              50 kommt hier also gar nicht mehr an. */}
+          <span className="unterzeile">Sicherheit {vorschlag.sicherheit} %</span>
           <button type="button" onClick={schliesse} aria-label="Schliessen">
             ✕
           </button>

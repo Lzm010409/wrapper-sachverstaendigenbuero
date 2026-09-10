@@ -61,6 +61,16 @@ export const PAKETGROESSE = 12
 /** Wie viele vorhandene Beschreibungen als Stilvorlage mitgehen. */
 const STILBEISPIELE = 8
 
+/**
+ * Unterhalb dieser Sicherheit entfällt ein Vorschlag komplett — für jede
+ * Kategorie, nicht nur bei einem Lexikon-Treffer. Das Foto zählt dann wie
+ * eines, zu dem das Modell nichts geliefert hat: kein Vorschlag, der nächste
+ * Lauf versucht es erneut. Eine Unsicherheit, die der Systemtext selbst
+ * einfordert ("unter 50, wenn das Bild unklar ist"), soll auch eine Folge
+ * haben, statt nur eine Zahl neben einem übernommenen Vorschlag zu sein.
+ */
+const MINDESTSICHERHEIT = 50
+
 export interface Fahrzeugkontext {
   marke: string | null
   modell: string | null
@@ -231,6 +241,16 @@ Grundsätze:
 - Benenne Bauteil und Seite, wenn beides erkennbar ist: "Heckstossfänger
   links, Kratzer über die gesamte Breite".
 - Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
+- Bei den vier Eckansichten (ansicht_vorne_links/rechts,
+  ansicht_hinten_links/rechts) entscheidet eine einfache Regel, keine
+  Vermutung: Bei einer Aufnahme von HINTEN blickst du gedanklich in
+  dieselbe Richtung wie das Fahrzeug fährt — keine Spiegelung, was im Bild
+  links erscheint, ist auch in Fahrtrichtung links. Bei einer Aufnahme von
+  VORNE blickst du dem Fahrzeug entgegen — hier spiegelt sich die Seite,
+  was im Bild links erscheint, ist in Fahrtrichtung rechts, und umgekehrt.
+  Beispiel: Auf einer Heckaufnahme ist links im Bild eine Fahrzeugseite mit
+  Rad und Kotflügel zu sehen, rechts nur Kennzeichen und Rückleuchte — das
+  ist "ansicht_hinten_links", nicht "ansicht_hinten_rechts".
 - Für die Positionskategorien (kennzeichen, vin, tacho und die vier
   ansicht_*) wird beschreibung ohnehin ignoriert und durch den
   Kategorienamen ersetzt. Formuliere dort trotzdem kurz und sachlich, falls
@@ -244,8 +264,13 @@ Grundsätze:
   sehen sind, wähle nur das eine deutlichste. teil und beschaedigungsart
   müssen dabei Zeichen für Zeichen aus der Liste für GENAU DIESES Teil
   stammen, nie aus der eines anderen Teils und nie ein eigener,
-  naheliegender Begriff. Ist keines der gelisteten Teile zu sehen, lass
-  treffer leer und beschreibe wie gewohnt frei im Feld beschreibung.
+  naheliegender Begriff.
+- Existiert ein Teile-Lexikon (siehe unten), wird bei kategorie "schaden"
+  ausschliesslich der Lexikon-Treffer verwendet — beschreibung wird in
+  diesem Fall nie benutzt, auch nicht wenn treffer leer bleibt. Erkennst du
+  keines der gelisteten Teile beschädigt, lass treffer leer und schreibe
+  trotzdem eine knappe beschreibung (Validierung verlangt das Feld) — sie
+  wird nur ignoriert, verschwende darauf also keine Mühe.
 - Sobald ein Treffer eingetragen ist, wird beschreibung verworfen und der
   Satz stattdessen aus dem Lexikon zusammengesetzt. Formuliere für ein
   gelistetes Teil deshalb NIE selbst in beschreibung — weder statt eines
@@ -356,7 +381,8 @@ const POSITIONSKATEGORIEN: readonly Kategorie[] = [
 
 /**
  * Welche Bildunterschrift ein Vorschlag am Ende bekommt — je nach Kategorie
- * unterschiedlich gebunden:
+ * unterschiedlich gebunden. `null` heisst: kein Vorschlag für dieses Foto,
+ * genau wie ein leerer String schon immer behandelt wurde.
  *
  * - **Positionsfotos** (`POSITIONSKATEGORIEN`) bekommen immer den
  *   Kategorienamen, nie Modelltext und nie einen Lexikon-Treffer. Sonst
@@ -364,22 +390,25 @@ const POSITIONSKATEGORIEN: readonly Kategorie[] = [
  *   Übersichtsbeschriftung — am 10.09.2026 beobachtet: eine „Ansicht hinten
  *   links" bekam dieselbe Schadensformulierung wie ein ganz anderes
  *   Detailfoto.
- * - **`schaden`** nutzt den Lexikon-Treffer, mit Rückfall auf freien Text,
- *   wenn keiner gültig ist (siehe `zusammensetzen` in `lexikon.ts`).
- * - **Alles andere** (Reifen, Innenraum, Papiere, Sonstiges) bleibt freier
- *   Modelltext — dort gibt es kein Lexikon, und die Aufnahmen unterscheiden
- *   sich zu stark für eine feste Formulierung.
+ * - **`schaden`, wenn ein Lexikon existiert** nutzt ausschliesslich den
+ *   Lexikon-Treffer. Kommt keiner gültig zustande — das Modell hat sich
+ *   nicht ans Lexikon gehalten, oder es ist wirklich ein nicht gelistetes
+ *   Teil zu sehen —, entfällt der Vorschlag komplett. Bewusst kein
+ *   Freitext mehr als Ausweg (bis 10.09.2026 gab es den): lieber kein
+ *   KI-Vorschlag als einer, der vom Hausstil abweicht.
+ * - **`schaden` ohne Lexikon** (es gibt noch keine Einträge) sowie **alles
+ *   andere** (Reifen, Innenraum, Papiere, Sonstiges) bleibt freier
+ *   Modelltext — dort gibt es keine Alternative zu Freitext.
  */
 function bildunterschrift(
   vorschlag: z.infer<typeof vorschlagSchema>,
   teile: readonly FotoTeil[],
-): string {
+): string | null {
   if (POSITIONSKATEGORIEN.includes(vorschlag.kategorie)) {
     return kategoriename(vorschlag.kategorie)
   }
 
-  let text = vorschlag.beschreibung
-  if (vorschlag.kategorie === 'schaden') {
+  if (vorschlag.kategorie === 'schaden' && teile.length > 0) {
     // `.slice(0, 1)` erzwingt serverseitig, was der Auftragstext nur bitten
     // kann: nie mehr als ein Treffer je Foto.
     const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
@@ -387,10 +416,13 @@ function bildunterschrift(
       seite: istSeite(t.seite) ? t.seite : null,
       begriff: t.beschaedigungsart,
     }))
-    text = zusammensetzen(teile, rohtreffer) ?? vorschlag.beschreibung
+    const zusammengesetzt = zusammensetzen(teile, rohtreffer)
+    if (!zusammengesetzt) return null
+    return zusammengesetzt.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)
   }
 
-  return text.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)
+  const text = vorschlag.beschreibung.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)
+  return text || null
 }
 
 /**
@@ -455,6 +487,13 @@ export async function beschriftePaket(
     const vorschlag = nachId.get(bild.fotoId)
     if (!vorschlag) continue
 
+    // Unter der Mindestsicherheit entfällt der Vorschlag komplett — für
+    // jede Kategorie, nicht nur bei einem Lexikon-Treffer. Gerundet wird
+    // hier einmal; derselbe Wert geht unten in den Vorschlag, kein zweites
+    // Runden nötig.
+    const sicherheit = Math.round(vorschlag.sicherheit)
+    if (sicherheit < MINDESTSICHERHEIT) continue
+
     const beschreibung = bildunterschrift(vorschlag, teile)
     if (!beschreibung) continue
     vorschlaege.push({
@@ -462,7 +501,7 @@ export async function beschriftePaket(
       kategorie: vorschlag.kategorie,
       beschreibung,
       verwendung: verwendungFuer(vorschlag.kategorie),
-      sicherheit: Math.round(vorschlag.sicherheit),
+      sicherheit,
       stand: 'offen',
     })
   }

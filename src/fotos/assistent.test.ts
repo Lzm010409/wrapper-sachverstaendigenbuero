@@ -235,8 +235,37 @@ describe('beschriftePaket', () => {
 
     const vorschlaege = await beschriftePaket(FAHRZEUG, [], [], [bild('a'), bild('b')])
 
+    // 140 wird auf 100 geklemmt und bleibt über der Mindestsicherheit.
     expect(vorschlaege.find((v) => v.fotoId === 'a')?.sicherheit).toBe(100)
-    expect(vorschlaege.find((v) => v.fotoId === 'b')?.sicherheit).toBe(0)
+    // -5 wird auf 0 geklemmt — und fällt damit unter die Mindestsicherheit.
+    expect(vorschlaege.find((v) => v.fotoId === 'b')).toBeUndefined()
+  })
+
+  it('verwirft jeden Vorschlag unter der Mindestsicherheit von 50, gleich welcher Kategorie', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        { id: 'a', kategorie: 'reifen', beschreibung: 'Reifen vorne links', sicherheit: 49 },
+        {
+          id: 'b',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          treffer: [{ teil: 'Kotflügel', seite: 'rechts', beschaedigungsart: 'deformiert' }],
+          sicherheit: 49,
+        },
+      ]),
+    )
+
+    expect(await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a'), bild('b')])).toEqual([])
+  })
+
+  it('behält einen Vorschlag genau bei der Mindestsicherheit von 50', async () => {
+    ruf.mockResolvedValue(
+      antwort([{ id: 'a', kategorie: 'reifen', beschreibung: 'Reifen vorne links', sicherheit: 50 }]),
+    )
+
+    const vorschlaege = await beschriftePaket(FAHRZEUG, [], [], [bild('a')])
+
+    expect(vorschlaege.map((v) => v.fotoId)).toEqual(['a'])
   })
 
   it('setzt den Hausstil-Satz aus einem Treffer zusammen', async () => {
@@ -288,7 +317,10 @@ describe('beschriftePaket', () => {
     expect(vorschlag?.beschreibung).toBe('Kotflügel links deformiert')
   })
 
-  it('fällt auf den freien Text zurück, wenn kein Teil erkannt wurde', async () => {
+  it('verwirft den Vorschlag, wenn kein Teil erkannt wurde und ein Lexikon existiert', async () => {
+    // Bis 10.09.2026 fiel das hier auf freien Text zurück ("Dachhimmel
+    // verschmutzt"). Jetzt: existiert ein Lexikon, gibt es für schaden nur
+    // noch dessen Wortlaut oder gar keinen Vorschlag — nie mehr Freitext.
     ruf.mockResolvedValue(
       antwort([
         {
@@ -301,15 +333,14 @@ describe('beschriftePaket', () => {
       ]),
     )
 
-    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
-
-    expect(vorschlag?.beschreibung).toBe('Dachhimmel verschmutzt')
+    expect(await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])).toEqual([])
   })
 
-  it('fällt auf den freien Text zurück, wenn sich das Modell nicht ans Lexikon gehalten hat', async () => {
+  it('verwirft den Vorschlag, wenn sich das Modell nicht ans Lexikon gehalten hat', async () => {
     // "vorne" gibt es für den Kotflügel im Lexikon nicht — die Kombination
     // ist ungültig, obwohl beide Werte für sich genommen aus dem Werkzeug
-    // stammen könnten.
+    // stammen könnten. Kein gültiger Treffer heisst jetzt: kein Vorschlag,
+    // nicht mehr der freie Text des Modells.
     ruf.mockResolvedValue(
       antwort([
         {
@@ -322,18 +353,27 @@ describe('beschriftePaket', () => {
       ]),
     )
 
-    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
-
-    expect(vorschlag?.beschreibung).toBe('Kotflügel vorne beschädigt')
+    expect(await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])).toEqual([])
   })
 
-  it('formuliert frei, wenn die Antwort gar kein treffer-Feld enthält', async () => {
-    // Der Zod-Default `[]` greift — dieselbe Beschreibung wie vor dem Lexikon.
+  it('verwirft den Vorschlag, wenn die Antwort gar kein treffer-Feld enthält und ein Lexikon existiert', async () => {
+    // Der Zod-Default `[]` greift, zählt also wie "kein Treffer" — mit
+    // Lexikon vorhanden gibt es dafür keinen Freitext-Ausweg mehr.
     ruf.mockResolvedValue(
       antwort([{ id: 'a', kategorie: 'schaden', beschreibung: 'Heckschürze verkratzt', sicherheit: 80 }]),
     )
 
-    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+    expect(await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])).toEqual([])
+  })
+
+  it('bleibt bei freiem Text, wenn für schaden noch kein Lexikon existiert', async () => {
+    // Ohne Lexikon-Einträge (teile: []) gibt es keine Alternative zu
+    // Freitext — der einzige Fall, in dem schaden weiterhin frei formuliert.
+    ruf.mockResolvedValue(
+      antwort([{ id: 'a', kategorie: 'schaden', beschreibung: 'Heckschürze verkratzt', sicherheit: 80 }]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [], [bild('a')])
 
     expect(vorschlag?.beschreibung).toBe('Heckschürze verkratzt')
   })
