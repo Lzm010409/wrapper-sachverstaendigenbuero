@@ -1,6 +1,6 @@
 # Die WBW-Beschaffung über Apify
 
-Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus drei echten
+Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus vier echten
 Probeläufen gegen die Actors, nicht aus deren Dokumentation. Was gemessen ist,
 steht mit Messwert da; was offen ist, steht als offen da.
 
@@ -20,8 +20,8 @@ führen einen Umkreisfilter, und er wirkt.
 
 ## Was gemessen wurde
 
-Drei Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
-03/2021), Gesamtkosten **0,136 $**.
+Vier Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
+03/2021), Gesamtkosten **0,204 $**.
 
 ### Der Umkreis am Portal wirkt
 
@@ -166,37 +166,72 @@ Grund: bei AutoScout24 ist das Eingabevokabular falsch, bei Kleinanzeigen ist
 die Eingabe des Verkäufers falsch. **Die Bauart wird nachträglich gefiltert,
 nie am Portal.**
 
-### Zwei Funde, nach denen niemand gesucht hat
+### Gesuche kommen durch, auch mit gesetztem Filter
 
-**Kleinanzeigen liefert Gesuche.** Im ungefilterten Sharan-Lauf stand
-*„Gesucht: SHARAN 7-Sitzer 2.0TDI"* mit `adType: "WANTED"`, 11.000 € und
-20.000 km. Ein Wunschpreis eines Käufers, kein Angebot. Ungefiltert wäre er
-als Vergleichsfahrzeug in den Median gegangen. Der Actor führt dafür einen
-Schalter — und der ist selbst schon die nächste Falle: das **Eingabefeld**
-`adType` nimmt `angebote`, das **Ausgabefeld** desselben Namens meldet
-`OFFERED`. Wer den gelieferten Wert zurückschreibt, filtert nichts. Genau der
-Fehler, der bei AutoScout24 `van` hiess. Gesetzt wird `angebote`, und das ist
-**Pflicht**, kein Feinschliff.
+Im ungefilterten Sharan-Lauf stand *„Gesucht: SHARAN 7-Sitzer 2.0TDI"* mit
+`adType: "WANTED"`, 11.000 € bei 20.000 km — ein Wunschpreis eines Käufers,
+der als Vergleichsfahrzeug in den Median gegangen wäre.
 
-**Kleinanzeigen liefert nur den heutigen Tag.** Über alle drei Probeläufe
-hinweg tragen **31 von 31** Datensätzen dasselbe Einstelldatum — den Tag des
-Laufs. Und ohne jeden Filter kamen bei `maxResults: 10` nur 4 (Sharan)
-beziehungsweise 5 (Berlingo) Fahrzeuge zurück.
+Der Actor führt dafür einen Schalter, und ich habe ihn zweimal falsch
+verstanden. Erst schrieb ich den **Ausgabewert** `OFFERED` ins Papier; das
+Eingabeschema nimmt `angebote`. Dann korrigierte ich auf `angebote` und nannte
+es Pflicht. Probelauf 4 hat auch das widerlegt:
 
-Beides zusammen liest sich so: der Actor holt die erste, nach Datum sortierte
-Seite und filtert den Umkreis danach lokal. Was gestern eingestellt wurde,
-sieht er nicht. Für einen Wertermittlungskorb ist das der Unterschied zwischen
-dem Markt und dem, was heute Morgen zufällig inseriert wurde.
+| Lauf | Eingabe | Gesuche in der Antwort |
+| --- | --- | --- |
+| mehr verlangt | `adType: "angebote"` | 1 von 19 |
+| ohne Umkreis | `adType: "angebote"` | 2 von 50 |
+| nach Preis | `adType: "angebote"` | 1 von 14 |
+| Startadresse | URL mit `anzeige:angebote` | 1 von 19 |
 
-**Gemessen ist das Symptom, nicht die Ursache.** Der Gegentest ist billig und
-steht aus: derselbe Lauf mit `maxResultsPerQuery` deutlich über 10, und einer
-über eine Startadresse mit Seitenzahl. Bis dahin ist Kleinanzeigen nicht die
-dritte gleichwertige Quelle, als die dieses Papier es bisher geführt hat.
+**Der Filter wirkt in keiner der vier Formen** — auch nicht über die
+Portaladresse. Gesuche werden deshalb **nachträglich** verworfen, am
+gelieferten Feld `adType !== 'OFFERED'`. Gesetzt wird `angebote` trotzdem: es
+schadet nicht und kostet nichts.
+
+### Probelauf 4: Kleinanzeigen sieht sehr wohl mehr als heute
+
+Die Vermutung aus Probelauf 3 — der Actor hole nur die neueste Seite — ist
+**widerlegt**. Fünf Läufe, ein Fall, je eine Variable, **0,068 $**:
+
+| Lauf | Treffer | davon nicht von heute |
+| --- | --- | --- |
+| wie Probelauf 3 (`maxResults: 10`) | 5 | 0 |
+| `maxResults: 50` | 19 | 0 |
+| ohne Umkreis | 50 | 2 |
+| **`sortBy: price_asc`** | 14 | **14** |
+| Startadresse | 19 | 0 |
+
+Die Sortierung war es. Voreingestellt ist `newest`, und Kleinanzeigen schiebt
+Anzeigen laufend nach oben — die ersten Seiten zeigen deshalb fast nur den
+heutigen Tag. Nach Preis sortiert kamen Inserate vom 22.08. bis 08.09. Der
+Actor blättert; er blätterte nur durch eine Liste, die vorn nichts Älteres
+enthält.
+
+**Zwei Dinge, die dabei nebenbei sichtbar wurden.**
+
+`maxResults` zählt die **geholten**, nicht die gelieferten Datensätze. Mit
+Umkreis kamen 19 von 50 zurück, ohne Umkreis 50 von 50. Der Umkreis wirkt bei
+Kleinanzeigen also als Nachfilter, und der Actor holt nicht nach, um die Zahl
+aufzufüllen. Wer vierzig Fahrzeuge im Korb will, muss ein Vielfaches
+verlangen.
+
+Und **keine der drei Sortierungen liefert einen unverzerrten Korb.** `newest`
+ist zeitlich verzerrt, `price_asc` liefert 14 von 14 Fahrzeugen unter 1.000 €
+— darunter eine Rückbank für 50 €, ein *„Schlachter"*, ein *„Bastlerfahrzeug"*
+und ein Citroën XM, also ein anderes Modell. `price_desc` wäre spiegelbildlich
+verzerrt. Für einen Median ist beides unbrauchbar.
+
+Der Ausweg ist nicht die Sortierung, sondern die **Enge der Grundmenge**:
+stehen `autos.km_i` und `autos.ez_i`, ist kaum noch etwas da, was eine
+Sortierung verzerren könnte. Genau das ist die nächste Messung — Probelauf 4
+lief bewusst ohne Attributfilter, um die Sortierung isoliert zu sehen.
 
 ### Die Lehre: Filter müssen sich nachweisen
 
-Dreimal in dieser Sitzung ist derselbe Fehler aufgetreten — ein Filter, der
-lautlos nichts tut oder lautlos das Falsche tut. Deshalb bekommt die
+Viermal in dieser Sitzung ist derselbe Fehler aufgetreten — ein Filter, der
+lautlos nichts tut oder lautlos das Falsche tut. Beim vierten, `adType`, hatte
+ich ihn schon als behoben ins Papier geschrieben. Deshalb bekommt die
 Beschaffung eine Selbstprüfung: **nach jedem Abruf wird gezählt, wie viele
 gelieferte Fahrzeuge die gesetzten Spannen verletzen.** Verletzt mehr als eine
 Handvoll sie, hat der Portalfilter nicht gegriffen; das steht dann im
@@ -251,7 +286,8 @@ Was gesetzt wird — und was ausdrücklich **nicht**:
 | Leistung | — | `powerMin`/`Max` | `autos.power_i` (**in PS**) |
 | Unfall | — | `damageStatus: EXCLUDE` | `autos.schaden_s: nein` |
 | Ausschluss | — | `excludeKeywords` (Export, Bastler) | `whatExclude` |
-| Angebote | — | — | **`adType: angebote`** (sonst Gesuche) |
+| Angebote | — | — | `adType: angebote` — **wirkt nicht, nachfiltern** |
+| Tiefe | — | — | `maxResults` ≫ Zielzahl (Umkreis filtert lokal) |
 | Details | `includeDetails: true` | `includeDetails: true` | `includeDetails: true` |
 | **Bauart** | **nie** | **nie** | **nie** (kostet einen echten Sharan) |
 
@@ -307,17 +343,20 @@ Oberfläche.
 
 ## Was offen bleibt
 
-- **Kleinanzeigen sieht nur den heutigen Tag.** 31 von 31 Datensätzen tragen
-  das Einstelldatum des Laufs; ungefiltert kamen 4 und 5 statt der angefragten
-  10. Der Gegentest — `maxResultsPerQuery` deutlich höher, und eine
-  Startadresse mit Seitenzahl — steht aus und ist der wichtigste offene Punkt
-  dieses Papiers. Fällt er schlecht aus, ist Kleinanzeigen eine Ergänzung und
-  keine dritte gleichwertige Quelle.
+- **Trägt Kleinanzeigen einen Korb?** Das ist die verbliebene Frage. Mit
+  Attributfiltern kamen bei `maxResults: 10` ein bis zwei Fahrzeuge zurück;
+  ohne Filter brachte `maxResults: 50` das Vierfache. Ob enge Filter plus
+  grosse Tiefe zusammen genügend Fahrzeuge liefern, ist ungemessen — und
+  entscheidet, ob Kleinanzeigen dritte Quelle oder Ergänzung ist.
+- ~~Kleinanzeigen sieht nur den heutigen Tag.~~ **Widerlegt:** es war die
+  Voreinstellung `sortBy: newest`.
 - ~~Kein EZ-Filter bei Kleinanzeigen.~~ **Erledigt:** `autos.ez_i`, gemessen
   wirksam.
 - ~~Liegt die magere Ausbeute am `attributeFilters`-Weg?~~ **Erledigt:**
   nein — `startUrls` liefert dieselben Inserate.
 - ~~Welche Schreibweise trägt?~~ **Erledigt:** beide, identisch.
+- ~~Lassen sich Gesuche am Portal ausschliessen?~~ **Nein.** Keine der vier
+  Formen wirkt; sie werden nachträglich verworfen.
 - **Die Bauart-Gruppierung ist ungemessen.** Dass Van, Station Wagon und
   Other für einen Sharan alle „Großraum" heissen müssen, ist aus zwanzig
   Datensätzen geschlossen, nicht aus hundert. Der als **Kombi** eingetragene
@@ -331,8 +370,9 @@ Oberfläche.
 | --- | --- | --- |
 | 1 | Probeläufe | ✅ abgeschlossen, 0,076 $ |
 | 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | ✅ abgeschlossen, 0,060 $ |
-| 1c | Probelauf 4: sieht Kleinanzeigen mehr als den heutigen Tag? | Treffer mit älterem Einstelldatum |
+| 1c | Probelauf 4: sieht Kleinanzeigen mehr als den heutigen Tag? | ✅ ja, 0,068 $ — es war `sortBy` |
+| 1d | Probelauf 5: enge Filter plus grosse Tiefe — trägt der Korb? | brauchbare Fahrzeuge je Fall |
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | Vertrag hält, Tests grün |
-| 3 | Filter je Portal vollständig setzen, Gesuche ausschliessen, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
+| 3 | Filter je Portal setzen, Gesuche nachfiltern, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
 | 5 | Umhängen auf L0, Gesamtdeckel, Rückfall-Hinweis | ein echter Lauf im Cockpit |
