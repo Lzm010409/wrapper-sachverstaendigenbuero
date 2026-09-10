@@ -3295,6 +3295,15 @@ body {
 .foto-beschriftung { align-items: flex-end; }
 .foto-beschriftung .feld { flex: 1 1 260px; }
 
+/*
+  `.foto-beschriftung` ist eine Zeilen-Flexbox (anders als `.assistent-
+  formular` im Prüfmodus, das auf `flex-direction: column` steht) — ohne
+  diese Regel säße das Klickmenü als schmales Flex-Kind neben Feld und
+  Häkchen statt darunter. `flex: 1 1 100%` erzwingt den vollen Zeilenumbruch,
+  unabhängig vom Wrap-Verhalten der übrigen Kinder.
+*/
+.foto-beschriftung .klickmenue { flex: 1 1 100%; }
+
 .foto-haekchen {
   display: flex;
   gap: 12px;

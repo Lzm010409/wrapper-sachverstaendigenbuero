@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState, useTransition } from 'react'
 import type { Foto } from '@/fotos/ansicht'
 import { beschrifteFoto } from '@/fotos/aktionen'
 import type { Fotoanalyse } from '@/fotos/vorschlag'
-import type { FotoTeil } from '@/fotos/lexikon'
-import { Fotoassistent } from './foto-assistent'
+import { zusammensetzen, type FotoTeil, type Rohtreffer } from '@/fotos/lexikon'
+import { Fotoassistent, Klickmenue } from './foto-assistent'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis, fehler as alsFehler } from '@/melden/typen'
 
@@ -158,6 +158,7 @@ export function Fotoraster({
           foto={sichtbar[offen]}
           nachbar={sichtbar[offen + 1] ?? null}
           position={`${offen + 1} von ${sichtbar.length}`}
+          teile={teile}
           schliesse={() => setzeOffen(null)}
           blaettere={blaettere}
           schreibenErlaubt={schreibenErlaubt}
@@ -172,6 +173,7 @@ function Grossansicht({
   foto,
   nachbar,
   position,
+  teile,
   schliesse,
   blaettere,
   schreibenErlaubt,
@@ -180,6 +182,7 @@ function Grossansicht({
   foto: Foto
   nachbar: Foto | null
   position: string
+  teile: FotoTeil[]
   schliesse: () => void
   blaettere: (richtung: -1 | 1) => void
   schreibenErlaubt: boolean
@@ -245,7 +248,13 @@ function Grossansicht({
         </div>
 
         {/* Auch hier der Schlüssel statt eines zurücksetzenden Effekts. */}
-        <Beschriftung key={`beschriftung-${foto.id}`} fallId={fallId} foto={foto} erlaubt={schreibenErlaubt} />
+        <Beschriftung
+          key={`beschriftung-${foto.id}`}
+          fallId={fallId}
+          foto={foto}
+          teile={teile}
+          erlaubt={schreibenErlaubt}
+        />
       </div>
     </div>
   )
@@ -313,15 +322,18 @@ const HAEKCHEN: { schluessel: keyof Foto; name: string }[] = [
 function Beschriftung({
   fallId,
   foto,
+  teile,
   erlaubt,
 }: {
   fallId: string
   foto: Foto
+  teile: FotoTeil[]
   erlaubt: boolean
 }) {
   // Der Anfangswert reicht: die Komponente wird beim Blättern über ihren
-  // Schlüssel neu aufgebaut.
+  // Schlüssel neu aufgebaut — das gilt auch für `aktiv` weiter unten.
   const [beschreibung, setzeBeschreibung] = useState(foto.beschreibung ?? '')
+  const [aktiv, setzeAktiv] = useState<Rohtreffer[]>([])
   const [laeuft, starte] = useTransition()
   const { melde } = useMelder()
 
@@ -339,6 +351,21 @@ function Beschriftung({
         )
       }
     })
+  }
+
+  // Anders als im Prüfmodus gibt es hier kein "Übernehmen" — das Textfeld
+  // speichert sonst erst beim Verlassen, ein Klick auf einen Chip löst aber
+  // kein Blur aus. Eine fertige Kombination speichert deshalb sofort, genau
+  // wie die Häkchen daneben es schon tun. Werden alle Chips wieder entfernt,
+  // bleibt die Beschreibung unangetastet — kein überraschendes Zurücksetzen.
+  function aendereAktiv(naechste: Rohtreffer[]) {
+    setzeAktiv(naechste)
+    if (naechste.length === 0) return
+    const komponiert = zusammensetzen(teile, naechste)
+    if (komponiert) {
+      setzeBeschreibung(komponiert)
+      sichere({ beschreibung: komponiert })
+    }
   }
 
   if (!erlaubt) {
@@ -375,6 +402,9 @@ function Beschriftung({
           }}
         />
       </div>
+
+      {teile.length > 0 ? <Klickmenue teile={teile} aktiv={aktiv} setzeAktiv={aendereAktiv} /> : null}
+
       <div className="foto-haekchen">
         {HAEKCHEN.map((h) => (
           <label key={h.schluessel}>

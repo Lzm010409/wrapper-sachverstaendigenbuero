@@ -514,17 +514,21 @@ function Vorschlagsformular({
 }
 
 /**
- * Schnellauswahl für ein Schadendetail-Foto: Teil, Seite, Schadensart per
- * Klick statt Tippen — dieselbe Bindung wie beim KI-Vorschlag
- * (`zusammensetzen` in `lexikon.ts`), nur von Hand statt vom Modell
- * geraten. Mehrere Kombinationen sind erlaubt: ein Mensch klickt nur an,
- * was er wirklich sieht, die Ein-Treffer-Grenze der KI gilt hier nicht.
+ * Schnellauswahl für ein Foto: Teil, Seite, Schadensart per Klick statt
+ * Tippen — dieselbe Bindung wie beim KI-Vorschlag (`zusammensetzen` in
+ * `lexikon.ts`), nur von Hand statt vom Modell geraten. Mehrere
+ * Kombinationen sind erlaubt: ein Mensch klickt nur an, was er wirklich
+ * sieht, die Ein-Treffer-Grenze der KI gilt hier nicht.
  *
  * Sequentiell: erst ein Teil wählen, dann erscheinen nur dessen gültige
  * Seiten (ganz ausgeblendet, wenn das Teil keine hat) und Schadensarten —
  * eine ungültige Kombination ist so gar nicht erst anklickbar.
+ *
+ * **Exportiert**, weil sowohl der Prüfmodus (`Vorschlagsformular` hier)
+ * als auch die normale Fotobearbeitung (`Beschriftung` in
+ * `fotos-raster.tsx`) dieselbe Auswahl brauchen — keine zweite Kopie.
  */
-function Klickmenue({
+export function Klickmenue({
   teile,
   aktiv,
   setzeAktiv,
