@@ -84,9 +84,15 @@ describe('mobile.de', () => {
   })
 
   it('setzt die Leistungsspanne in PS — so nimmt der Actor sie entgegen', () => {
-    // 103 kW = 140 PS, ±20 %.
-    expect(m.powerMin).toBe(112)
-    expect(m.powerMax).toBe(168)
+    /*
+      Die Spanne kommt aus `leistungToleranzKw` und nicht mehr aus festen
+      20 %. Der Sachverständige stellt die Toleranz in der Maske ein; bis zum
+      11.09.2026 wurde das Feld ausgefüllt und ignoriert.
+
+      103 kW ± 10 kW = 93…113 kW = 126…154 PS.
+    */
+    expect(m.powerMin).toBe(126)
+    expect(m.powerMax).toBe(154)
   })
 
   it('setzt KEINE Bauart', () => {
@@ -98,10 +104,19 @@ describe('Kleinanzeigen', () => {
   const k = build(SHARAN).kleinanzeigen
 
   it('nutzt die Attributschlüssel des Portals, mit Typkürzel', () => {
+    /*
+      Ohne Kraftstoff, Getriebe und Türen in den Eingaben bleiben deren
+      Filter weg — was fehlt, wird nicht gefiltert. Leistung und
+      Schadensfreiheit stehen dagegen immer: die Leistung kommt aus dem
+      Subjekt, die Schadensfreiheit ist bei einem Wiederbeschaffungswert
+      keine Wahl.
+    */
     expect(k.attributeFilters).toEqual({
       'autos.marke_s': 'volkswagen',
       'autos.km_i': '130390,194390',
       'autos.ez_i': '2007,2013',
+      'autos.power_i': '126,154',
+      'autos.schaden_s': 'nein',
     })
   })
 

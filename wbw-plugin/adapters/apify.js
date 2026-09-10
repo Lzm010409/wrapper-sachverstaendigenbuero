@@ -17,6 +17,7 @@
 const { holeJson, zahl, ez, ausstattung, leeresFahrzeug, fehlendeZugangsdaten } = require("./gemeinsam.js");
 const { mappeMitKarte } = require("./feldkarte.js");
 const { reserviere, erstatte, schaetzeKosten } = require("../budget.js");
+const { kraftstoffPasst } = require("../portalvokabular.js");
 
 const BASIS = "https://api.apify.com/v2";
 
@@ -169,12 +170,44 @@ async function holen(eingaben, opts = {}) {
   if (gesuche > 0) warnungen.push(`${quelle}: ${gesuche} Gesuch(e) verworfen (adType != OFFERED)`);
 
   const items = angebote.map((x) => mappe(x, quelle, warnungen)).filter(Boolean);
+
+  /*
+    Hat der Kraftstofffilter gegriffen?
+
+    Diese Actors lehnen einen unbekannten Wert nicht ab — sie reichen ihn
+    durch, und er filtert nichts. Ob Kleinanzeigen fuer Elektro wirklich
+    `elektro` heisst, steht in keiner Quelle, die vorliegt. Statt zu raten und
+    zu hoffen, wird nachgezaehlt: kommen Fahrzeuge mit anderem Kraftstoff
+    zurueck, hat der Filter nicht gegriffen, und das steht im Protokoll.
+  */
+  const erwarteterKraftstoff = opts.erwartet && opts.erwartet.kraftstoff;
+  let fremderKraftstoff = 0;
+  if (erwarteterKraftstoff) {
+    fremderKraftstoff = items.filter((f) => !kraftstoffPasst(erwarteterKraftstoff, f.kraftstoff)).length;
+    if (fremderKraftstoff > 0) {
+      warnungen.push(
+        `${quelle}: Kraftstofffilter "${erwarteterKraftstoff}" hat nicht gegriffen — ` +
+        `${fremderKraftstoff} von ${items.length} Fahrzeugen tragen einen anderen Kraftstoff. ` +
+        "Vermutlich kennt der Actor das gesendete Token nicht (portalvokabular.js)."
+      );
+    }
+  }
   return {
     items,
     protokoll: {
       abrufe: [{ url: `${BASIS}/acts/${actor}/run-sync-get-dataset-items`, status: r.status, ms: Date.now() - t0, zeitpunkt: new Date().toISOString() }],
       actor, maxTotalChargeUsd: deckel, geschaetzteKostenUsd: geschaetzt,
-      rohTreffer: roh.length, gesuche, warnungen,
+      rohTreffer: roh.length, gesuche, fremderKraftstoff, warnungen,
+      /*
+        Die vollstaendige Eingabe, wie sie an Apify ging.
+
+        Ohne sie laesst sich nicht nachpruefen, ob ein Filter ueberhaupt
+        hinausging — man sieht nur das Ergebnis und muss raten. Sie steht
+        hier, damit sie sich Zeile fuer Zeile gegen die Apify-Konsole halten
+        laesst, ohne den Lauf zu wiederholen. Der Zugangstoken steckt in der
+        URL und nicht im Rumpf; saubereProtokollDaten redigiert ihn zusaetzlich.
+      */
+      gesendeteEingabe: input,
       kostenpflichtig: true,
     },
     roh,

@@ -1,6 +1,7 @@
 import type { Gutachten } from "@/autoixpert/typen";
 import { ezToleranzFuer, kmToleranzFuer } from './toleranz'
 import { MINDESTKORB } from './zyklus'
+import type { Kraftstoff } from './portalvokabular'
 
 /**
  * Eingabedatei des WBW-Plugins (params.json).
@@ -24,6 +25,15 @@ export interface WbwParams {
   ezToleranzJahre: number;
   leistungToleranzKw: number;
   getriebe?: "Automatik" | "Manuell";
+  /** Leer heisst: nicht danach filtern. */
+  kraftstoff?: Kraftstoff;
+  /**
+   * Ob die Bauart an die Portale geht.
+   *
+   * Nur im engen Zyklus. Der Lauf setzt es je Stufe; ein Aufruf von Hand
+   * (`params.json` direkt) lässt es weg und sucht dann ohne Bauart am Portal.
+   */
+  bauartAmPortal?: boolean;
   tueren?: number;
   maxItemsProPortal: number;
   /**
@@ -50,6 +60,7 @@ export interface WbwEingaben {
   variante?: string;
   plz?: string;
   getriebe?: "Automatik" | "Manuell" | "egal";
+  kraftstoff?: Kraftstoff | "egal";
   tueren?: number;
   sollAusstattung?: string;
   radiusKm?: number;
@@ -121,6 +132,9 @@ export function reportToWbwParams(report: Gutachten, eingaben: WbwEingaben = {})
   // Das Plugin filtert nur, wenn das Feld gesetzt ist - "egal" heisst weglassen.
   if (eingaben.getriebe === "Automatik" || eingaben.getriebe === "Manuell") {
     params.getriebe = eingaben.getriebe;
+  }
+  if (eingaben.kraftstoff && eingaben.kraftstoff !== "egal") {
+    params.kraftstoff = eingaben.kraftstoff;
   }
   if (eingaben.tueren) params.tueren = eingaben.tueren;
 

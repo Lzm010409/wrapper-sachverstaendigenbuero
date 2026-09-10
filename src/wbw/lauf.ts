@@ -18,6 +18,7 @@ import {
 import { brauchbare, pruefeInserate, type Inseratsangabe, type Pruefurteil } from './pruefung'
 import { fahrzeugKennung } from './ergebnis'
 import { protokolliereWarnung } from '@/protokoll'
+import type { Kraftstoff } from './portalvokabular'
 
 const fuehreAus = promisify(execFile)
 
@@ -83,6 +84,7 @@ export interface WbwEingabe {
   plz: string
   sollAusstattung: string[]
   getriebe?: 'Automatik' | 'Manuell'
+  kraftstoff?: Kraftstoff
   tueren?: number
   radiusKm: number
   kmToleranz: number
@@ -406,8 +408,22 @@ function parameterFuer(
     plz: eingabe.plz,
     zentrum,
     ...(eingabe.subjekt.bauart ? { karosserie: eingabe.subjekt.bauart } : {}),
+    /*
+      Die Bauart geht nur im ENGEN Zyklus an die Portale.
+
+      Gemessen am 10.09.2026 schnitt `bodyType: "van"` den AutoScout24-Korb
+      eines VW Sharan von zehn Treffern auf einen — dort meint `van` das
+      Nutzfahrzeug und nicht die Großraumlimousine. Zyklus 1 sucht damit und
+      liefert einen scharf getrennten Korb; reicht er nicht, sucht Zyklus 2
+      ohne sie, und eine falsche Zuordnung kann den Lauf nicht mehr kosten.
+
+      Getriebe und Kraftstoff gehen in jedem Zyklus hinaus: deren Vokabular
+      ist eindeutig, das der Bauart nachweislich nicht.
+    */
+    bauartAmPortal: stufe.name === 'eng',
     ...toleranzen,
     ...(eingabe.getriebe ? { getriebe: eingabe.getriebe } : {}),
+    ...(eingabe.kraftstoff ? { kraftstoff: eingabe.kraftstoff } : {}),
     ...(eingabe.tueren ? { tueren: eingabe.tueren } : {}),
     maxItemsProPortal: eingabe.maxItemsProPortal,
     kleinanzeigenLocId: null,
