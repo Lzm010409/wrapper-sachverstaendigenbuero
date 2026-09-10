@@ -139,20 +139,44 @@ export async function formulierePosition(auftrag: KompositionsAuftrag): Promise<
  * Eine gescheiterte Position reisst die übrigen nicht mit — sie wird mit
  * ihrem Fehler zurückgegeben, damit die Oberfläche gezielt einen neuen
  * Versuch anbieten kann.
+ *
+ * **Die erste Position läuft allein.** Systemanweisung und Hausstil sind für
+ * alle Positionen dieselben rund 1700 Token und liegen im Zwischenspeicher
+ * des Modells (siehe `alsSystemblock` in `ki/client.ts`). Der Eintrag
+ * entsteht aber erst, wenn ein Aufruf ihn geschrieben hat. Starteten alle
+ * Positionen gleichzeitig, käme keine an einem fertigen Eintrag an: jede
+ * schriebe ihren eigenen — zum 1,25-fachen Preis — und keine läse einen. Das
+ * Zwischenspeichern wäre dann teurer als gar keines. Läuft die erste zuerst,
+ * lesen alle übrigen ihren Eintrag zu einem Zehntel des Preises.
+ *
+ * Das kostet die Wartezeit eines einzelnen Aufrufs. Bei acht Positionen
+ * stehen dem rund drei Viertel weniger Eingabe-Token gegenüber.
  */
 export async function formulierePositionen(
   auftraege: { positionId: string; auftrag: KompositionsAuftrag }[],
 ): Promise<{ positionId: string; text?: string; fehler?: string }[]> {
-  return Promise.all(
-    auftraege.map(async ({ positionId, auftrag }) => {
-      try {
-        return { positionId, text: await formulierePosition(auftrag) }
-      } catch (fehler) {
-        return {
-          positionId,
-          fehler: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler',
-        }
+  async function formuliere({
+    positionId,
+    auftrag,
+  }: {
+    positionId: string
+    auftrag: KompositionsAuftrag
+  }): Promise<{ positionId: string; text?: string; fehler?: string }> {
+    try {
+      return { positionId, text: await formulierePosition(auftrag) }
+    } catch (fehler) {
+      return {
+        positionId,
+        fehler: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler',
       }
-    }),
-  )
+    }
+  }
+
+  const [erste, ...uebrige] = auftraege
+  if (!erste) return []
+
+  // Der Warmlauf. Scheitert er, laufen die übrigen trotzdem — dann eben ohne
+  // gefüllten Zwischenspeicher, wie vorher auch.
+  const zuerst = await formuliere(erste)
+  return [zuerst, ...(await Promise.all(uebrige.map(formuliere)))]
 }
