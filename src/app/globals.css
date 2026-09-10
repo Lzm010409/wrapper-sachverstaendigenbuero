@@ -1920,6 +1920,19 @@ code {
   position: relative;
 }
 
+/*
+ * Vorschlag und Platzhalter stehen vor den Blasen, mit demselben Abstand
+ * zueinander wie in der Seitenleiste des Falls (`.seitenleiste .karte +
+ * .karte`) und einem eigenen Abstand nach unten zur ersten Blase.
+ */
+.rand-karten {
+  margin-bottom: 20px;
+}
+
+.rand-karten .karte + .karte {
+  margin-top: 14px;
+}
+
 .blase {
   border: 1px solid var(--line);
   border-radius: var(--radius);

@@ -88,6 +88,7 @@ describe('ladeVorgang', () => {
       schadenhoeheBrutto: 8490.71,
       ausgebuchterBetrag: 120,
       sevdeskRechnungId: 'RE-2026-0042',
+      sevdeskRechnungLink: null,
     })
   })
 
@@ -126,6 +127,22 @@ describe('ladeVorgang', () => {
       deal: { id: 3, custom_fields: { d8863fcbcb97aeb225a9418261b5508c0410783f: '   ' } },
     })
     expect((await ladeVorgang('0926/2081TG')).deal?.sevdeskRechnungId).toBeNull()
+  })
+
+  it('gibt den in Pipedrive gepflegten sevDesk-Rechnungslink weiter', async () => {
+    vi.stubEnv('PIPEDRIVE_API_TOKEN', 'geheim')
+    findeDeal.mockResolvedValueOnce({
+      art: 'gefunden',
+      deal: {
+        id: 7,
+        custom_fields: {
+          ee8bc622d857b546eca74c56a303f1373b05047c: 'https://my.sevdesk.de/fi/edit/type/RE/id/42',
+        },
+      },
+    })
+    expect((await ladeVorgang('0926/2081TG')).deal?.sevdeskRechnungLink).toBe(
+      'https://my.sevdesk.de/fi/edit/type/RE/id/42',
+    )
   })
 
   it('meldet mehrere Treffer als eigenen Zustand, statt den ersten stillschweigend zu nehmen', async () => {

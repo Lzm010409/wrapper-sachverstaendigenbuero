@@ -64,6 +64,18 @@ export function leseVorgangsangaben(daten: Falldaten) {
 }
 
 /**
+ * Die Klartextbeschriftung zur Herkunft eines Empfängervorschlags — dieselben
+ * Schlüssel wie `schlageEmpfaengerVor` liefert. Ein Ort für diese drei
+ * Zeilen, nicht zwei: die Stellungnahme-Maske zeigt denselben Vorschlag wie
+ * früher der Reiter „Vorgang".
+ */
+export const HERKUNFT_LABEL: Record<'anwalt' | 'versicherung' | 'werkstatt', string> = {
+  anwalt: 'Rechtsanwalt aus dem Gutachten',
+  versicherung: 'Versicherung aus dem Gutachten',
+  werkstatt: 'Werkstatt aus dem Gutachten',
+}
+
+/**
  * Kann auf diesem Server ein Prüfbericht ausgewertet werden?
  *
  * Zwei Voraussetzungen, die nichts miteinander zu tun haben: das

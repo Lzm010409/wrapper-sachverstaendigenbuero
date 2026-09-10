@@ -74,6 +74,14 @@ import { markiereVersendet, nimmVersandZurueck } from '@/stellungnahme/export-ak
 import type { Pruefergebnis } from '@/export/waechter'
 import type { Befund } from '@/export/waechter'
 import { Blase, type PositionAnzeige, type Vorschlag } from './blase'
+import type { Beteiligter } from '@/autoixpert/felder'
+
+/** Empfängervorschlag aus dem Gutachten — Herkunft schon als Klartext. */
+export interface Empfaengervorschlag {
+  empfaenger: Beteiligter | null
+  herkunftLabel: string
+  betreff: string | null
+}
 
 /**
  * Der Schreibtisch: links der Brief, rechts die Anmerkungen.
@@ -109,6 +117,7 @@ export function Schreibtisch({
   positionen,
   vorschlaege,
   werte,
+  vorschlag,
   kiAktiv,
   versendet,
 }: {
@@ -118,6 +127,7 @@ export function Schreibtisch({
   positionen: PositionAnzeige[]
   vorschlaege: Vorschlag[]
   werte: Record<string, string>
+  vorschlag: Empfaengervorschlag
   kiAktiv: boolean
   versendet: boolean
 }) {
@@ -1109,6 +1119,60 @@ export function Schreibtisch({
         </div>
 
         <aside className="rand" ref={randRef}>
+          <div className="rand-karten">
+            <div className="karte">
+              <h2>Vorschlag für die Stellungnahme</h2>
+              {vorschlag.empfaenger ? (
+                <>
+                  <p className="unterzeile" style={{ marginTop: 0 }}>
+                    {vorschlag.herkunftLabel}
+                  </p>
+                  <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 14 }}>
+                    {vorschlag.empfaenger.name}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>
+                    {vorschlag.empfaenger.strasse}
+                    {vorschlag.empfaenger.strasse ? <br /> : null}
+                    {vorschlag.empfaenger.plzOrt}
+                  </p>
+                  {vorschlag.betreff ? (
+                    <p style={{ margin: '12px 0 0', fontSize: 13 }}>
+                      <span style={{ color: 'var(--ink-soft)' }}>Betreff: </span>
+                      {vorschlag.betreff}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="unterzeile" style={{ margin: 0 }}>
+                  Kein Empfänger im Gutachten hinterlegt.
+                </p>
+              )}
+            </div>
+
+            <div className="karte">
+              <h2>Verfügbare Platzhalter</h2>
+              <p className="unterzeile" style={{ marginTop: 0 }}>
+                Werden beim Einfügen eines Bibliothekstexts automatisch gesetzt.
+              </p>
+              {Object.keys(werte).length === 0 ? (
+                <p className="unterzeile" style={{ margin: 0 }}>
+                  Keine — die Falldaten sind zu dünn.
+                </p>
+              ) : (
+                <dl className="kv">
+                  {Object.entries(werte).map(([schluessel, wert]) => (
+                    <span key={schluessel} style={{ display: 'contents' }}>
+                      <dt>
+                        <code style={{ fontSize: 11 }}>[{schluessel}]</code>
+                      </dt>
+                      <dd style={{ textAlign: 'left', fontSize: 12.5 }}>{wert}</dd>
+                    </span>
+                  ))}
+                </dl>
+              )}
+            </div>
+          </div>
+
           {/* Die Zahl an der Blase ist die des Prüfberichts — dieselbe wie
               auf der Marke in der Leiste. Vorher war es die Nummer im
               Schreiben, die es erst mit Text gibt: bei einem frischen Fall

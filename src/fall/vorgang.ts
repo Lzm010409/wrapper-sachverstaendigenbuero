@@ -39,6 +39,8 @@ export interface VorgangAnsicht {
     schadenhoeheBrutto: number | undefined
     ausgebuchterBetrag: number | undefined
     sevdeskRechnungId: string | null
+    /** Der Direktlink zur Rechnung in sevDesk, gepflegt am Pipedrive-Deal. */
+    sevdeskRechnungLink: string | null
   }
   /** Nur bei `stand === 'mehrdeutig'`: die widersprüchlichen Treffer. */
   treffer?: { id: number; title: string | null }[]
@@ -83,6 +85,7 @@ export async function ladeVorgang(aktenzeichen: string | null): Promise<VorgangA
       schadenhoeheBrutto: monetaerWert(felder[dealFelder.schadenhoeheBrutto]),
       ausgebuchterBetrag: monetaerWert(felder[dealFelder.ausgebuchterBetrag]),
       sevdeskRechnungId: textOderNull(felder[dealFelder.sevdeskRechnungId]),
+      sevdeskRechnungLink: textOderNull(felder[dealFelder.sevdeskRechnungLink]),
     },
   }
 }

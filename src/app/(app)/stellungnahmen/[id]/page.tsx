@@ -5,7 +5,8 @@ import { holeVorschlaege } from '@/stellungnahme/aktionen'
 import type { Sonderfallbefund } from '@/pruefbericht/sonderfaelle'
 import type { Extraktion } from '@/pruefbericht/schema'
 import { gutachtenSchema } from '@/autoixpert/typen'
-import { leseFalldaten, platzhalterWerte } from '@/autoixpert/felder'
+import { leseFalldaten } from '@/autoixpert/felder'
+import { HERKUNFT_LABEL, leseVorgangsangaben, type Falldaten } from '@/fall/ansicht'
 import { stelleDokumentBereit } from '@/dokument/dienst'
 import { kiVerfuegbar } from '@/ki/client'
 import { Schreibtisch } from './schreiben'
@@ -23,10 +24,10 @@ function euro(wert: string | number | null | undefined): string {
   return zahl.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 }
 
-function falldatenWerte(daten: unknown): Record<string, string> {
+function falldatenAnsicht(daten: unknown): Falldaten | null {
   const geprueft = gutachtenSchema.safeParse(daten)
-  if (!geprueft.success) return {}
-  return platzhalterWerte(leseFalldaten(geprueft.data))
+  if (!geprueft.success) return null
+  return leseFalldaten(geprueft.data)
 }
 
 /**
@@ -106,6 +107,16 @@ export default async function StellungnahmeSeite({
   }
 
   const [vorschlaege, brief] = await Promise.all([holeVorschlaege(id), stelleDokumentBereit(s)])
+
+  /*
+    Was früher im Reiter „Vorgang" der Akte stand — Empfängervorschlag und
+    Platzhalter aus dem Gutachten — braucht die Maske hier genauso: beides
+    entsteht beim Formulieren des Schreibens, nicht beim Blick auf den Fall.
+  */
+  const falldaten = falldatenAnsicht(s.fall?.daten)
+  const { vorschlag, platzhalter } = falldaten
+    ? leseVorgangsangaben(falldaten)
+    : { vorschlag: { empfaenger: null, herkunft: null, betreff: null, anrede: '' }, platzhalter: {} }
 
   const befunde = (s.sonderfaelle ?? []) as Sonderfallbefund[]
   const extraktion = s.extraktion as Extraktion | null
@@ -225,7 +236,12 @@ export default async function StellungnahmeSeite({
         stand={brief.stand}
         kiAktiv={kiVerfuegbar()}
         versendet={Boolean(s.versendetAm)}
-        werte={falldatenWerte(s.fall?.daten)}
+        werte={platzhalter}
+        vorschlag={{
+          empfaenger: vorschlag.empfaenger,
+          herkunftLabel: vorschlag.herkunft ? HERKUNFT_LABEL[vorschlag.herkunft] : 'aus dem Gutachten',
+          betreff: vorschlag.betreff,
+        }}
         positionen={s.positionen.map((p) => ({
           id: p.id,
           bezeichnung: p.bezeichnung,
