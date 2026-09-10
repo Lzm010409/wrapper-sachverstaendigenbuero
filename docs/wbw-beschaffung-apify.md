@@ -1,6 +1,6 @@
 # Die WBW-Beschaffung über Apify
 
-Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus vier echten
+Stand: 10.09.2026. Alle Zahlen in diesem Papier stammen aus fünf echten
 Probeläufen gegen die Actors, nicht aus deren Dokumentation. Was gemessen ist,
 steht mit Messwert da; was offen ist, steht als offen da.
 
@@ -20,8 +20,8 @@ führen einen Umkreisfilter, und er wirkt.
 
 ## Was gemessen wurde
 
-Vier Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
-03/2021), Gesamtkosten **0,204 $**.
+Fünf Probeläufe, zwei echte Fälle (VW Sharan 12/2010, Citroën Berlingo
+03/2021), Gesamtkosten **0,239 $**.
 
 ### Der Umkreis am Portal wirkt
 
@@ -227,11 +227,74 @@ stehen `autos.km_i` und `autos.ez_i`, ist kaum noch etwas da, was eine
 Sortierung verzerren könnte. Genau das ist die nächste Messung — Probelauf 4
 lief bewusst ohne Attributfilter, um die Sortierung isoliert zu sehen.
 
+### Probelauf 5: Kleinanzeigen trägt — mit Tiefe
+
+Der Probeaufbau der fertigen Beschaffung: alle gemessenen Filter zusammen,
+je Fall einmal flach und einmal tief. Vier Läufe, **0,035 $**.
+
+| Fall | Tiefe | geliefert | im Korb | verschiedene Einstelltage |
+| --- | --- | --- | --- | --- |
+| Sharan | 10 | 2 | 2 | 1 |
+| Sharan | **80** | 17 | **17** | **7** |
+| Berlingo | 10 | 1 | 1 | 1 |
+| Berlingo | **80** | 18 | **18** | **16** |
+
+Die Tiefe löst beide Probleme auf einmal. Der Korb wird gross genug — statt
+zwei und einem Fahrzeug siebzehn und achtzehn — und er reicht zeitlich
+zurück: der Berlingo-Korb spannt vom 27.07. bis zum 10.09.
+
+**`sortBy` bleibt deshalb auf `newest`.** Probelauf 4 legte nahe, an der
+Sortierung zu drehen; das wäre der falsche Hebel gewesen, weil jede
+Preissortierung den Korb verzerrt. Es war nie die Sortierung, es war die
+Tiefe.
+
+Die Körbe sind plausibel: Sharan 3.900 bis 15.490 € bei einem Median von
+10.400 €, Berlingo 8.990 bis 21.950 € bei 15.245 €.
+
+### Zwei echte Sharans, verworfen von meinem eigenen Filter
+
+Von 17 gelieferten Fahrzeugen fielen zwei an der Stufe *„richtiges Modell"*:
+
+```
+Modell='Weitere VW'   Vw Sharan 2.0 TDI          15.650 €
+Modell='Weitere VW'   Vw sharan diesel 2.0 tdi    9.500 €
+```
+
+Beide sind Sharans. Der Verkäufer hat das Modell nicht eingetragen, und
+Kleinanzeigen hat *„Weitere VW"* daraus gemacht. Mein Probeskript prüfte
+`Modell ?? Titel` — weil `Modell` gesetzt war, kam der Titel nie zum Zug.
+Mit `Modell` **und** Titel bleiben 17 von 17.
+
+Ein Zwölftel des Korbs, verloren an eine Zeile, die ich selbst geschrieben
+habe, um genau solche Verluste sichtbar zu machen. Daraus die Regel:
+
+> **Modell, Marke und Bauart werden nie aus einem einzigen Feld entschieden.**
+> Attributfeld und Titel zusammen, und bei Gleichstand gewinnt das
+> grosszügigere Ergebnis.
+
+Es ist dieselbe Sache wie *„Feel XL"* im Modellfeld der DAT, nur von der
+anderen Seite: dort stand zu viel im Feld, hier zu wenig.
+
+### Die Bauart-Gruppierung, jetzt mit Zahlen
+
+Der Berlingo-Korb aus achtzehn Fahrzeugen trägt fünf verschiedene
+Bauartangaben:
+
+| Van/Bus | Andere Fahrzeugtypen | Kombi | Limousine | ohne Angabe |
+| --- | --- | --- | --- | --- |
+| 12 | 3 | 1 | 1 | 1 |
+
+**Ein Drittel des Korbs heisst nicht „Van/Bus"** — und eine *„Limousine"* ist
+bei einem Berlingo schlicht falsch eingetragen. Damit ist belegt, was bisher
+aus zwanzig Datensätzen geschlossen war: die Bauartgruppe muss weit sein, und
+eine fehlende Angabe darf nie zum Verwerfen führen.
+
 ### Die Lehre: Filter müssen sich nachweisen
 
-Viermal in dieser Sitzung ist derselbe Fehler aufgetreten — ein Filter, der
+Fünfmal in dieser Sitzung ist derselbe Fehler aufgetreten — ein Filter, der
 lautlos nichts tut oder lautlos das Falsche tut. Beim vierten, `adType`, hatte
-ich ihn schon als behoben ins Papier geschrieben. Deshalb bekommt die
+ich ihn schon als behoben ins Papier geschrieben. Der fünfte stand in dem
+Skript, das die anderen aufdecken sollte. Deshalb bekommt die
 Beschaffung eine Selbstprüfung: **nach jedem Abruf wird gezählt, wie viele
 gelieferte Fahrzeuge die gesetzten Spannen verletzen.** Verletzt mehr als eine
 Handvoll sie, hat der Portalfilter nicht gegriffen; das steht dann im
@@ -287,7 +350,8 @@ Was gesetzt wird — und was ausdrücklich **nicht**:
 | Unfall | — | `damageStatus: EXCLUDE` | `autos.schaden_s: nein` |
 | Ausschluss | — | `excludeKeywords` (Export, Bastler) | `whatExclude` |
 | Angebote | — | — | `adType: angebote` — **wirkt nicht, nachfiltern** |
-| Tiefe | — | — | `maxResults` ≫ Zielzahl (Umkreis filtert lokal) |
+| Tiefe | — | — | **`maxResults: 80`** (10 ergab 1–2 Fahrzeuge) |
+| Sortierung | — | — | `newest` — jede Preissortierung verzerrt |
 | Details | `includeDetails: true` | `includeDetails: true` | `includeDetails: true` |
 | **Bauart** | **nie** | **nie** | **nie** (kostet einen echten Sharan) |
 
@@ -334,7 +398,8 @@ Rückfall ist derselbe Fehler wie die stille PDF-Stufe.
 
 Kosten: 0,005 $ je Actorlauf, 0,00049 (AS24) / 0,00059 (mobile.de) / 0,0004
 (Kleinanzeigen) je Datensatz. Drei Portale, bis drei Zyklen, 40 Treffer je
-Lauf: **rund 0,22 $ je Recherche.**
+Lauf — bei Kleinanzeigen 80, weil die Tiefe dort der Hebel ist:
+**rund 0,26 $ je Recherche.**
 
 Der heutige Deckel `maxTotalChargeUsd: 0.5` gilt **je Aufruf** — bei neun
 Aufrufen wären das 4,50 $. Er wird ein Gesamtdeckel für den Lauf, und die
@@ -343,13 +408,10 @@ Oberfläche.
 
 ## Was offen bleibt
 
-- **Trägt Kleinanzeigen einen Korb?** Das ist die verbliebene Frage. Mit
-  Attributfiltern kamen bei `maxResults: 10` ein bis zwei Fahrzeuge zurück;
-  ohne Filter brachte `maxResults: 50` das Vierfache. Ob enge Filter plus
-  grosse Tiefe zusammen genügend Fahrzeuge liefern, ist ungemessen — und
-  entscheidet, ob Kleinanzeigen dritte Quelle oder Ergänzung ist.
+- ~~Trägt Kleinanzeigen einen Korb?~~ **Ja, mit Tiefe 80:** 17 und 18
+  Fahrzeuge über 7 bzw. 16 Einstelltage.
 - ~~Kleinanzeigen sieht nur den heutigen Tag.~~ **Widerlegt:** es war die
-  Voreinstellung `sortBy: newest`.
+  Voreinstellung `sortBy: newest` in Verbindung mit zu geringer Tiefe.
 - ~~Kein EZ-Filter bei Kleinanzeigen.~~ **Erledigt:** `autos.ez_i`, gemessen
   wirksam.
 - ~~Liegt die magere Ausbeute am `attributeFilters`-Weg?~~ **Erledigt:**
@@ -357,10 +419,12 @@ Oberfläche.
 - ~~Welche Schreibweise trägt?~~ **Erledigt:** beide, identisch.
 - ~~Lassen sich Gesuche am Portal ausschliessen?~~ **Nein.** Keine der vier
   Formen wirkt; sie werden nachträglich verworfen.
-- **Die Bauart-Gruppierung ist ungemessen.** Dass Van, Station Wagon und
-  Other für einen Sharan alle „Großraum" heissen müssen, ist aus zwanzig
-  Datensätzen geschlossen, nicht aus hundert. Der als **Kombi** eingetragene
-  Sharan zeigt, dass die Gruppe weit sein muss.
+- ~~Die Bauart-Gruppierung ist ungemessen.~~ **Gemessen:** 6 von 18
+  Fahrzeugen im Berlingo-Korb tragen nicht „Van/Bus", eines gar nichts.
+- **Die Verkäuferart ist ungeklärt.** Der Sharan-Korb ist 9 gewerblich zu 6
+  privat, der Berlingo-Korb 15 zu 3. Für einen Wiederbeschaffungswert zählt
+  der Händlerpreis; ob und wie stark private Angebote den Median nach unten
+  ziehen dürfen, ist eine fachliche Entscheidung, keine technische.
 - **Ein echter Lauf im Cockpit hat nie stattgefunden.** Alles hier stammt aus
   Einzelaufrufen der Actors, nicht aus der Pipeline.
 
@@ -371,7 +435,7 @@ Oberfläche.
 | 1 | Probeläufe | ✅ abgeschlossen, 0,076 $ |
 | 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | ✅ abgeschlossen, 0,060 $ |
 | 1c | Probelauf 4: sieht Kleinanzeigen mehr als den heutigen Tag? | ✅ ja, 0,068 $ — es war `sortBy` |
-| 1d | Probelauf 5: enge Filter plus grosse Tiefe — trägt der Korb? | brauchbare Fahrzeuge je Fall |
+| 1d | Probelauf 5: enge Filter plus grosse Tiefe — trägt der Korb? | ✅ ja, 0,035 $ — 17 und 18 im Korb |
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | Vertrag hält, Tests grün |
 | 3 | Filter je Portal setzen, Gesuche nachfiltern, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
