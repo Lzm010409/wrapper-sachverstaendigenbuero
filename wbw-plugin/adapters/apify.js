@@ -91,6 +91,24 @@ function mappe(raw, quelle, warnungen) {
   return f;
 }
 
+/**
+ * Wirft Gesuche weg — nicht am Portal, sondern hier.
+ *
+ * Der Eingabeschalter `adType: "angebote"` wirkt bei Kleinanzeigen
+ * nachweislich nicht: in allen vier gemessenen Formen kamen Gesuche durch,
+ * auch über eine Portaladresse mit `anzeige:angebote` (1 von 19, 2 von 50,
+ * 1 von 14, 1 von 19 Treffern). Ein Gesuch trägt den Wunschpreis eines
+ * Käufers — im Probelauf stand ein „Gesucht: SHARAN 7-Sitzer 2.0TDI" mit
+ * 11.000 € bei 20.000 km zwischen den Angeboten. Ungefiltert wäre er als
+ * Vergleichsfahrzeug in den Median gegangen.
+ *
+ * Geprüft wird nur, was eine Angabe trägt. AutoScout24 und mobile.de führen
+ * kein `adType`; für sie ist das hier ein Durchreicher.
+ */
+function nurAngebote(roh) {
+  return (roh || []).filter((x) => x == null || x.adType == null || x.adType === "OFFERED");
+}
+
 /** Führt den Actor synchron aus und liefert die Dataset-Items. */
 async function holen(eingaben, opts = {}) {
   pruefeFreigabe();
@@ -113,16 +131,22 @@ async function holen(eingaben, opts = {}) {
   if (r.status < 200 || r.status >= 300) throw new Error(`L3 Apify: HTTP ${r.status} für Actor ${actor}`);
   const roh = Array.isArray(r.daten) ? r.daten : [];
   const warnungen = [];
-  const items = roh.map((x) => mappe(x, opts.quelle || "apify", warnungen)).filter(Boolean);
+  const quelle = opts.quelle || "apify";
+
+  const angebote = nurAngebote(roh);
+  const gesuche = roh.length - angebote.length;
+  if (gesuche > 0) warnungen.push(`${quelle}: ${gesuche} Gesuch(e) verworfen (adType != OFFERED)`);
+
+  const items = angebote.map((x) => mappe(x, quelle, warnungen)).filter(Boolean);
   return {
     items,
     protokoll: {
       abrufe: [{ url: `${BASIS}/acts/${actor}/run-sync-get-dataset-items`, status: r.status, ms: Date.now() - t0, zeitpunkt: new Date().toISOString() }],
-      actor, maxTotalChargeUsd: opts.maxTotalChargeUsd ?? 0.5, rohTreffer: roh.length, warnungen,
+      actor, maxTotalChargeUsd: opts.maxTotalChargeUsd ?? 0.5, rohTreffer: roh.length, gesuche, warnungen,
       kostenpflichtig: true,
     },
     roh,
   };
 }
 
-module.exports = { holen, mappe, pruefeFreigabe, BASIS };
+module.exports = { holen, mappe, nurAngebote, pruefeFreigabe, BASIS };

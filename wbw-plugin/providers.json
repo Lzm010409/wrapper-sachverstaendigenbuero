@@ -75,9 +75,10 @@
           "id": "L3",
           "adapter": "apify",
           "enabled": true,
-          "actor": "fatihtahta/ebay-kleinanzeigen-scraper",
+          "actor": "blackfalcondata/kleinanzeigen-scraper",
           "maxTotalChargeUsd": 0.5,
-          "kostenpflichtig": true
+          "kostenpflichtig": true,
+          "grund_actorwechsel": "Vorher fatihtahta/ebay-kleinanzeigen-scraper. Der erwartet andere Eingabeschluessel (queries/car_make/min_mileage/enrich_data/limit) als der hier gebaute Eingabeblock. Unbekannte Schluessel werden laut Schema \"sent as-is\" und filtern still nicht. Der blackfalcondata-Actor ist der, gegen den die Probelaeufe 1 bis 5 gemessen wurden - siehe docs/wbw-beschaffung-apify.md."
         }
       ]
     }
