@@ -1,5 +1,6 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
+import { protokolliereInfo } from '@/protokoll'
 
 /**
  * Zugang zum Sprachmodell.
@@ -50,6 +51,80 @@ export function holeClient(): Anthropic {
   return zwischenspeicher
 }
 
+/**
+ * Setzt den Haltepunkt für das Prompt Caching auf die Systemanweisung.
+ *
+ * Anthropic gleicht den Prompt als Präfix ab: Alles vor dem Haltepunkt wird
+ * zwischengespeichert und beim nächsten Aufruf zum Bruchteil des Preises
+ * gelesen, alles dahinter jedes Mal neu. Die Reihenfolge ist
+ * `tools` → `system` → `messages`, ein Haltepunkt auf dem System-Block hält
+ * deshalb Werkzeugdefinition UND Systemanweisung zusammen im Speicher —
+ * genau den Teil, der sich zwischen zwei Aufrufen derselben Stelle nicht
+ * ändert. Der veränderliche Teil (Prüfbericht, Inserate, Auftrag) steht
+ * dahinter.
+ *
+ * **Warum hier und nicht als `cache_control` auf oberster Ebene der Anfrage.**
+ * Die automatische Platzierung setzt den Haltepunkt ans Ende der Anfrage,
+ * also hinter den veränderlichen Teil. Der wäre dann bei jeder Anfrage neu zu
+ * schreiben — zum 1,25-fachen Preis — und würde nie wieder gelesen. Das
+ * Attribut wäre nicht wirkungslos, sondern teurer als gar keines.
+ *
+ * **Wann es wirkt.** Anthropic legt einen Eintrag erst ab einer Mindestlänge
+ * des Präfixes an: 512 Token bei Opus 5, 1024 bei Sonnet 5, 4096 bei
+ * Haiku 4.5. Darunter passiert nichts — ohne Fehler, ohne Hinweis, nur
+ * `cache_creation_input_tokens: 0`. Nach Werkzeug plus Systemanweisung
+ * geschätzt:
+ *
+ * | Aufrufstelle              | Modell   | Präfix | Schwelle | greift        |
+ * |---------------------------|----------|--------|----------|---------------|
+ * | `stellungnahme/komposition` | Sonnet 5 | ~1700  | 1024     | ja            |
+ * | `fotos/assistent`         | Haiku 4.5 | ~2300 | 4096     | noch nicht    |
+ * | `pruefbericht/extraktion`  | Haiku 4.5 | ~1700 | 4096     | noch nicht    |
+ * | `wbw/pruefung`            | Haiku 4.5 | ~950   | 4096     | noch nicht    |
+ *
+ * Bei den drei Haiku-Stellen ist der Haltepunkt heute also folgenlos. Er
+ * greift von selbst, sobald ein Prompt wächst oder die Aufrufstelle das
+ * Modell wechselt — beim Fotoassistenten am ehesten, weil dessen
+ * Werkzeugdefinition mit dem Fotolexikon mitwächst. Was tatsächlich ankommt,
+ * steht im Protokoll — siehe `protokolliereVerbrauch`.
+ *
+ * **Voraussetzung ist ein Byte für Byte gleicher Präfix.** Alle vier
+ * Systemanweisungen sind fest verdrahtet, ohne Einsetzung pro Anfrage; der
+ * Hausstil der Komposition wird einmal geladen und im Modul gehalten; das
+ * Fotolexikon kommt sortiert aus der Datenbank (`orderBy(asc(name))`), damit
+ * die Werkzeugdefinition zwischen zwei Anfragen dieselbe bleibt. Wer hier
+ * etwas Veränderliches einsetzt — Datum, Fall-ID, unsortierte Liste —, macht
+ * das Zwischenspeichern wirkungslos, ohne dass etwas fehlschlägt.
+ *
+ * Die Lebensdauer beträgt fünf Minuten und wird von jedem Zugriff erneuert.
+ * Das passt zu der Art, wie hier gearbeitet wird: ein Vorgang in einem Zug.
+ */
+function alsSystemblock(system: string): Anthropic.TextBlockParam[] {
+  return [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+}
+
+/**
+ * Schreibt den Tokenverbrauch eines Aufrufs ins Protokoll.
+ *
+ * Caching fällt lautlos aus. Ändert jemand später den Aufbau eines Prompts
+ * so, dass der Präfix nicht mehr Byte für Byte derselbe ist, laufen die
+ * Aufrufe weiter, nur die Rechnung steigt — es gibt keine Fehlermeldung, die
+ * darauf hinweist. Diese Zeilen sind der einzige Beleg dafür, dass der
+ * Zwischenspeicher überhaupt greift: Ist `cacheGelesen` über mehrere Aufrufe
+ * derselben Stelle hinweg null, stimmt etwas nicht.
+ */
+function protokolliereVerbrauch(modell: string, verbrauch: Anthropic.Usage, dauerMs: number): void {
+  protokolliereInfo('ki.aufruf', 'Modellaufruf abgeschlossen.', {
+    dienst: 'anthropic',
+    modell,
+    dauerMs,
+    eingabe: verbrauch.input_tokens,
+    ausgabe: verbrauch.output_tokens,
+    cacheGeschrieben: verbrauch.cache_creation_input_tokens ?? 0,
+    cacheGelesen: verbrauch.cache_read_input_tokens ?? 0,
+  })
+}
+
 export interface WerkzeugDefinition {
   name: string
   description: string
@@ -98,13 +173,14 @@ export async function rufeMitWerkzeugAuf(optionen: {
   maxTokens?: number
 }): Promise<unknown> {
   const client = holeClient()
+  const begonnen = Date.now()
 
   let antwort
   try {
     antwort = await client.messages.create({
       model: optionen.modell,
       max_tokens: optionen.maxTokens ?? 8000,
-      system: optionen.system,
+      system: alsSystemblock(optionen.system),
       tools: [optionen.werkzeug as never],
       tool_choice: { type: 'tool', name: optionen.werkzeug.name },
       messages: [{ role: 'user', content: optionen.inhalt as never }],
@@ -115,6 +191,8 @@ export async function rufeMitWerkzeugAuf(optionen: {
       fehler,
     )
   }
+
+  protokolliereVerbrauch(optionen.modell, antwort.usage, Date.now() - begonnen)
 
   const block = antwort.content.find((b) => b.type === 'tool_use')
   if (!block || block.type !== 'tool_use') {
@@ -147,13 +225,15 @@ export async function rufeFuerTextAuf(optionen: {
     nachrichten.push({ role: 'assistant', content: optionen.vorlaufText })
   }
 
+  const begonnen = Date.now()
   try {
     const antwort = await client.messages.create({
       model: optionen.modell,
       max_tokens: optionen.maxTokens ?? 4000,
-      system: optionen.system,
+      system: alsSystemblock(optionen.system),
       messages: nachrichten,
     })
+    protokolliereVerbrauch(optionen.modell, antwort.usage, Date.now() - begonnen)
     const text = antwort.content
       .filter((b) => b.type === 'text')
       .map((b) => (b.type === 'text' ? b.text : ''))
