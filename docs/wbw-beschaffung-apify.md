@@ -417,6 +417,47 @@ mitzuschleppen hiesse, Werte zu tragen, die nirgends ankommen. Der
 Unfallstatus wird bei mobile.de ohnehin am Portal gefiltert
 (`damageStatus: EXCLUDE`).
 
+### 2b. Der Bauartfilter — weich in drei Stufen
+
+Mit der Feldkarte kommt die Bauart an. Damit tritt der umgekehrte Fehler in
+den Vordergrund: der Filter verwirft echte Vergleichsfahrzeuge, weil die
+Portale dieselbe Karosserie verschieden benennen und Verkäufer sie falsch
+eintragen. Gemessen an den 35 Kleinanzeigen-Datensätzen:
+
+| | Van | Kombi | Limousine | ohne Angabe |
+| --- | --- | --- | --- | --- |
+| nur aus dem Bauartfeld | 29 | 1 | 1 | 4 |
+| Bauartfeld **plus Titel** | **34** | 1 | — | — |
+
+**Der Titel rettet fast alles** — weil der Katalog Modellnamen kennt
+(„sharan", „berlingo", „touran"). Ein als *Limousine* eingetragener
+*„Citroën Berlingo Kasten Club M L1"* wird trotzdem als Van erkannt.
+
+Drei Stufen halten den Rest ab:
+
+1. **Unbekannt bleibt drin.** „Other", „OTHER", „Andere Fahrzeugtypen": drei
+   Portale, drei Sammeltöpfe. Sie zu einer Bauart zu erklären hiesse raten.
+2. **Verwandte bleiben drin.** AutoScout24 führte denselben Sharan mal als
+   *Van*, mal als *Station Wagon*; ein echter *„Citroën Berlingo Shine
+   Panorama/AHK"* trägt *Kombi*. Van und Kombi schliessen einander deshalb
+   nicht aus — und nur die beiden, weil nur das gemessen ist. Limousine und
+   Van bleiben ein echter Unterschied.
+3. **Unter der Untergrenze gibt er auf.** Bleiben weniger als `MINDESTKORB`
+   Fahrzeuge übrig, wird die Bauart fallengelassen und der Grund steht im
+   Ergebnis. Dieselbe Regel wie beim Linienfilter.
+
+Die Untergrenze kommt aus **einer** Quelle: `MINDESTKORB` in `src/wbw/zyklus.ts`
+— dieselbe Zahl, ab der `ergebnis.ts` den Korb als zu klein meldet.
+
+**Ein Prüfstein, der nichts prüft.** Der erste Regressionstest benutzte einen
+Sharan — und der Filter tat nie etwas, weil schon der Titel „Sharan" die
+Bauart entschied. Die Tests laufen deshalb gegen einen **Mercedes-Benz
+Citan**: der steht in keiner Musterliste, dort entscheidet allein das Feld,
+und dort muss die Weichheit tragen.
+
+Im Vokabular fehlte genau ein Wert: `SMALL`, wie mobile.de den Kleinwagen
+nennt. Alle übrigen 14 gemessenen Werte erkannte der Katalog bereits.
+
 ### 3. Ausstattung: Übersetzungstabelle
 
 AutoScout24 und mobile.de liefern englisch (`Air conditioning`, `Park
@@ -478,5 +519,5 @@ Oberfläche.
 | 1d | Probelauf 5: enge Filter plus grosse Tiefe — trägt der Korb? | ✅ ja, 0,035 $ — 17 und 18 im Korb |
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | ✅ 30 Tests, Vertrag hält |
 | 3 | Filter je Portal setzen, Gesuche nachfiltern, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
-| 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
+| 4 | Bauartfilter im Plugin auf die neuen Werte, weich | ✅ 25 Tests, Citan-Regressionsfall |
 | 5 | Umhängen auf L0, Gesamtdeckel, Rückfall-Hinweis | ein echter Lauf im Cockpit |

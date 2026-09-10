@@ -1,5 +1,6 @@
 import type { Gutachten } from "@/autoixpert/typen";
 import { ezToleranzFuer, kmToleranzFuer } from './toleranz'
+import { MINDESTKORB } from './zyklus'
 
 /**
  * Eingabedatei des WBW-Plugins (params.json).
@@ -25,6 +26,16 @@ export interface WbwParams {
   getriebe?: "Automatik" | "Manuell";
   tueren?: number;
   maxItemsProPortal: number;
+  /**
+   * Ab wann der Bauartfilter im Plugin nachgibt.
+   *
+   * Er filtert Fahrzeuge weg, deren Karosserie nicht zur gesuchten passt —
+   * richtig, solange danach noch ein Korb übrig ist. Bleiben weniger als
+   * diese Zahl übrig, wird die Bauart fallengelassen und das steht im
+   * Ergebnis. Dieselbe Regel wie beim Linienfilter: ein weiter Korb ist
+   * besser als ein sauberer, der keinen Median trägt.
+   */
+  mindestKorb: number;
   kleinanzeigenLocId: null;
   wbwOpts: { eurProKm: number; eurProEzMonat: number };
 }
@@ -100,6 +111,9 @@ export function reportToWbwParams(report: Gutachten, eingaben: WbwEingaben = {})
       eingaben.ezToleranzJahre ?? ezToleranzFuer(toEzMonat(car.first_registration_date ?? undefined)),
     leistungToleranzKw: eingaben.leistungToleranzKw ?? 10,
     maxItemsProPortal: eingaben.maxItemsProPortal ?? 40,
+    // Eine Quelle für die Untergrenze: dieselbe Zahl, ab der `ergebnis.ts`
+    // den Korb als zu klein meldet und keinen Vorschlag mehr ausweist.
+    mindestKorb: MINDESTKORB,
     kleinanzeigenLocId: null,
     wbwOpts: { eurProKm: 0.1, eurProEzMonat: 120 },
   };

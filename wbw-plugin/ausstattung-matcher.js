@@ -285,11 +285,40 @@ const KAROSSERIEN = [
     "touran", "galaxy", "espace", "multivan", "caddy", "combo", "berlingo",
     "partner", "kangoo", "doblo", "rifter", "proace", "spacetourer"]],
   ["Pickup", ["pickup", "pick-up", "pritsche"]],
-  ["Kleinwagen", ["kleinwagen", "small car", "hatchback", "kompaktklasse"]],
+  // "small" ist die Bauart, die mobile.de fuer Kleinwagen liefert.
+  ["Kleinwagen", ["kleinwagen", "small", "small car", "hatchback", "kompaktklasse"]],
   // "lim." ist die Abkuerzung, die AutoScout24 im Titel fuehrt ("VII Lim. Trendline").
   ["Limousine", ["limousine", "sedan", "saloon", "stufenheck", "lim", "lim.",
     "schraegheck", "schrägheck", "fliessheck", "fließheck"]],
 ];
+
+/**
+ * Bauarten, die einander nicht ausschliessen duerfen.
+ *
+ * **Warum das noetig ist.** Dieselbe Karosserie heisst je nach Portal und je
+ * nach Verkaeufer anders. Gemessen am 10.09.2026:
+ *
+ *   - AutoScout24 fuehrte denselben VW Sharan einmal als "Van" und einmal als
+ *     "Station Wagon" (das erkennt der Erkenner als Kombi).
+ *   - Im Kleinanzeigen-Korb aus 18 Berlingos trugen sechs nicht "Van/Bus" —
+ *     darunter einer "Kombi" und einer sogar "Limousine".
+ *   - Der Bauartfilter am Portal warf einen echten Sharan hinaus, den der
+ *     Verkaeufer als "Kombi" eingetragen hatte.
+ *
+ * Aufgenommen ist nur, was gemessen ist. Van und Kombi liegen bei Grossraum-
+ * fahrzeugen nachweislich uebereinander. Limousine und Van dagegen sind ein
+ * echter Unterschied — wer die auch noch zusammenwirft, filtert gar nicht mehr.
+ */
+const VERWANDTE_BAUARTEN = [
+  ["Van", "Kombi"],
+];
+
+/** Ob zwei Bauarten als dieselbe gelten. Unbekanntes ist mit nichts verwandt. */
+function sindVerwandt(a, b) {
+  if (a == null || b == null) return false;
+  if (a === b) return true;
+  return VERWANDTE_BAUARTEN.some((paar) => paar.includes(a) && paar.includes(b));
+}
 
 // Bauart aus Bauart-Feld + Titel erkennen.
 function detectKarosserie(text) {
@@ -322,5 +351,6 @@ function detectGetriebe(text) {
 
 module.exports = {
   matchFahrzeug, bewerteKorb, klimaautomatikVorhanden, KATALOG,
-  detectLinie, LINIEN, detectKarosserie, KAROSSERIEN, detectGetriebe, GETRIEBE,
+  detectLinie, LINIEN, detectKarosserie, KAROSSERIEN, sindVerwandt, VERWANDTE_BAUARTEN,
+  detectGetriebe, GETRIEBE,
 };
