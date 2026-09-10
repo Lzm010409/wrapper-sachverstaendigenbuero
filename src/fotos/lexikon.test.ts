@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { istSeite, zusammensetzen, type FotoTeil, type Rohtreffer } from './lexikon'
+import { istSeite, toggleTreffer, zusammensetzen, type FotoTeil, type Rohtreffer } from './lexikon'
 
 const KOTFLUEGEL: FotoTeil = {
   id: 't1',
@@ -89,5 +89,31 @@ describe('zusammensetzen', () => {
         treffer('Dachhimmel', null, 'zerkratzt'),
       ]),
     ).toBe('Kotflügel links deformiert')
+  })
+})
+
+describe('toggleTreffer', () => {
+  it('fügt einen neuen Treffer hinzu, wenn die Liste leer ist', () => {
+    const t = treffer('Kotflügel', 'links', 'deformiert')
+    expect(toggleTreffer([], t)).toEqual([t])
+  })
+
+  it('fügt einen zweiten, unterschiedlichen Treffer hinzu, ohne den ersten zu verlieren', () => {
+    const erster = treffer('Kotflügel', 'links', 'deformiert')
+    const zweiter = treffer('Heckverkleidung', null, 'plastisch verformt')
+    expect(toggleTreffer([erster], zweiter)).toEqual([erster, zweiter])
+  })
+
+  it('entfernt einen Treffer wieder, wenn exakt derselbe erneut übergeben wird', () => {
+    const t = treffer('Kotflügel', 'links', 'deformiert')
+    expect(toggleTreffer([t], { ...t })).toEqual([])
+  })
+
+  it('unterscheidet zwei Treffer mit gleichem Teil, aber unterschiedlicher Seite', () => {
+    const links = treffer('Kotflügel', 'links', 'deformiert')
+    const rechts = treffer('Kotflügel', 'rechts', 'deformiert')
+    // Der zweite Klick fügt "rechts" hinzu, statt "links" zu entfernen —
+    // beide sind unterschiedliche Kombinationen, keine Verwechslung.
+    expect(toggleTreffer([links], rechts)).toEqual([links, rechts])
   })
 })

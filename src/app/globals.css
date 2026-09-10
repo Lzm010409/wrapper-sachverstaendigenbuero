@@ -3411,6 +3411,43 @@ body {
   justify-content: flex-end;
 }
 
+/*
+  Klickmenü im Prüfmodus: Teil/Seite/Schadensart per Klick statt Tippen
+  (`Klickmenue` in `foto-assistent.tsx`). Optik an `.foto-filterknopf`
+  angelehnt, aber eigene Klassen — das Klickmenü hat mit der Fotofilterung
+  nichts zu tun, nur dieselbe Pillenform.
+*/
+.klickmenue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.klickmenue-reihe { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-mid);
+  font-size: 12.5px;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.label-chip:hover { border-color: var(--accent-rand); }
+
+.label-chip.aktiv {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 /* ------------------------------------------------------------------ *
  * Doppelte Kontakte
  *
