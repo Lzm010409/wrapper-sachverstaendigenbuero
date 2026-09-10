@@ -1,0 +1,4056 @@
+/*
+ * Tailwind bewusst OHNE Preflight: die vorhandene Werkbank-Optik steht in
+ * klassischem CSS und wuerde von einem globalen Reset ueberfahren. Waehrend
+ * der Umstellung auf den autoiXpert-Look laufen beide Welten nebeneinander;
+ * ist die Umstellung durch, kann Preflight dazugenommen werden.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/**
+ * Farben, Masse und Formen folgen jetzt **autoiXpert** (nachgemessen an
+ * Screenshots vom 07.09.2026: Gutachtenliste, Unfall & Beteiligte,
+ * Fahrzeugauswahl, Fotos, Kalkulation). Vorher war es die Vorlage „Judia".
+ *
+ * Der Grund ist der Benutzerfluss: wer den ganzen Tag in autoiXpert
+ * arbeitet, soll beim Wechsel ins Cockpit nicht umlernen. Kennzeichnend
+ * sind vier Dinge — helle Flächen mit **Schatten statt Rändern**,
+ * Kartenüberschriften **zentriert und gesperrt in Grossbuchstaben**,
+ * Formularfelder **ohne Rahmen, nur mit Unterstrich**, und Blau als
+ * einzige Signalfarbe.
+ *
+ * Die Namen der Variablen bleiben, wie sie waren — umgestellt wird das
+ * Aussehen, nicht das Gerüst.
+ *
+ * Eine Ausnahme bleibt bewusst bestehen: der Brief selbst wird in einer
+ * Serifenschrift gesetzt. Er soll wie ein Schreiben aussehen und nicht wie
+ * eine Bildschirmmaske — das ist der Unterschied zwischen der Anwendung und
+ * ihrem Erzeugnis. autoiXpert hat kein Gegenstück dazu, also gibt es auch
+ * nichts nachzuahmen.
+ */
+
+:root {
+  --ground: #e8ebef;
+  --surface: #ffffff;
+  --surface-alt: #f5f6f8;
+  --line: #e2e6ea;
+  --line-soft: #eceff1;
+  --ink: #37474f;
+  --ink-mid: #4a5c66;
+  --ink-soft: #9aa4ad;
+  --accent: #1f8fd4;
+  --accent-stark: #1878b4;
+  --accent-soft: #e6f3fb;
+  --accent-rand: #8fcbeb;
+  --accent-ink: #ffffff;
+  --quelle-marke: #ddebff;
+  --warn: #997404;
+  --warn-soft: #fff3cd;
+  --crit: #c1441c;
+  --crit-soft: #fae1d8;
+  --good: #43a047;
+  --good-soft: #e6f4e7;
+
+  /*
+   * Die Farben der Handlungen.
+   *
+   * Drei Bedeutungen, sonst nichts: blau trägt die Arbeit voran, grün gibt
+   * frei, rot löscht endgültig. Alles Übrige bleibt grau. Ausgemalt wird
+   * nur der Umriss — gefüllt wird erst unter dem Zeiger, im Augenblick vor
+   * dem Klick. So bleibt je Fläche genau ein lauter Knopf: der, der
+   * weiterführt.
+   */
+  --gefahr: #b23c17;
+  --gefahr-fest: #c1441c;
+  --gefahr-ink: #ffffff;
+  --freigabe: #0a6a49;
+  --freigabe-fest: #0a6a49;
+  --freigabe-ink: #ffffff;
+
+  --schiene: #f7f8fa;
+  --schiene-ink: #9aa4ad;
+  --menue: #ffffff;
+  --menue-ink: #5f7480;
+  --menue-titel: #9aa4ad;
+
+  --schatten: 0 1px 3px rgba(38, 50, 56, 0.12), 0 1px 2px rgba(38, 50, 56, 0.06);
+  --schatten-menue: 0 1px 3px rgba(38, 50, 56, 0.14);
+
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial,
+    sans-serif;
+  --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, 'Times New Roman', serif;
+  --mono: SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  --radius: 4px;
+  --radius-klein: 3px;
+
+  --schiene-breite: 56px;
+  --menue-breite: 0px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ground: #1a1d20;
+    --surface: #212529;
+    --surface-alt: #2b3035;
+    --line: #495057;
+    --line-soft: #343a40;
+    --ink: #f8f9fa;
+    --ink-mid: #dee2e6;
+    --ink-soft: #a7acb1;
+    --accent: #5cb8ec;
+    --accent-stark: #7fc9f2;
+    --accent-soft: #001933;
+    --accent-rand: #004c99;
+    --accent-ink: #06182e;
+    --quelle-marke: rgba(102, 178, 255, 0.16);
+    --warn: #ffda6a;
+    --warn-soft: #332701;
+    --crit: #f0a589;
+    --crit-soft: #2e150c;
+    --good: #70d0af;
+    --good-soft: #032318;
+
+    --gefahr: #f0a589;
+    --gefahr-fest: #b23c17;
+    --gefahr-ink: #ffffff;
+    --freigabe: #70d0af;
+    --freigabe-fest: #0d7a55;
+    --freigabe-ink: #ffffff;
+
+    --schiene: #1b2429;
+    --schiene-ink: #7a8b94;
+    --menue: #212529;
+    --menue-ink: #ced4da;
+    --menue-titel: #8291af;
+
+    --schatten: 0 2px 4px rgba(0, 0, 0, 0.35);
+    --schatten-menue: 0 2px 4px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  --ground: #1a1d20;
+  --surface: #212529;
+  --surface-alt: #2b3035;
+  --line: #495057;
+  --line-soft: #343a40;
+  --ink: #f8f9fa;
+  --ink-mid: #dee2e6;
+  --ink-soft: #a7acb1;
+  --accent: #5cb8ec;
+  --accent-stark: #7fc9f2;
+  --accent-soft: #001933;
+  --accent-rand: #004c99;
+  --accent-ink: #06182e;
+  --quelle-marke: rgba(102, 178, 255, 0.16);
+  --warn: #ffda6a;
+  --warn-soft: #332701;
+  --crit: #f0a589;
+  --crit-soft: #2e150c;
+  --good: #70d0af;
+  --good-soft: #032318;
+
+  --gefahr: #f0a589;
+  --gefahr-fest: #b23c17;
+  --gefahr-ink: #ffffff;
+  --freigabe: #70d0af;
+  --freigabe-fest: #0d7a55;
+  --freigabe-ink: #ffffff;
+
+  --schiene: #1b2429;
+  --schiene-ink: #7a8b94;
+  --menue: #212529;
+  --menue-ink: #ced4da;
+  --menue-titel: #8291af;
+
+  --schatten: 0 2px 4px rgba(0, 0, 0, 0.35);
+  --schatten-menue: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink-mid);
+  font-family: var(--sans);
+  font-size: 0.925rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--accent-stark);
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-klein);
+}
+
+/* ---------- Die Schiene, das Menü, die Kopfleiste ---------- */
+
+/**
+ * Der Aufbau von autoiXpert: **eine** schmale helle Leiste ganz links, die
+ * die Piktogramme der Bereiche trägt, darüber eine niedrige Kopfleiste.
+ *
+ * Vorher waren es zwei Spalten — eine dunkle Zierschiene von 30px und
+ * daneben ein Menü von 250px mit Beschriftungen. Die 250px sind ersatzlos
+ * entfallen: autoiXpert hat sie nicht, und der Inhalt gewinnt sie. Was die
+ * Beschriftungen leisteten, leisten jetzt `title` und ein Text nur für
+ * Screenreader — sichtbar bleibt das Piktogramm.
+ */
+.schiene {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--schiene-breite);
+  background: var(--schiene);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 5px;
+  z-index: 1000;
+}
+
+/* Das breite Menü ist entfallen; die Punkte stehen in der Schiene. */
+.menue {
+  display: contents;
+}
+
+/* Der Name steht jetzt in der Kopfleiste, nicht über dem Menü. */
+.marke {
+  display: none;
+  padding: 22px 24px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.marke:hover {
+  text-decoration: none;
+}
+
+.menue-titel {
+  display: none;
+  font-size: 13px;
+  color: var(--menue-titel);
+  margin: 5px 24px 6px;
+}
+
+.menue-nav {
+  display: contents;
+}
+
+/* Ein Punkt der Schiene: quadratisch, nur Piktogramm, 44px Zielfläche. */
+.menue-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  color: var(--schiene-ink);
+  text-decoration: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.menue-nav a svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.menue-nav a:hover,
+.menue-nav a[aria-current='page'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+
+/* Benutzer und Abmelden sind in die Kopfleiste gewandert, rechts aussen. */
+.menue-fuss {
+  margin-top: auto;
+  padding: 0 0 12px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.menue-benutzer {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  /* autoiXpert setzt eine flache Kopfzeile; 70px wirkten daneben wuchtig. */
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  z-index: 900;
+}
+
+.topbar-titel {
+  /* autoiXpert setzt den Titel normal, nicht fett. */
+  font-weight: 400;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  /* Nicht mehr wachsend: sonst schöbe der Bereichsname das Suchfeld an den
+     rechten Rand, und dort läse es sich als ein Schalter mehr. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Das Zeichen am Kopf der Leiste, wie das „X" in autoiXpert: links aussen,
+ * auf Höhe der Kopfzeile. Es stand zuerst in der Kopfzeile selbst — dort
+ * begann es aber erst hinter der Leiste, also 56px zu weit rechts.
+ */
+.schiene-zeichen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 46px;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--accent);
+  text-decoration: none;
+  flex: none;
+}
+
+.schiene-zeichen:hover {
+  text-decoration: none;
+}
+
+.topbar-rechts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Namenszeichen des angemeldeten Benutzers: Kreis mit Anfangsbuchstaben. */
+.benutzer-zeichen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+}
+
+.benutzer-name {
+  font-size: 0.875rem;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+/* Auf schmalen Schirmen weicht der ausgeschriebene Name dem Zeichen. */
+@media (max-width: 640px) {
+  .benutzer-name {
+    display: none;
+  }
+}
+
+/* Ein Knopf ohne Rahmen — für Nebensächliches wie das Abmelden. */
+.knopf-schlicht {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.knopf-schlicht:hover {
+  color: var(--accent);
+  background: none;
+}
+
+.menue-schalter {
+  padding: 6px 10px;
+  line-height: 1;
+}
+
+.huelle {
+  margin-left: var(--schiene-breite);
+  min-height: 100vh;
+}
+
+/*
+ * Der Ein- und Ausklappstand des alten Menüs hat keine Wirkung mehr: die
+ * Schiene ist 56px breit und steht immer. Die Klassen bleiben, weil die
+ * Kopfleiste sie noch setzt — sie tun nur nichts.
+ */
+
+/*
+ * Hier stand eine Regel, die das 250px breite Menü unterhalb von 900px aus
+ * dem Bild schob. Die schmale Leiste braucht das nicht — sie ist 56px breit
+ * und passt auf jeden Schirm. Ohne diese Streichung hätte `translateX(-100%)`
+ * die Piktogramme auf dem Telefon unsichtbar gemacht.
+ */
+
+/* ---------- Grundgerüst ---------- */
+
+main {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 26px 26px 80px;
+}
+
+.seiten-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 22px;
+}
+
+h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.unterzeile {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+/* ---------- Formularelemente ---------- */
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/*
+ * autoiXpert setzt das Label klein und grau ÜBER das Feld, nicht fett
+ * daneben. Es ist eine Beschriftung, keine Überschrift.
+ */
+label {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+/*
+ * Das prägendste Merkmal der autoiXpert-Masken: Felder haben keinen Rahmen,
+ * nur einen Unterstrich. Eine Maske mit dreissig Feldern wirkt damit ruhig
+ * statt wie ein Gitter aus Kästen.
+ */
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='file'],
+input[type='number'],
+input[type='date'],
+select,
+textarea {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 2px 0 5px;
+  width: 100%;
+}
+
+/*
+ * Ausnahme: das mehrzeilige Feld ist eine Schreibfläche, kein Formularfeld.
+ * Es behält Rahmen und Fläche, sonst schwämme der Text im Nichts.
+ */
+textarea {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 120px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.8rem;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+/*
+ * Beim Hineinklicken verdickt sich der Unterstrich, statt dass ein Ring um
+ * das Feld erscheint — ein Ring bräuchte einen Rahmen, den es hier nicht
+ * gibt. Der zweite Schatten ist die zweite Linie: `border-bottom` kennt
+ * keine halben Pixel, ein zusätzlicher `box-shadow` schon.
+ */
+input:focus,
+select:focus,
+textarea:focus {
+  border-bottom-color: var(--accent);
+  outline: none;
+  box-shadow: 0 1px 0 0 var(--accent);
+}
+
+button,
+.knopf {
+  font-family: inherit;
+  font-size: 0.925rem;
+  font-weight: 400;
+  padding: 0.525rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-mid);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+button:hover,
+.knopf:hover {
+  background: var(--surface-alt);
+  border-color: var(--ink-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+button.haupt,
+.knopf.haupt {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+button.haupt:hover,
+.knopf.haupt:hover {
+  background: var(--accent-stark);
+  border-color: var(--accent-stark);
+  color: var(--accent-ink);
+}
+
+/*
+ * Zerstörend: rot im Umriss, gefüllt erst unter dem Zeiger.
+ *
+ * Die Farbe ist nie das einzige Zeichen — jeder dieser Knöpfe sagt in
+ * Worten, was er tut, und fragt vor dem Vollzug nach. Rot steht
+ * ausschliesslich dort, wo etwas endgültig verschwindet; was sich
+ * zurücknehmen lässt (nicht bestreiten, aus der Bibliothek nehmen,
+ * zurückziehen), bleibt grau.
+ */
+button.gefahr,
+.knopf.gefahr {
+  border-color: var(--gefahr);
+  color: var(--gefahr);
+}
+
+button.gefahr:hover:not(:disabled),
+button.gefahr:focus-visible,
+.knopf.gefahr:hover {
+  background: var(--gefahr-fest);
+  border-color: var(--gefahr-fest);
+  color: var(--gefahr-ink);
+}
+
+/* Freigeben und bestätigen: dasselbe in Grün. */
+button.freigabe,
+.knopf.freigabe {
+  border-color: var(--freigabe);
+  color: var(--freigabe);
+}
+
+button.freigabe:hover:not(:disabled),
+button.freigabe:focus-visible,
+.knopf.freigabe:hover {
+  background: var(--freigabe-fest);
+  border-color: var(--freigabe-fest);
+  color: var(--freigabe-ink);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/*
+ * Wo die Freigabe selbst die Handlung der Fläche ist — auf der Karte
+ * „Freigabe" —, ist sie gefüllt wie ein Hauptknopf, nur in Grün.
+ */
+button.haupt.freigabe,
+.knopf.haupt.freigabe {
+  background: var(--freigabe-fest);
+  border-color: var(--freigabe-fest);
+  color: var(--freigabe-ink);
+}
+
+button.haupt.freigabe:hover:not(:disabled) {
+  filter: brightness(1.12);
+  color: var(--freigabe-ink);
+}
+
+/* Ein gesperrter Knopf droht nicht. Die Farbe weicht dem Grau. */
+button.gefahr:not(.haupt):disabled,
+button.freigabe:not(.haupt):disabled {
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink-mid);
+}
+
+button.haupt:disabled:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/*
+ * Mehrere Felder nebeneinander INNERHALB einer Karte.
+ *
+ * Dafür wurde zuerst `.werkzeugleiste` genommen — die ist aber selbst eine
+ * Karte mit Rand und Schatten und zeichnete so einen Kasten in den Kasten.
+ * Hier braucht es nur die Aufteilung, keine Fläche.
+ */
+.feldgruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: flex-end;
+}
+
+/* ---------- Karten und Listen ---------- */
+
+/*
+ * autoiXpert trägt seine Karten auf Schatten, nicht auf Rändern - deshalb
+ * fällt der Rand weg und der Innenabstand wächst. Ein Rand *und* ein
+ * Schatten wären zwei Begrenzungen für eine Kante.
+ */
+.karte {
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 1.25rem;
+}
+
+.werkzeugleiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.werkzeugleiste input[type='search'] {
+  flex: 1;
+  min-width: 220px;
+}
+
+.werkzeugleiste select {
+  width: auto;
+  min-width: 150px;
+}
+
+.treffer-zahl {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* Auf einem Telefon ist die Zeile „12 Fälle · zuletzt abgerufen …" breiter
+   als der Schirm; mit `nowrap` schob sie die ganze Seite quer (gemessen:
+   433px bei 380px Fenster). Dort darf sie umbrechen. */
+@media (max-width: 520px) {
+  .treffer-zahl {
+    white-space: normal;
+  }
+}
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  overflow: hidden;
+}
+
+/* Die Hülle trägt den Löschknopf, damit er nicht im Verweis steht. Blass,
+   solange die Zeile nicht angesteuert wird — aber nie ganz unsichtbar: ein
+   Knopf, den erst der Mauszeiger hervorholt, fehlt auf dem Tablet ganz. */
+.zeile-huelle {
+  position: relative;
+}
+
+.zeile-huelle .loeschknopf {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
+}
+
+.zeile-huelle:hover .loeschknopf,
+.zeile-huelle .loeschknopf:focus-visible {
+  opacity: 1;
+}
+
+.loeschknopf {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+.zeile {
+  background: var(--surface);
+  padding: 13px 16px;
+  display: grid;
+  /* Die erste Spalte trägt mal eine Gliederungsnummer („2.11"), mal ein
+     Aktenzeichen („PA-0726/2011TG"). Bei festen 58px lief das Aktenzeichen
+     aus seiner Zelle heraus und legte sich quer über den Titel daneben —
+     Rasterzellen schneiden nichts ab, sie lassen überlaufen. Deshalb wächst
+     die Spalte jetzt mit ihrem Inhalt und schrumpft im Notfall wieder auf
+     58px, wo dann der Umbruch greift. */
+  grid-template-columns: minmax(58px, auto) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  text-decoration: none;
+  color: inherit;
+}
+
+.zeile:hover {
+  background: var(--surface-alt);
+  /* Die ganze Zeile ist ein Verweis. Ohne diese Zeile griff die globale
+     Regel `a:hover` und unterstrich beim Überfahren jeden Text darin -
+     Titel, Aktenzeichen, Kennwerte. autoiXpert wechselt nur die Fläche. */
+  text-decoration: none;
+}
+
+/*
+  Auf dem Telefon kehrt sich der Vorteil um: eine mitwachsende erste Spalte
+  nahm dem Aktenzeichen zuliebe 101 von 296 nutzbaren Pixeln, und für den
+  Titel blieb kaum etwas. Dort ist die Spalte wieder schmal — das
+  Aktenzeichen bricht dann um (`overflow-wrap: anywhere`), was auf einem
+  schmalen Schirm die richtige Wahl ist.
+*/
+@media (max-width: 640px) {
+  .zeile {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /* Statuspille und Knöpfe stehen darunter statt daneben. Nebeneinander
+     nahmen sie dem Titel über hundert der knapp dreihundert nutzbaren
+     Pixel; auf einem Telefon liest man lieber untereinander als in einer
+     Spalte von neunzig Pixeln. */
+  .zeile-rechts {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+}
+
+.zeile-nummer {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  padding-top: 2px;
+  min-width: 0;
+  /* Ein Aktenzeichen hat keine Leerzeichen, an denen umbrochen werden
+     könnte. Ohne diese Zeile bliebe es auch in einer engen Spalte in einer
+     Zeile stehen und ragte hinaus. */
+  overflow-wrap: anywhere;
+}
+
+.zeile-titel {
+  /* Als `inline` wirkten weder der untere Abstand noch `text-wrap`, und der
+     Titel ragte auf schmalen Schirmen über den rechten Rand hinaus. */
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.008em;
+  margin-bottom: 3px;
+  text-wrap: balance;
+}
+
+.zeile-meta {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.zeile-auszug {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  margin-top: 5px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.zeile-rechts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+/* ---------- Marker ---------- */
+
+/*
+ * Statuskennzeichen wie in der autoiXpert-Gutachtenliste: ein farbiger
+ * Punkt trägt die Bedeutung, der Text bleibt grau. Vorher war die ganze
+ * Pille eingefärbt - bei vier Kennzeichen nebeneinander (»Vertrag an Kunde
+ * geschickt«, »Vorakte angelegt«, …) wurde daraus ein Farbband.
+ */
+.marke-pille {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.2;
+  padding: 0.3em 0.6em;
+  border-radius: var(--radius-klein);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  background: var(--surface-alt);
+  color: var(--ink-mid);
+  border: 0;
+}
+
+.marke-pille::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* Nur der Punkt traegt die Farbe, der Text bleibt lesbar grau. */
+.m-entwurf::before {
+  background: var(--ink-soft);
+}
+.m-pruefung::before {
+  background: var(--warn);
+}
+.m-freigegeben::before {
+  background: var(--good);
+}
+.m-zurueckgezogen::before {
+  background: var(--crit);
+}
+.m-akzent::before {
+  background: var(--accent);
+}
+.m-warn::before {
+  background: var(--warn);
+}
+.m-gut::before {
+  background: var(--good);
+}
+.m-krit::before {
+  background: var(--crit);
+}
+
+/*
+ * Die Klassen bleiben, ihre Füllung nicht: Fläche und Schrift sind für alle
+ * gleich, die Bedeutung trägt der Punkt (siehe `.marke-pille::before`).
+ * Damit lesen sich auch vier Kennzeichen nebeneinander noch als Text.
+ */
+
+/* ---------- Der Fall: Kopfzeile und Reiter ---------- */
+
+/*
+ * Der Fall ist der Anker. Seine Kopfzeile trägt das Aktenzeichen als Marke
+ * neben dem Namen — wie in autoiXpert, wo beides in einer Zeile über den
+ * Reitern steht.
+ */
+.fall-titel {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fall-marke {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border-radius: var(--radius-klein);
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+/*
+ * Die Reiterleiste des Falls. Wie in autoiXpert: eine helle Leiste, der
+ * aktive Reiter blau umrandet statt unterstrichen — ein Rahmen hält die
+ * Zeile ruhig, wenn sieben Reiter nebeneinander stehen.
+ */
+.fall-reiter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 6px;
+  margin-bottom: 20px;
+}
+
+.fall-reiter a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.fall-reiter a:hover {
+  background: var(--surface-alt);
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+
+.fall-reiter a[aria-current='page'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+/* Die Zahl hinter einem Reiter, z. B. wie viele Schreiben es gibt. */
+.fall-reiter-zahl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.fall-reiter a[aria-current='page'] .fall-reiter-zahl {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- Detailansicht ---------- */
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.block {
+  margin-bottom: 20px;
+}
+
+/*
+ * Die Überschrift einer Karte steht in autoiXpert mittig, gesperrt und in
+ * Grossbuchstaben - ANSPRUCHSTELLER, UNFALLDATEN, KALKULATION. Sie ist
+ * dadurch Aufschrift und nicht Satzanfang.
+ */
+.block-label {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  font-weight: 500;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fliesstext {
+  font-family: var(--serif);
+  font-size: 15.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.zitat {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 13px 16px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.intern {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  padding: 13px 16px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 14px;
+}
+
+.seitenleiste .karte + .karte {
+  margin-top: 14px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  font-size: 13px;
+}
+
+.kv dt {
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.kv dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.marker-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.hinweis {
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.hinweis.warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.hinweis.fehler {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+/* Erfolg. Die Farbe --good gab es von Anfang an, eine Meldungsklasse dazu
+   nicht — Erfolg war deshalb visuell nicht von einem beliebigen Hinweis zu
+   unterscheiden und wurde in Blau angezeigt. */
+.hinweis.erfolg {
+  border-left-color: var(--good);
+  background: var(--good-soft);
+}
+
+.hinweis-titel {
+  display: block;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+.leer {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+/* ---------- Vorgangsschritte: Notizen und Mails aus Pipedrive ---------- */
+
+.vorgangsschritte-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.vorgangsschritt {
+  background: var(--surface);
+}
+
+.vorgangsschritt-kopf {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* Touch-Target mindestens 44px, auch wenn der Inhalt schmaler ist. */
+  min-height: 44px;
+}
+
+.vorgangsschritt-kopf:hover {
+  background: var(--surface-alt);
+}
+
+.vorgangsschritt-datum {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.vorgangsschritt-von {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.vorgangsschritt-betreff {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vorgangsschritt-pfeil {
+  margin-left: auto;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.vorgangsschritt-kopf[aria-expanded='true'] .vorgangsschritt-pfeil {
+  transform: rotate(-135deg);
+}
+
+.vorgangsschritt-inhalt {
+  padding: 4px 16px 16px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--surface-alt);
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  padding: 0.08em 0.34em;
+}
+
+/* ---------- Anmeldung ---------- */
+
+.anmelde-huelle {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.anmelde-karte {
+  width: 100%;
+  max-width: 390px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 2rem;
+}
+
+.anmelde-karte form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Trefferliste und Prüfliste ---------- */
+
+.vorschlag {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: var(--ground);
+}
+
+.vorschlag-titel { font-weight: 600; font-size: 13.5px; overflow-wrap: break-word; }
+.vorschlag-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+.b-direkt { background: var(--good-soft); color: var(--good); }
+.b-teilweise { background: var(--warn-soft); color: var(--warn); }
+
+.sonderfall {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+}
+.sonderfall.wichtig { border-left-color: var(--crit); background: var(--crit-soft); }
+.sonderfall.hinweis { border-left-color: var(--accent); background: var(--accent-soft); }
+
+.sonderfall-titel {
+  font-weight: 640;
+  font-size: 13.5px;
+  margin-bottom: 3px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.sonderfall-text { font-size: 13px; line-height: 1.5; }
+.sonderfall-handlung { font-size: 13px; color: var(--ink-mid); margin-top: 5px; }
+
+
+/* ---------- Kopfzeile über dem Brief ---------- */
+
+/**
+ * Eine Zeile für alles, was nicht der Brief ist. Vorher standen Rückweg,
+ * Überschrift, Kennzahlen, Prüfliste und Empfänger untereinander und
+ * schoben den Brief aus dem Bild — bei zwölf Positionen sah man von der
+ * eigentlichen Arbeit noch drei Absätze.
+ */
+.brief-kopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.brief-kopfzeile .zurueck {
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+
+.brief-kopfzeile .zurueck:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.brief-aktenzeichen {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-klein);
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.brief-kopfzeile h1 {
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 44ch;
+}
+
+.brief-kennzahlen {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.brief-kennzahlen strong {
+  font-family: var(--mono);
+  color: var(--crit);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Die aufklappbaren Kästen rücken gemeinsam nach rechts und öffnen über
+   dem Brief, statt ihn nach unten zu schieben. */
+.brief-kopf-klappen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.brief-kopfzeile .klappe.schmal {
+  margin: 0;
+  position: relative;
+  padding: 0 12px;
+}
+
+.klappe.schmal > summary {
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.klappe.schmal[open] > summary {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.klappe.schmal .klappe-inhalt {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  width: min(560px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(20, 18, 30, 0.16);
+  padding: 14px 16px;
+}
+
+/* ---------- Klappe ---------- */
+
+.klappe {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 16px;
+  margin-bottom: 14px;
+}
+
+.klappe > summary {
+  cursor: pointer;
+  padding: 11px 0;
+  font-weight: 620;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+}
+
+.klappe > summary::-webkit-details-marker {
+  display: none;
+}
+
+.klappe > summary::before {
+  content: '▸';
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.klappe[open] > summary::before {
+  content: '▾';
+}
+
+.klappe[open] > summary {
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 14px;
+}
+
+.klappe > *:last-child {
+  margin-bottom: 16px;
+}
+
+/* ---------- Schreibtisch: links der Brief, rechts die Anmerkungen ---------- */
+
+.werkbank-leiste {
+  position: sticky;
+  top: 70px;
+  z-index: 10;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.werkzeuge {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.werkzeuge button {
+  padding: 4px 10px;
+  font-size: 13px;
+  min-width: 32px;
+}
+
+.werkzeuge button.an {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+/* ---------- Schnellauswahl über der Markierung ---------- */
+
+.schnellauswahl {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+  z-index: 40;
+}
+
+.schnellauswahl button {
+  padding: 3px 9px;
+  font-size: 13px;
+  min-width: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.schnellauswahl button:hover:not(:disabled) {
+  background: var(--surface-alt);
+  border-color: var(--line);
+}
+
+.schnellauswahl button.an {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.schnellauswahl-strich {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--line);
+}
+
+.speicherstand {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.speicherstand.speichert { color: var(--accent); }
+.speicherstand.geaendert { color: var(--warn); }
+.speicherstand.konflikt,
+.speicherstand.fehler { color: var(--crit); font-weight: 600; }
+
+.pruefstand {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.ausgabe-leiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.werkbank-raster {
+  display: grid;
+  /* Der Brief bekommt so viel Breite, wie der Satzspiegel braucht, und der
+     Rest geht an die Anmerkungen — nicht umgekehrt. */
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+/**
+ * Fokus: nur der Brief. Die Anmerkungen bleiben im Baum stehen und werden
+ * ausgeblendet — beim Zurückschalten steht alles wieder da, wo es war.
+ */
+.werkbank-raster.fokus {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.werkbank-raster.fokus .rand {
+  display: none;
+}
+
+/* ---------- Positionsleiste ---------- */
+
+/* Kopfleiste und Werkzeugleiste kleben oben fest. Wer zu einem Abschnitt
+   oder einer Anmerkung springt, soll sie nicht darunter suchen müssen —
+   deshalb hält alles Anspringbare diesen Abstand zum oberen Rand frei. */
+.brief-flaeche .d-abschnitt,
+.blase,
+.d-bild {
+  scroll-margin-top: 150px;
+}
+
+/* Die Leiste bricht um, statt zu rollen. Vorher lief sie bei achtzehn
+   Positionen waagerecht davon: die ersten Marken standen ausserhalb des
+   Bildes, und wer nach Position 1 suchte, fand sie nicht mehr. */
+.positionsleiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding: 2px 4px;
+}
+
+.positionsmarke {
+  padding: 3px 8px;
+  min-width: 30px;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  gap: 5px;
+  border-radius: var(--radius-klein);
+}
+
+.positionsmarke.fertig {
+  border-color: var(--good);
+  color: var(--good);
+  background: var(--good-soft);
+}
+
+.positionsmarke.leer {
+  border-style: dashed;
+}
+
+/* Nicht bestritten: die Marke bleibt — die Position gehört zum Fall —, sagt
+   aber unübersehbar, dass sie nicht im Schreiben steht. */
+.positionsmarke.draussen {
+  opacity: 0.55;
+  border-style: dotted;
+}
+
+.positionsmarke.draussen span {
+  text-decoration: line-through;
+}
+
+.positionsmarke.aktiv {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.positionsmarke em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+/* ---------- Der Brief ---------- */
+
+.brief {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 34px 40px 44px;
+  min-height: 60vh;
+}
+
+.brief-flaeche {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.62;
+  outline: none;
+  counter-reset: abschnitt;
+  /* Rund 70 Zeichen je Zeile — die Breite, bei der sich am ruhigsten liest.
+     Zentriert, damit der Brief in einer breiten Spalte nicht links klebt. */
+  max-width: 34em;
+  margin: 0 auto;
+}
+
+.brief-flaeche p {
+  margin: 0 0 1em;
+}
+
+.brief-flaeche .d-betreff {
+  font-weight: 700;
+  font-family: var(--sans);
+  font-size: 15px;
+  margin-bottom: 1.6em;
+}
+
+.brief-flaeche .d-anrede {
+  margin-bottom: 1.2em;
+}
+
+.brief-flaeche .d-abschnitt {
+  counter-increment: abschnitt;
+  margin: 0 0 1.4em;
+  position: relative;
+}
+
+/**
+ * Die Marke im Papierrand.
+ *
+ * Sie steht neben dem Abschnitt, nicht in ihm: dieselbe Zahl wie in der
+ * Leiste oben und an der Anmerkung am Rand. Ein Klick öffnet die Anmerkung
+ * genau dort, wo gerade gelesen wird — bei achtzehn Positionen der
+ * Unterschied zwischen Suchen und Finden.
+ */
+.abschnittsmarke {
+  position: absolute;
+  left: -2.6em;
+  top: 0.05em;
+  width: 1.9em;
+  min-width: 0;
+  padding: 1px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+  user-select: none;
+}
+
+.abschnittsmarke:hover {
+  border-color: var(--accent);
+}
+
+.abschnittsmarke.leer {
+  color: var(--ink-soft);
+  background: var(--surface-alt);
+}
+
+.abschnittsmarke.draussen {
+  color: var(--ink-soft);
+  background: transparent;
+  border-style: dotted;
+  border-color: var(--line);
+  text-decoration: line-through;
+}
+
+/* Auf schmalen Schirmen ist kein Rand übrig — dann sitzt die Marke am
+   Abschnittsanfang, wo sie zwar auffällt, aber nichts verdeckt. */
+@media (max-width: 1100px) {
+  .abschnittsmarke {
+    position: static;
+    display: inline-block;
+    margin: 0 0 4px;
+  }
+}
+
+.brief-flaeche .d-ueberschrift {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 660;
+  margin: 0 0 0.7em;
+  letter-spacing: -0.01em;
+}
+
+.brief-flaeche .d-ueberschrift::before {
+  content: counter(abschnitt) '. ';
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Ein Abschnitt ohne Text erscheint auch im fertigen Schreiben nicht — er
+ * bekommt deshalb keine Nummer. Sonst zeigte der Editor eine andere
+ * Zählung als das versandte Dokument.
+ */
+:root {
+  --leer-hoehe: 1.9em;
+}
+
+/**
+ * Ein Abschnitt ohne Text schrumpft auf eine Zeile.
+ *
+ * Vorher nahm jede noch unbearbeitete Position so viel Platz ein wie eine
+ * geschriebene — bei zwölf Positionen las sich der Brief als Liste von
+ * Stümpfen. Jetzt steht der Rumpf schmal da und macht dem Platz, was
+ * geschrieben ist.
+ */
+.brief-flaeche .d-abschnitt.abschnitt-leer {
+  counter-increment: none;
+  margin: 0 0 0.35em;
+  border-left: 2px dashed var(--line);
+  padding-left: 10px;
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer .d-ueberschrift {
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-size: 13.5px;
+  margin: 0;
+  line-height: var(--leer-hoehe);
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer .d-ueberschrift::before {
+  content: '';
+}
+
+/* Eine Überschrift, die gelöscht wurde, zeigt den Namen ihrer Position als
+   Schatten. Ein Abschnitt verschwindet damit nie ganz aus dem Bild. */
+.brief-flaeche .d-ueberschrift.ueberschrift-leer::before {
+  content: none;
+}
+
+.brief-flaeche .d-ueberschrift.ueberschrift-leer::after {
+  content: attr(data-titel);
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Der leere Absatz darunter bleibt anklickbar, nimmt aber kaum Raum. */
+.brief-flaeche .d-abschnitt.abschnitt-leer p {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 13.5px;
+}
+
+.brief-flaeche .d-abschnitt.abschnitt-leer p.is-empty::before {
+  font-size: 12px;
+}
+
+/* Der Abschnitt zur offenen Anmerkung. */
+.brief-flaeche .d-abschnitt.aktiv {
+  box-shadow: -14px 0 0 -12px var(--accent);
+}
+
+.brief-flaeche .d-ergebnis {
+  margin: 1.8em 0 1.4em;
+}
+
+.brief-flaeche .d-signatur {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 14px;
+  margin-top: 26px;
+  color: var(--ink-soft);
+  user-select: none;
+}
+
+.brief-flaeche .d-signatur p {
+  margin: 0;
+  min-height: 1.4em;
+}
+
+/**
+ * Eingefügter Bibliothekstext bleibt erkennbar — dezent, damit der Brief
+ * nicht wie ein Formular aussieht, aber sichtbar genug, um beim
+ * Überarbeiten zu wissen, was von wem stammt.
+ */
+.brief-flaeche .d-quelle {
+  box-shadow: inset 0 -0.55em 0 var(--quelle-marke);
+}
+
+.brief-flaeche .d-quelle[data-herkunft='eigener_text'] {
+  box-shadow: none;
+}
+
+.brief-flaeche ul,
+.brief-flaeche ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+
+.brief-flaeche p.is-empty::before,
+.brief-flaeche h3.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-soft);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-family: var(--sans);
+  font-size: 13.5px;
+}
+
+.brief-flaeche ::selection {
+  background: var(--accent-soft);
+}
+
+/* ---------- Die Anmerkungen am Rand ---------- */
+
+.rand {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* Bezugspunkt für die Höhenberechnung der Blasen. */
+  position: relative;
+}
+
+.blase {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--schatten);
+  width: 100%;
+  text-align: left;
+  transition: margin-top 0.12s ease-out;
+}
+
+.blase.zu {
+  display: grid;
+  white-space: normal;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.blase.zu:hover {
+  border-color: var(--accent);
+}
+
+.blase.auf {
+  border-color: var(--accent);
+  border-left-width: 3px;
+  padding: 12px 14px 14px;
+  position: relative;
+}
+
+/* Eine kurze Linie zum Brief hin — sie macht sichtbar, was zusammengehört. */
+.blase.auf::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 18px;
+  width: 16px;
+  border-top: 1px solid var(--accent);
+}
+
+.blase.draussen {
+  opacity: 0.62;
+}
+
+.blase-kopf,
+.blase.zu {
+  font-size: 13.5px;
+}
+
+.blase-kopf {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.blase-nummer {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 2px 6px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.blase-titel {
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.blase-marken {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.blase-betrag {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--crit);
+  white-space: nowrap;
+}
+
+.blase-zitat {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.blase-abschnitt {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.blase-abschnitt:first-of-type {
+  border-top: 0;
+  margin-top: 0;
+}
+
+.blase-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.blase-vorschlag {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: var(--ground);
+  overflow: hidden;
+}
+
+.blase-vorschlag-kopf {
+  display: grid;
+  white-space: normal;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.blase-vorschlag-kopf:hover {
+  background: var(--surface-alt);
+}
+
+.blase-entwurf {
+  border-top: 1px solid var(--line-soft);
+  padding: 10px;
+  background: var(--surface);
+}
+
+.blase-entwurf textarea {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.blase-variante {
+  padding: 3px 9px;
+  font-size: 12px;
+  margin: 0 5px 5px 0;
+}
+
+.blase-knoepfe {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+
+.blase-knoepfe button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.blase-fuss {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+  margin-top: 12px;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.blase-fuss button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.blase-befunde {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.befund {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  text-align: left;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border: 0;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--warn-soft);
+  color: var(--ink);
+  cursor: pointer;
+  width: 100%;
+}
+
+.befund.sperrt {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+}
+
+@media (max-width: 1100px) {
+  .werkbank-raster {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brief {
+    padding: 26px 24px 32px;
+  }
+
+  /* Ohne zweite Spalte tragen die Blasen keine Anker mehr. */
+  .rand {
+    gap: 8px;
+  }
+
+  .blase {
+    margin-top: 0 !important;
+  }
+}
+
+/**
+ * Ein nicht bestrittener Abschnitt bleibt sichtbar, gehört aber nicht in
+ * das Schreiben: keine Nummer, zurückgenommene Farbe. Sein Text bleibt
+ * erhalten — wer die Position doch bestreitet, findet ihn wieder.
+ */
+.brief-flaeche .d-abschnitt[data-ausgelassen] {
+  counter-increment: none;
+  opacity: 0.5;
+}
+
+.brief-flaeche .d-abschnitt[data-ausgelassen] .d-ueberschrift::before {
+  content: 'nicht bestritten — ';
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ---------- Warten: Kreisel und Balken ---------- */
+
+.nur-vorlesen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.kreisel-zeile {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.kreisel {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  animation: kreisel-dreht 0.75s linear infinite;
+}
+
+.kreisel.gross {
+  width: 20px;
+  height: 20px;
+  border-width: 2.5px;
+}
+
+@keyframes kreisel-dreht {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/**
+ * Wer Bewegung abgestellt hat, bekommt statt der Drehung ein ruhiges
+ * Pulsieren — ganz ohne Anzeige bliebe sonst offen, ob überhaupt etwas
+ * läuft.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .kreisel {
+    animation: kreisel-pulst 1.6s ease-in-out infinite !important;
+    border-right-color: currentColor;
+  }
+  @keyframes kreisel-pulst {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.9; }
+  }
+}
+
+.fortschritt {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 15px;
+}
+
+.fortschritt.fehler {
+  border-left-color: var(--crit);
+}
+
+.fortschritt-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.fortschritt-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.fortschritt-zahl {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fortschritt-schiene {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.fortschritt-fuellung {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.35s ease-out;
+}
+
+.fortschritt.fehler .fortschritt-fuellung {
+  background: var(--crit);
+}
+
+.fortschritt-verlauf {
+  list-style: none;
+  margin: 9px 0 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+
+.fortschritt-verlauf li::before {
+  content: '✓ ';
+  color: var(--good);
+}
+
+.fortschritt-verlauf li:last-child {
+  color: var(--ink-mid);
+}
+
+/* ---------- Erscheinungsbild ---------- */
+
+.erscheinung {
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 1;
+  min-width: 32px;
+  justify-content: center;
+}
+
+/* ---------- Bausteine ziehen ---------- */
+
+.blase-vorschlag-kopf.ziehbar {
+  cursor: grab;
+}
+
+.blase-vorschlag-kopf.ziehbar:active {
+  cursor: grabbing;
+}
+
+.ziehgriff {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 3px 9px;
+  cursor: grab;
+  user-select: none;
+  align-self: center;
+}
+
+.ziehgriff:active {
+  cursor: grabbing;
+}
+
+/**
+ * Solange ein Baustein am Zeiger hängt, zeigt der Brief seine Abschnitte —
+ * damit sichtbar ist, wohin er überhaupt fallen darf.
+ */
+body.zieht-baustein .brief-flaeche .d-abschnitt {
+  outline: 1px dashed var(--accent);
+  outline-offset: 6px;
+  border-radius: 2px;
+}
+
+body.zieht-baustein .brief-flaeche .d-abschnitt[data-ausgelassen] {
+  outline-color: var(--line);
+}
+
+/* ---------- Bilder im Brief ---------- */
+
+.brief-flaeche .d-bild {
+  margin: 1.4em 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brief-flaeche .d-bild-rahmen {
+  position: relative;
+  max-width: 100%;
+  line-height: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+}
+
+.brief-flaeche .d-bild-rahmen img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-klein);
+}
+
+.brief-flaeche .d-bild.gewaehlt .d-bild-rahmen,
+.brief-flaeche .d-bild.zieht .d-bild-rahmen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem rgba(0, 127, 255, 0.2);
+}
+
+/**
+ * Der Griff sitzt in der unteren rechten Ecke des Bildes und zieht
+ * stufenlos. Er erscheint erst beim Überfahren — im Lesefluss soll das
+ * Bild ein Bild sein und kein Bedienelement.
+ */
+.brief-flaeche .d-bild-griff {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  touch-action: none;
+}
+
+.brief-flaeche .d-bild:hover .d-bild-griff,
+.brief-flaeche .d-bild.gewaehlt .d-bild-griff,
+.brief-flaeche .d-bild.zieht .d-bild-griff,
+.brief-flaeche .d-bild-griff:focus-visible {
+  opacity: 1;
+}
+
+.brief-flaeche .d-bild-mass {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-klein);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.brief-flaeche .d-bild.zieht .d-bild-mass {
+  opacity: 1;
+}
+
+.brief-flaeche .d-bild-unterschrift {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 7px 0 0;
+  line-height: 1.45;
+  min-height: 1.4em;
+  /* Volle Breite, damit die leere Beschriftung anklickbar bleibt — sonst
+     schrumpft sie im Flusslayout auf null. */
+  width: 100%;
+}
+
+.brief-flaeche .d-bild-unterschrift.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-soft);
+  opacity: 0.7;
+  float: none;
+  height: auto;
+  pointer-events: none;
+  font-size: 12px;
+}
+
+/* Beim Ziehen einer Datei zeigt der Brief, dass er sie annimmt. */
+.brief.nimmt-datei {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+/* ---------- Bildbibliothek ---------- */
+
+.bildgitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.bildkarte {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bildkarte.offen-uebernahme {
+  border-style: dashed;
+}
+
+.bildkarte-bild {
+  padding: 0;
+  border: 0;
+  background: var(--surface-alt);
+  border-radius: var(--radius-klein);
+  overflow: hidden;
+  cursor: zoom-in;
+  display: block;
+  width: 100%;
+}
+
+.bildkarte-bild img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  background: var(--surface-alt);
+}
+
+.bildkarte-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.bildkarte-titel {
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.35;
+  /* Zwei Zeilen: der Titel ist der Griff, an dem ein Bild wiedergefunden
+     wird — ihn nach zwei Wörtern abzuschneiden hilft niemandem. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bildkarte-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bildkarte-themen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bildkarte-fuss,
+.bildkarte-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.bildkarte-fuss {
+  justify-content: space-between;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
+}
+
+.bildkarte-fuss button,
+.bildkarte-knoepfe button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.bildkarte-formular {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* ---------- Bilder in der Randspalte ---------- */
+
+.blase-bilder {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.blase-bild {
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-klein);
+  background: var(--ground);
+  overflow: hidden;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  white-space: normal;
+}
+
+.blase-bild:active {
+  cursor: grabbing;
+}
+
+.blase-bild img {
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+  display: block;
+}
+
+.blase-bild span {
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 4px 6px;
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- Platzhalter im Brief ---------- */
+
+/*
+  Ein Platzhalter war bis eben gewöhnlicher Text in eckigen Klammern. Er
+  sieht jetzt aus wie das, was er ist: eine offene Stelle, die noch etwas
+  verlangt — und keine Textstelle, in die man versehentlich hineinschreibt.
+
+  Zwei Farben für zwei Dinge, die vorher gleich aussahen: ein einzusetzender
+  Wert trägt die Akzentfarbe, ein Arbeitsauftrag die Warnfarbe. Rot ist
+  bewusst nicht dabei — hier verschwindet nichts, hier fehlt etwas.
+
+  Alle Farben kommen aus vorhandenen Merkmalen; die Kachel folgt damit dem
+  Erscheinungsbild, ohne dass ein neues Merkmal in allen drei Blöcken
+  nachgeführt werden müsste.
+*/
+
+.platzhalter-huelle {
+  position: relative;
+  display: inline;
+  white-space: normal;
+}
+
+.platzhalter {
+  display: inline;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin: 0 1px;
+  font-size: 0.94em;
+  font-weight: 600;
+  line-height: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  /* Ein Platzhalter ist ein Ding, kein Wort: er darf nicht umbrechen. */
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.platzhalter.wert {
+  background: var(--accent-soft);
+  border-color: var(--accent-rand);
+  color: var(--accent-stark);
+}
+
+.platzhalter.anweisung {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.platzhalter:hover,
+.platzhalter.auf {
+  border-style: solid;
+  filter: brightness(0.97);
+}
+
+.platzhalter.auf {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Der Punkt sagt: zu dieser Angabe hat der Fall etwas anzubieten. */
+.platzhalter-punkt {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.platzhalter-kasten {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max(240px, 20vw);
+  max-width: min(340px, 90vw);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  font-weight: 400;
+  font-style: normal;
+  white-space: normal;
+  cursor: auto;
+  text-align: left;
+}
+
+.platzhalter-titel {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.platzhalter-text {
+  display: block;
+  line-height: 1.5;
+}
+
+.platzhalter-vorschlag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.platzhalter-knoepfe {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.platzhalter-knoepfe input {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+  In der Ausgabe und beim Ausschneiden trägt der Knoten seine Klammern
+  wieder — dort darf nichts von der Kachel übrig bleiben.
+*/
+.d-platzhalter {
+  font: inherit;
+}
+
+
+/* ---- autoiXpert-Look: Designtokens des Cockpits ---- */
+@theme {
+  /* Flaechen */
+  --color-ax-bg: #e8ebef;
+  --color-ax-surface: #ffffff;
+  --color-ax-surface-muted: #f5f6f8;
+  --color-ax-rail: #f7f8fa;
+  --color-ax-border: #e2e6ea;
+  --color-ax-divider: #eceff1;
+
+  /* Schrift */
+  --color-ax-text: #37474f;
+  --color-ax-text-soft: #607d8b;
+  --color-ax-label: #9aa4ad;
+
+  /* Akzente */
+  --color-ax-primary: #1f8fd4;
+  --color-ax-primary-strong: #1878b4;
+  --color-ax-primary-soft: #e6f3fb;
+  --color-ax-value: #43a047;
+  --color-ax-warn: #f5a623;
+  --color-ax-danger: #e05252;
+
+  /* Status-Chips der Gutachtenliste */
+  --color-ax-chip-green: #4caf50;
+  --color-ax-chip-red: #ef5350;
+  --color-ax-chip-orange: #ffa726;
+  --color-ax-chip-purple: #ab47bc;
+  --color-ax-chip-blue: #42a5f5;
+
+  /* autoiXpert setzt Roboto; ohne Netzabhaengigkeit nehmen wir es nur, wenn es lokal da ist. */
+  --font-sans: Roboto, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+
+  --radius-ax: 4px;
+  --radius-ax-lg: 6px;
+
+  --shadow-ax-card: 0 1px 3px rgb(38 50 56 / 0.12), 0 1px 2px rgb(38 50 56 / 0.06);
+  --shadow-ax-raised: 0 4px 14px rgb(38 50 56 / 0.14);
+}
+
+html,
+body {
+  background: var(--color-ax-bg);
+  font-family: var(--font-sans);
+  color: var(--color-ax-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* autoiXpert setzt Formularfelder ohne Rahmen, nur mit Unterstrich. */
+.ax-field-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--color-ax-border);
+  background: transparent;
+  padding: 2px 0 5px;
+  font-size: 14px;
+  color: var(--color-ax-text);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.ax-field-input:focus {
+  border-bottom-color: var(--color-ax-primary);
+  box-shadow: 0 1px 0 0 var(--color-ax-primary);
+}
+.ax-field-input::placeholder {
+  color: color-mix(in srgb, var(--color-ax-label) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Meldewesen: Einblendungen, Glocke, Verlauf
+ *
+ * Im Ton der übrigen Oberfläche: weisse Karte mit Schatten statt Rand, und
+ * die Farbe trägt der Punkt, nicht die Fläche — dieselbe Regel wie bei den
+ * Statuspillen. Eine vollflächig rote Einblendung wäre lauter als alles
+ * andere auf dem Bildschirm; das steht einer Fehlermeldung nicht zu, die
+ * meistens nur sagt, dass ein Portal gerade nicht antwortet.
+ * ------------------------------------------------------------------ */
+
+.einblendstapel {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.einblendung {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue);
+  font-size: 13.5px;
+  line-height: 1.45;
+  /* Nur transform und opacity — beides ohne Layout-Neuberechnung. */
+  animation: einblendung-herein 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.einblendung-punkt {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.einblendung.e-fehler .einblendung-punkt { background: var(--crit); }
+.einblendung.e-warnung .einblendung-punkt { background: var(--warn); }
+.einblendung.e-erfolg .einblendung-punkt { background: var(--good); }
+
+.einblendung-inhalt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.einblendung-inhalt strong { font-weight: 600; }
+
+.einblendung-schliessen {
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.2;
+  /* Die Trefferfläche ist grösser als das Zeichen. */
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.einblendung-schliessen:hover { color: var(--ink); }
+
+@keyframes einblendung-herein {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Glocke in der Kopfleiste */
+.glocke-halter {
+  position: relative;
+  display: inline-flex;
+}
+
+.glocke {
+  position: relative;
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: var(--radius);
+  min-width: 30px;
+  min-height: 30px;
+}
+
+.glocke:hover { background: var(--surface-alt); }
+
+.glocke-zahl {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--crit);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.verlauf {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  width: min(380px, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue);
+  animation: einblendung-herein 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.verlauf-kopf {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.verlauf-leer {
+  margin: 0;
+  padding: 18px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.verlauf-liste { list-style: none; margin: 0; padding: 0; }
+
+.verlauf-eintrag {
+  display: flex;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+
+.verlauf-eintrag:last-child { border-bottom: 0; }
+
+.verlauf-punkt {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.verlauf-eintrag.v-fehler .verlauf-punkt { background: var(--crit); }
+.verlauf-eintrag.v-warnung .verlauf-punkt { background: var(--warn); }
+.verlauf-eintrag.v-erfolg .verlauf-punkt { background: var(--good); }
+
+.verlauf-titel { font-weight: 600; }
+.verlauf-text { color: var(--ink-mid); margin-top: 1px; }
+.verlauf-zeit { color: var(--ink-soft); font-size: 11.5px; margin-top: 3px; }
+
+@media (max-width: 700px) {
+  .einblendstapel { top: 60px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Platzhalter (Skelette)
+ *
+ * Ein wanderndes Glanzlicht statt eines Pulsierens: es zeigt eine Richtung
+ * und wirkt dadurch weniger nervös. Animiert wird nur `background-position`
+ * auf einem Verlauf — kein Layout, kein Neuzeichnen des Textflusses.
+ * ------------------------------------------------------------------ */
+
+.skelett {
+  display: block;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-alt) 25%,
+    var(--line-soft) 50%,
+    var(--surface-alt) 75%
+  );
+  background-size: 200% 100%;
+  animation: skelett-glanz 1.4s ease-in-out infinite;
+}
+
+@keyframes skelett-glanz {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.skelett-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.skelett-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.skelett-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.skelett-reiterleiste {
+  display: flex;
+  gap: 18px;
+  padding: 0 4px 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.skelett-reiterleiste .skelett { width: 76px; }
+
+.skelett-kachel {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  border-radius: var(--radius);
+}
+
+/* Ohne Bewegung bleibt ein ruhiger Grauton — die Fläche muss trotzdem
+   sichtbar sein, sonst wäre die Seite währenddessen leer. */
+@media (prefers-reduced-motion: reduce) {
+  .skelett {
+    background: var(--surface-alt);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Fotos
+ *
+ * Kacheln mit festem Seitenverhältnis: der Platz steht, bevor das Bild da
+ * ist. Ohne das springt das Raster bei jedem eintreffenden Vorschaubild —
+ * bei 67 Fotos 67 Mal.
+ * ------------------------------------------------------------------ */
+
+.foto-leiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.foto-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.foto-filterknopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-mid);
+  font-size: 12.5px;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.foto-filterknopf:hover { border-color: var(--accent-rand); }
+
+/*
+  Die Schrift bleibt `--ink`. Naheliegend wäre `--accent-ink` gewesen — das
+  ist aber die Farbe **auf dem vollen Blau** (im Hellen weiss), und auf dem
+  blassen `--accent-soft` ergäbe das weiss auf hellblau: 1,13:1, also
+  unlesbar. `--accent-stark` käme auf 4,24:1 und verfehlte die Schwelle von
+  4,5:1 für Fliesstext knapp. `--ink` schafft 8,5:1 im Hellen und 16,8:1 im Dunklen; den aktiven Zustand
+  tragen Rand und Fläche.
+*/
+.foto-filterknopf.aktiv {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.foto-filterzahl { color: var(--ink-soft); font-size: 11.5px; }
+.foto-filterknopf.aktiv .foto-filterzahl { color: inherit; opacity: 0.75; }
+
+/* Nicht gesetzte Verwendungen: sichtbar, aber zurückgenommen — sonst sehen
+   die vier Pillen alle gleich wichtig aus. */
+.foto-haekchen .marke-pille { opacity: 0.5; }
+.foto-haekchen .marke-pille.m-akzent { opacity: 1; }
+
+.foto-raster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.foto-kachel {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.foto-kachel:hover { box-shadow: var(--schatten-menue); transform: translateY(-1px); }
+
+.foto-kachel img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-alt);
+}
+
+.foto-kachel-titel {
+  display: block;
+  padding: 7px 9px;
+  font-size: 12px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Grossansicht */
+.foto-buehne {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.72);
+  animation: buehne-auf 0.15s ease;
+}
+
+@keyframes buehne-auf {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/*
+  `height: 100%` statt nur `max-height: 100%` — eine reine Deckelung
+  macht die Höhe von `.foto-buehne-bild` (und damit die Bezugsgrösse für
+  `img { max-height: 100% }`) nach der Flexbox-Spezifikation nicht in
+  jedem Fall "definit". Bei Querformat-Bildern blieb das unsichtbar, weil
+  dort ohnehin `max-width: 100%` die bindende Grenze ist — bei
+  Hochkantbildern griff `max-height` dagegen manchmal gar nicht, das Bild
+  wuchs auf seine native (sehr grosse) Höhe und schob Leiste und Formular
+  aus dem Bild.
+*/
+.foto-buehne-inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(1100px, 100%);
+  height: 100%;
+}
+
+.foto-buehne-bild {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+  `max-height: 100%` bezieht sich auf die tatsächlich zugeteilte Höhe von
+  `.foto-buehne-bild` (flex-schrumpfbar dank `min-height: 0` oben) — nicht
+  auf einen festen Bruchteil der Bildschirmhöhe. Vorher stand hier `72vh`,
+  unabhängig davon, wieviel Platz die Leiste und das Formular darunter
+  gerade brauchen. Im Prüfmodus wächst das Formular mit dem Klickmenü
+  (Teil → Achsen → Schadensart → aktive Kombinationen); mit einem starren
+  `72vh` schrumpfte das Bild dabei nicht mit und schob sich über die
+  Navigationsleiste — genau das beobachtete Überlagern der Pfeile.
+  `scale-down` statt `contain`: seit `.foto-buehne-inhalt` immer die volle
+  Höhe einnimmt, würde `contain` ein kleines Bild sonst hochskalieren.
+*/
+.foto-buehne-bild img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: scale-down;
+  border-radius: var(--radius);
+  transition: opacity 0.2s ease;
+}
+
+.foto-buehne-platzhalter {
+  position: absolute;
+  width: min(760px, 90%);
+  height: 50vh;
+  border-radius: var(--radius);
+}
+
+.foto-buehne-leiste,
+.foto-beschriftung {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.foto-buehne-titel { font-weight: 600; flex: 1 1 auto; min-width: 0; }
+.foto-buehne-position { color: var(--ink-soft); font-size: 12px; }
+
+.foto-buehne-leiste button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.foto-buehne-leiste button:hover { border-color: var(--accent-rand); }
+
+.foto-beschriftung { align-items: flex-end; }
+.foto-beschriftung .feld { flex: 1 1 260px; }
+
+/*
+  `.foto-beschriftung` ist eine Zeilen-Flexbox (anders als `.assistent-
+  formular` im Prüfmodus, das auf `flex-direction: column` steht) — ohne
+  diese Regel säße das Klickmenü als schmales Flex-Kind neben Feld und
+  Häkchen statt darunter. `flex: 1 1 100%` erzwingt den vollen Zeilenumbruch,
+  unabhängig vom Wrap-Verhalten der übrigen Kinder.
+*/
+.foto-beschriftung .klickmenue { flex: 1 1 100%; }
+
+.foto-haekchen {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.foto-haekchen label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .foto-buehne { padding: 10px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Fotoassistent
+ *
+ * Der Kasten sitzt ueber dem Raster, nicht darin: er gehoert zum ganzen
+ * Fotosatz, nicht zu einem Bild. Flaeche `--surface-alt` statt `--surface`,
+ * damit er sich vom Raster abhebt, ohne einen zweiten Rahmen zu brauchen.
+ *
+ * Der Pruefmodus benutzt die vorhandene `.foto-buehne` weiter. Ein zweiter
+ * Dialog mit eigener Abdunklung, eigener Breite und eigenem Verhalten waere
+ * dieselbe Sache ein zweites Mal — und beim naechsten Umbau die Stelle, die
+ * jemand vergisst.
+ * ------------------------------------------------------------------ */
+
+.assistent {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.assistent-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.assistent-knoepfe {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/*
+  Der Pflichtfotosatz als Reihe von Pillen. Die Bedeutung haengt nicht an
+  der Farbe allein: das Zeichen davor sagt dasselbe noch einmal, und fuer
+  den Screenreader steht "fehlt" bzw. "vorhanden" ausgeschrieben dahinter.
+*/
+.pflichtsatz {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.pflichtsatz li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-mid);
+}
+
+.pflichtsatz li.da span[aria-hidden] {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.pflichtsatz li.fehlt {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/*
+  Im Pruefmodus stehen Feld, Haekchen und Knoepfe untereinander statt in
+  einer Reihe: das Beschreibungsfeld braucht die volle Breite, und die
+  Knoepfe sollen immer an derselben Stelle liegen, damit der Durchgang zur
+  Gewohnheit wird und man nicht bei jedem Bild sucht.
+*/
+.assistent-formular {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistent-formular .foto-haekchen,
+.assistent-formular .assistent-knoepfe {
+  width: 100%;
+}
+
+/*
+  `.foto-beschriftung .feld` traegt `flex: 1 1 260px` — sinnvoll in der
+  Reihe der Grossansicht, wo 260px die **Breite** meinen. Hier steht das
+  Formular als Spalte, und dieselbe Angabe wurde zur Hoehe: das Feld wuchs
+  auf 260 Pixel und riss ein leeres Loch zwischen Beschreibung und Haken.
+*/
+.assistent-formular .feld {
+  flex: 0 0 auto;
+}
+
+.assistent-formular .assistent-knoepfe {
+  justify-content: flex-end;
+}
+
+/*
+  Klickmenü im Prüfmodus und in der normalen Fotobearbeitung: Teil/Richtung/
+  Schadensart per Klick statt Tippen (`Klickmenue` in `foto-assistent.tsx`).
+  Optik an `.foto-filterknopf` angelehnt, aber eigene Klassen — das
+  Klickmenü hat mit der Fotofilterung nichts zu tun, nur dieselbe Pillenform.
+*/
+.klickmenue {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/*
+  Ein Abschnitt (Teil / Richtung / Beschädigungsart) fasst eine Überschrift
+  und ihre Reihe(n) sichtbar zusammen — ohne das war bei drei Achsen-Reihen
+  plus Teil- und Begriffs-Reihe nicht zu erkennen, wo eine Gruppe endet.
+*/
+.klickmenue-abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.klickmenue-abschnitt-titel {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.klickmenue-reihe { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-mid);
+  font-size: 12.5px;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.label-chip:hover { border-color: var(--accent-rand); }
+
+.label-chip.aktiv {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ *
+ * Doppelte Kontakte
+ *
+ * Eine Tabelle je Gruppe statt einer langen Liste: die Frage lautet nicht
+ * "welche Kontakte gibt es", sondern "welche von diesen dreien ist die
+ * richtige" — und die beantwortet man nur nebeneinander.
+ * ------------------------------------------------------------------ */
+
+.dubletten {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dublettengruppe h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dublettenkopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dublettentabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dublettentabelle th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 4px 8px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dublettentabelle td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.dublettentabelle tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+  Der Fuss einer Gruppe: links der Stand, rechts der Knopf. Der Stand steht
+  bewusst dort und nicht in einer Einblendung — bei acht Kontakten waeren
+  das acht Einblendungen, von denen keine stehen bliebe.
+*/
+.gruppenfuss {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  min-height: 34px;
+}
+
+/* Was schon geloescht ist, tritt zurueck — es ist nur noch Beleg dafuer, dass es weg ist. */
+.dublettentabelle tr.geloescht td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/*
+  Vorschau und Bericht sitzen im Kasten der Gruppe, abgesetzt durch die
+  Flaeche: was gleich geschieht, soll sich von dem unterscheiden, was
+  dasteht.
+*/
+.vorschau {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.vorschau.gescheitert {
+  border-left-color: var(--crit);
+  background: var(--crit-soft);
+}
+
+.vorschauliste {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vorschauliste li {
+  padding: 2px 0;
+}
+
+/* Ein Vorbehalt ist kein Fehler, aber auch keine Zusage. */
+.vorschauliste li.mit-vorbehalt {
+  color: var(--ink-mid);
+}
+
+.dublettentabelle input[type='radio'],
+.dublettentabelle input[type='checkbox'] {
+  /* 24px Trefferflaeche in einer Tabellenzeile, die selbst 34px hoch ist. */
+  width: 16px;
+  height: 16px;
+  margin: 4px;
+  cursor: pointer;
+}
+
+/*
+  Leere Eintraege abgesetzt, aber nicht ausgegraut: sie sind das, worauf es
+  ankommt — die, die man loeschen koennte. Ausgegraut lesen sich Zeilen wie
+  "erledigt".
+*/
+.dublettentabelle tr.ohne-beleg td {
+  background: var(--warn-soft);
+}
+
+.dublettentabelle tr.ohne-beleg td:first-child {
+  border-left: 3px solid var(--warn);
+  padding-left: 8px;
+}
+
+/* Benutzerverwaltung: eine Zeile je Recht */
+.recht-zeile {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.recht-zeile:last-child { border-bottom: 0; }
+
+/* ---------- Filterleiste ---------- */
+
+/*
+ * Die Leiste über einer Liste. Sie ist eine Karte wie `.werkzeugleiste`,
+ * trägt aber zwei Reihen und darunter die Marken der gesetzten Filter.
+ *
+ * Der Rand fällt weg, der Schatten trägt die Kante — dieselbe Linie wie bei
+ * `.karte`. `.werkzeugleiste` hat beides noch; sie bleibt unangetastet,
+ * damit dieser Umbau nicht nebenbei drei andere Seiten verschiebt.
+ */
+.filterleiste {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+}
+
+.filterleiste-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+
+/*
+ * `hidden` muss das `display: flex` darüber schlagen.
+ *
+ * Der Browser bringt `[hidden] { display: none }` selbst mit — aber aus
+ * seinem eigenen Stylesheet, und eine Klasse wiegt schwerer als ein
+ * Attributselektor von dort. Die zweite Filterreihe stand deshalb immer
+ * offen, obwohl `hidden` gesetzt war. Die Regel gilt bewusst für die ganze
+ * Anwendung: derselbe Fehler wartet in jedem Bauteil, das `el.hidden` mit
+ * einer Layoutklasse kombiniert.
+ */
+[hidden] {
+  display: none !important;
+}
+
+/* Das Suchfeld nimmt den Platz, der übrig bleibt — es ist das Feld, in das
+   zuerst getippt wird. Unter 240px wird es unbrauchbar, dann bricht die
+   Reihe lieber um. */
+.filterleiste input[type='search'] {
+  flex: 1 1 240px;
+  min-width: 240px;
+  align-self: center;
+}
+
+.filterleiste .feld {
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.filterleiste select,
+.filterleiste input[type='date'],
+.filterleiste .feld input[type='text'] {
+  width: auto;
+  min-width: 150px;
+}
+
+.filterleiste button[type='submit'] {
+  align-self: center;
+}
+
+/*
+ * Die Marken der gesetzten Filter.
+ *
+ * Sie beantworten die Frage, die eine kurze Liste immer aufwirft: „warum
+ * sehe ich so wenig?". Deshalb stehen sie unter der Leiste und nicht in ihr
+ * — sie gehören zur Antwort, nicht zur Eingabe.
+ */
+.filtermarken {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.filtermarke {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.3em 0.7em;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink-mid);
+  background: var(--surface-alt);
+  border: 0;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+}
+
+.filtermarke strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Blau erst beim Hinzeigen: eine Reihe blauer Marken sähe aus wie eine Reihe
+   Knöpfe, die etwas auslösen. Sie zeigen einen Zustand und nehmen ihn auf
+   Klick zurück — das ist eine Nebenhandlung, keine Hauptsache. */
+.filtermarke:hover,
+.filtermarke:focus-visible {
+  color: var(--accent-stark);
+  background: var(--accent-soft);
+}
+
+.filter-zuruecksetzen {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* Auf dem Telefon steht jedes Feld für sich — nebeneinander wären es
+   Felder von 60 Pixeln, in die niemand tippt. */
+@media (max-width: 620px) {
+  .filterleiste-reihe {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterleiste .feld,
+  .filterleiste select,
+  .filterleiste input[type='date'],
+  .filterleiste input[type='search'],
+  .filterleiste .feld input[type='text'] {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ---------- Sortierleiste ---------- */
+
+/*
+ * Sortieren für die Karten-/Zeilenlisten. Kein `.filterleiste`-Umbau: sie
+ * hat nur ein Feld und einen Richtungsknopf, keine zwei Reihen und keine
+ * Filtermarken darunter — deshalb eine eigene, schmalere Leiste.
+ */
+.sortierleiste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.sortierleiste .feld {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+.sortierleiste select {
+  width: auto;
+  min-width: 170px;
+}
+
+.sortierrichtung {
+  /* Auf derselben Grundlinie wie das Auswahlfeld daneben, nicht dessen
+     Beschriftung — `.feld` stapelt Label über Feld und ist dadurch höher. */
+  margin-bottom: 1px;
+}
+
+/* ---------- Vergleichskorb ---------- */
+
+/*
+ * Die Filterzeile über dem Korb.
+ *
+ * Bewusst keine `.filterleiste`: die schickt ein Formular an den Server, und
+ * genau das soll hier nicht passieren. Die Zeilen sind schon geladen — ein
+ * Serverabruf je Klick auf eine Spaltenüberschrift wäre Wartezeit für eine
+ * Sortierung, die bereits dasteht.
+ */
+.korb-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.korb-filter select,
+.korb-filter input[type='text'] {
+  width: auto;
+  min-width: 130px;
+}
+
+.korb-filter .treffer-zahl {
+  margin-left: auto;
+  align-self: center;
+}
+
+/* Ein Schalter mit Beschriftung. Das ganze Etikett ist anklickbar — ein
+   Kästchen von 13 Pixeln allein trifft auf einem Zeigegerät niemand. */
+.korb-schalter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.korb-schalter input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.korb-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.korb-tabelle thead th {
+  padding: 4px 10px 6px 0;
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.korb-tabelle tbody td {
+  padding: 7px 10px 7px 0;
+  border-top: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.korb-tabelle td.zahl {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.korb-tabelle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+/*
+ * Die gewählte Zeile.
+ *
+ * Nur ein Hauch Fläche: die Farbe trägt sonst der Punkt, und eine Tabelle,
+ * in der zwei Drittel der Zeilen blau hinterlegt sind, hat keine Betonung
+ * mehr, sondern einen Hintergrund. Der Haken selbst sagt es ohnehin — das
+ * hier hilft nur dem Blick über die Spalte.
+ */
+.korb-tabelle tbody tr.gewaehlt {
+  background: var(--accent-soft);
+}
+
+/* Eine Spaltenüberschrift, die sortiert. Sie sieht aus wie Text und
+   verhält sich wie ein Knopf — deshalb der Zeiger und der Fokusrahmen. */
+.spaltenkopf {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.spaltenkopf:hover {
+  color: var(--accent-stark);
+}
+
+.korb-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* ---------- Suche in der Kopfleiste ---------- */
+
+/*
+ * Das Feld steht zwischen Bereichsnamen und Schaltern.
+ *
+ * `flex: 0 1 360px` statt einer festen Breite: auf einem schmalen Schirm
+ * schrumpft es, statt die Kopfleiste umzubrechen. Unter 200px ist ein
+ * Suchfeld nicht mehr zu gebrauchen — dort verschwindet es lieber ganz
+ * (siehe unten), und die Bereichslisten haben ja ihre eigenen Filter.
+ */
+.kopfsuche {
+  position: relative;
+  flex: 0 1 360px;
+  min-width: 200px;
+  /* Mittig statt rechts aussen: rechts stünde sie zwischen Glocke und
+     Benutzerzeichen und läse sich als ein Schalter mehr. */
+  margin: 0 auto;
+}
+
+.kopfsuche input[type='search'] {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--surface-alt);
+  border: 1px solid transparent;
+  border-radius: var(--radius-klein);
+}
+
+/* Erst beim Tippen bekommt das Feld eine Kante — vorher soll es die flache
+   Leiste nicht in zwei Hälften teilen. */
+.kopfsuche input[type='search']:focus {
+  background: var(--surface);
+  border-color: var(--accent);
+  outline: none;
+}
+
+/*
+ * Die Trefferliste hängt unter dem Feld.
+ *
+ * `position: absolute` und ein eigener Schatten: sie liegt über dem Inhalt
+ * und darf ihn nicht verschieben — wer sucht, will die Seite darunter
+ * wiederfinden, wenn er Escape drückt.
+ */
+.kopfsuche-liste {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-menue, var(--schatten));
+  z-index: 950;
+}
+
+.kopfsuche-gruppe {
+  padding: 8px 8px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.kopfsuche-treffer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  max-width: 100%;
+  padding: 7px 8px;
+  /* `align-items` gehört dazu: die Knöpfe der Anwendung zentrieren ihren
+     Inhalt, und ohne das stand jede Trefferzeile mittig — eine Liste, die
+     man von oben nach unten überfliegt, braucht eine gemeinsame linke
+     Kante. */
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-klein);
+  cursor: pointer;
+}
+
+/* Eine Zeile, nicht zwei: die Markierung folgt Maus *und* Pfeiltasten, und
+   zwei verschiedene Hervorhebungen nebeneinander wären eine zu viel. */
+.kopfsuche-treffer.markiert {
+  background: var(--accent-soft);
+}
+
+.kopfsuche-titel {
+  max-width: 100%;
+  font-size: 0.875rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kopfsuche-unterzeile {
+  max-width: 100%;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kopfsuche-leer {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* Auf dem Telefon hat die Kopfleiste keinen Platz für ein Suchfeld neben
+   Bereichsnamen, Glocke und Benutzer. */
+@media (max-width: 720px) {
+  .kopfsuche {
+    display: none;
+  }
+}

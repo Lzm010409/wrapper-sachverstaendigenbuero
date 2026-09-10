@@ -1,0 +1,63 @@
+{
+  "name": "sv-cockpit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "bibliothek:import": "tsx scripts/bibliothek-import.ts",
+    "bibliothek:export": "tsx scripts/bibliothek-export.ts",
+    "benutzer:anlegen": "tsx scripts/benutzer-anlegen.ts",
+    "fotolexikon:seed": "tsx scripts/fotolexikon-seed.ts",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "@tiptap/core": "^3.30.0",
+    "@tiptap/extensions": "^3.30.0",
+    "@tiptap/pm": "^3.30.0",
+    "@tiptap/react": "^3.30.0",
+    "@tiptap/starter-kit": "^3.30.0",
+    "drizzle-orm": "^0.45.2",
+    "fflate": "^0.8.3",
+    "jose": "^6.2.8",
+    "next": "^16.3.0",
+    "postgres": "^3.4.9",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "^16.3.0",
+    "playwright": "^1.62.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "tailwindcss": "^4"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786538449181,
+      "tag": "0000_silent_bloodaxe",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786540768056,
+      "tag": "0001_funny_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786551375550,
+      "tag": "0002_faithful_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786559105307,
+      "tag": "0003_first_stellaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786559823819,
+      "tag": "0004_complete_ogun",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786875243275,
+      "tag": "0005_aromatic_silverclaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786961643275,
+      "tag": "0006_bibliothek_fingerabdruck",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788813226589,
+      "tag": "0007_bitter_talos",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788845959441,
+      "tag": "0008_rich_boomer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788849651839,
+      "tag": "0009_known_sinister_six",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788849791595,
+      "tag": "0010_silly_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788855567341,
+      "tag": "0011_wbw_zyklen",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788933259135,
+      "tag": "0012_foto_analyse",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788934329389,
+      "tag": "0013_rechnungsspiegel",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788938771979,
+      "tag": "0014_kontaktumhang",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788947183407,
+      "tag": "0015_powerful_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788953715873,
+      "tag": "0016_superb_firelord",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788958968219,
+      "tag": "0017_rich_black_widow",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788969401891,
+      "tag": "0018_pretty_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789034112675,
+      "tag": "0019_flashy_scalphunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789035434212,
+      "tag": "0020_striped_boomerang",
+      "breakpoints": true
+    }
+  ]
+}

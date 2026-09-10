@@ -1,0 +1,1945 @@
+{
+  "id": "e492e910-b8de-480b-886e-ea3cc5a45fb7",
+  "prevId": "0006bibl-fing-erab-druc-000000000006",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.beleg": {
+      "name": "beleg",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typ": {
+          "name": "typ",
+          "type": "beleg_typ",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'urteil'"
+        },
+        "gericht": {
+          "name": "gericht",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aktenzeichen": {
+          "name": "aktenzeichen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "datum": {
+          "name": "datum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fundstelle": {
+          "name": "fundstelle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kernaussage": {
+          "name": "kernaussage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quelle_url": {
+          "name": "quelle_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verifiziert_am": {
+          "name": "verifiziert_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verifiziert_von": {
+          "name": "verifiziert_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "beleg_eintrag_idx": {
+          "name": "beleg_eintrag_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beleg_eintrag_id_eintrag_id_fk": {
+          "name": "beleg_eintrag_id_eintrag_id_fk",
+          "tableFrom": "beleg",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "beleg_verifiziert_von_benutzer_id_fk": {
+          "name": "beleg_verifiziert_von_benutzer_id_fk",
+          "tableFrom": "beleg",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "verifiziert_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.benutzer": {
+      "name": "benutzer",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passwort_hash": {
+          "name": "passwort_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entra_oid": {
+          "name": "entra_oid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rolle": {
+          "name": "rolle",
+          "type": "rolle",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ersteller'"
+        },
+        "aktiv": {
+          "name": "aktiv",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "letzte_anmeldung": {
+          "name": "letzte_anmeldung",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "benutzer_email_idx": {
+          "name": "benutzer_email_idx",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "benutzer_entra_idx": {
+          "name": "benutzer_entra_idx",
+          "columns": [
+            {
+              "expression": "entra_oid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bild": {
+      "name": "bild",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "stellungnahme_id": {
+          "name": "stellungnahme_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "titel": {
+          "name": "titel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "beschreibung": {
+          "name": "beschreibung",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "themen": {
+          "name": "themen",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "in_bibliothek": {
+          "name": "in_bibliothek",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "dateiname": {
+          "name": "dateiname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mimetyp": {
+          "name": "mimetyp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "daten": {
+          "name": "daten",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "breite_px": {
+          "name": "breite_px",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hoehe_px": {
+          "name": "hoehe_px",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "erstellt_von": {
+          "name": "erstellt_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "bild_stellungnahme_idx": {
+          "name": "bild_stellungnahme_idx",
+          "columns": [
+            {
+              "expression": "stellungnahme_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bild_bibliothek_idx": {
+          "name": "bild_bibliothek_idx",
+          "columns": [
+            {
+              "expression": "in_bibliothek",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bild_stellungnahme_id_stellungnahme_id_fk": {
+          "name": "bild_stellungnahme_id_stellungnahme_id_fk",
+          "tableFrom": "bild",
+          "tableTo": "stellungnahme",
+          "columnsFrom": [
+            "stellungnahme_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bild_erstellt_von_benutzer_id_fk": {
+          "name": "bild_erstellt_von_benutzer_id_fk",
+          "tableFrom": "bild",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "erstellt_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eintrag": {
+      "name": "eintrag",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nummer": {
+          "name": "nummer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titel": {
+          "name": "titel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bereich": {
+          "name": "bereich",
+          "type": "bereich",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abschnitt": {
+          "name": "abschnitt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typische_begruendung": {
+          "name": "typische_begruendung",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gegenargument": {
+          "name": "gegenargument",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vorgehen": {
+          "name": "vorgehen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hinweise": {
+          "name": "hinweise",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "haeufigkeit_text": {
+          "name": "haeufigkeit_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "eintrag_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'entwurf'"
+        },
+        "herkunft": {
+          "name": "herkunft",
+          "type": "herkunft",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manuell'"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quelldatei": {
+          "name": "quelldatei",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inhaltsfingerabdruck": {
+          "name": "inhaltsfingerabdruck",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_von": {
+          "name": "erstellt_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freigegeben_von": {
+          "name": "freigegeben_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freigegeben_am": {
+          "name": "freigegeben_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "geaendert_am": {
+          "name": "geaendert_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "eintrag_bereich_nummer_idx": {
+          "name": "eintrag_bereich_nummer_idx",
+          "columns": [
+            {
+              "expression": "bereich",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "nummer",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "eintrag_status_idx": {
+          "name": "eintrag_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "eintrag_bereich_idx": {
+          "name": "eintrag_bereich_idx",
+          "columns": [
+            {
+              "expression": "bereich",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eintrag_erstellt_von_benutzer_id_fk": {
+          "name": "eintrag_erstellt_von_benutzer_id_fk",
+          "tableFrom": "eintrag",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "erstellt_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "eintrag_freigegeben_von_benutzer_id_fk": {
+          "name": "eintrag_freigegeben_von_benutzer_id_fk",
+          "tableFrom": "eintrag",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "freigegeben_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eintrag_ergaenzung": {
+      "name": "eintrag_ergaenzung",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titel": {
+          "name": "titel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wann_einsetzen": {
+          "name": "wann_einsetzen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reihenfolge": {
+          "name": "reihenfolge",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "ergaenzung_eintrag_idx": {
+          "name": "ergaenzung_eintrag_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eintrag_ergaenzung_eintrag_id_eintrag_id_fk": {
+          "name": "eintrag_ergaenzung_eintrag_id_eintrag_id_fk",
+          "tableFrom": "eintrag_ergaenzung",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eintrag_platzhalter": {
+      "name": "eintrag_platzhalter",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schluessel": {
+          "name": "schluessel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "art": {
+          "name": "art",
+          "type": "platzhalter_art",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'wert'"
+        },
+        "quelle": {
+          "name": "quelle",
+          "type": "platzhalter_quelle",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manuell'"
+        },
+        "feldpfad": {
+          "name": "feldpfad",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pflicht": {
+          "name": "pflicht",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "beispiel": {
+          "name": "beispiel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "platzhalter_eintrag_idx": {
+          "name": "platzhalter_eintrag_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "platzhalter_eintrag_schluessel_idx": {
+          "name": "platzhalter_eintrag_schluessel_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "schluessel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eintrag_platzhalter_eintrag_id_eintrag_id_fk": {
+          "name": "eintrag_platzhalter_eintrag_id_eintrag_id_fk",
+          "tableFrom": "eintrag_platzhalter",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eintrag_variante": {
+      "name": "eintrag_variante",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bezeichnung": {
+          "name": "bezeichnung",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bedingung": {
+          "name": "bedingung",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reihenfolge": {
+          "name": "reihenfolge",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "variante_eintrag_idx": {
+          "name": "variante_eintrag_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eintrag_variante_eintrag_id_eintrag_id_fk": {
+          "name": "eintrag_variante_eintrag_id_eintrag_id_fk",
+          "tableFrom": "eintrag_variante",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eintrag_vorbedingung": {
+      "name": "eintrag_vorbedingung",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "muss_bestaetigt_werden": {
+          "name": "muss_bestaetigt_werden",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {
+        "vorbedingung_eintrag_idx": {
+          "name": "vorbedingung_eintrag_idx",
+          "columns": [
+            {
+              "expression": "eintrag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eintrag_vorbedingung_eintrag_id_eintrag_id_fk": {
+          "name": "eintrag_vorbedingung_eintrag_id_eintrag_id_fk",
+          "tableFrom": "eintrag_vorbedingung",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fall": {
+      "name": "fall",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "aktenzeichen": {
+          "name": "aktenzeichen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autoixpert_id": {
+          "name": "autoixpert_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "daten": {
+          "name": "daten",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "abgerufen_am": {
+          "name": "abgerufen_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fall_aktenzeichen_idx": {
+          "name": "fall_aktenzeichen_idx",
+          "columns": [
+            {
+              "expression": "aktenzeichen",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fall_autoixpert_idx": {
+          "name": "fall_autoixpert_idx",
+          "columns": [
+            {
+              "expression": "autoixpert_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.position": {
+      "name": "position",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "stellungnahme_id": {
+          "name": "stellungnahme_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bezeichnung": {
+          "name": "bezeichnung",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seite": {
+          "name": "seite",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "betrag_gutachten": {
+          "name": "betrag_gutachten",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "betrag_gekuerzt": {
+          "name": "betrag_gekuerzt",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "differenz": {
+          "name": "differenz",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "begruendung_versicherer": {
+          "name": "begruendung_versicherer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "behandlung": {
+          "name": "behandlung",
+          "type": "behandlung",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'offen'"
+        },
+        "reihenfolge": {
+          "name": "reihenfolge",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "position_stellungnahme_idx": {
+          "name": "position_stellungnahme_idx",
+          "columns": [
+            {
+              "expression": "stellungnahme_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "position_stellungnahme_id_stellungnahme_id_fk": {
+          "name": "position_stellungnahme_id_stellungnahme_id_fk",
+          "tableFrom": "position",
+          "tableTo": "stellungnahme",
+          "columnsFrom": [
+            "stellungnahme_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.position_baustein": {
+      "name": "position_baustein",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "position_id": {
+          "name": "position_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typ": {
+          "name": "typ",
+          "type": "baustein_typ",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eintrag_id": {
+          "name": "eintrag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "varianten_ids": {
+          "name": "varianten_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "ergaenzungen_ids": {
+          "name": "ergaenzungen_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "text_final": {
+          "name": "text_final",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "herkunft": {
+          "name": "herkunft",
+          "type": "baustein_herkunft",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reihenfolge": {
+          "name": "reihenfolge",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "in_bibliothek_uebernehmen": {
+          "name": "in_bibliothek_uebernehmen",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "baustein_position_idx": {
+          "name": "baustein_position_idx",
+          "columns": [
+            {
+              "expression": "position_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "position_baustein_position_id_position_id_fk": {
+          "name": "position_baustein_position_id_position_id_fk",
+          "tableFrom": "position_baustein",
+          "tableTo": "position",
+          "columnsFrom": [
+            "position_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "position_baustein_eintrag_id_eintrag_id_fk": {
+          "name": "position_baustein_eintrag_id_eintrag_id_fk",
+          "tableFrom": "position_baustein",
+          "tableTo": "eintrag",
+          "columnsFrom": [
+            "eintrag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.position_bild": {
+      "name": "position_bild",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "position_id": {
+          "name": "position_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dateiname": {
+          "name": "dateiname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pfad": {
+          "name": "pfad",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "breite_emu": {
+          "name": "breite_emu",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hoehe_emu": {
+          "name": "hoehe_emu",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reihenfolge": {
+          "name": "reihenfolge",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "bild_position_idx": {
+          "name": "bild_position_idx",
+          "columns": [
+            {
+              "expression": "position_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "position_bild_position_id_position_id_fk": {
+          "name": "position_bild_position_id_position_id_fk",
+          "tableFrom": "position_bild",
+          "tableTo": "position",
+          "columnsFrom": [
+            "position_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sitzung": {
+      "name": "sitzung",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "benutzer_id": {
+          "name": "benutzer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "laeuft_ab_am": {
+          "name": "laeuft_ab_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sitzung_token_idx": {
+          "name": "sitzung_token_idx",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sitzung_benutzer_idx": {
+          "name": "sitzung_benutzer_idx",
+          "columns": [
+            {
+              "expression": "benutzer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sitzung_benutzer_id_benutzer_id_fk": {
+          "name": "sitzung_benutzer_id_benutzer_id_fk",
+          "tableFrom": "sitzung",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "benutzer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.stellungnahme": {
+      "name": "stellungnahme",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "fall_id": {
+          "name": "fall_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modus": {
+          "name": "modus",
+          "type": "modus",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "extraktion": {
+          "name": "extraktion",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sonderfaelle": {
+          "name": "sonderfaelle",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pruefbericht_dateiname": {
+          "name": "pruefbericht_dateiname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pruefbericht_seiten": {
+          "name": "pruefbericht_seiten",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dokument": {
+          "name": "dokument",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dokument_stand": {
+          "name": "dokument_stand",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "dokument_geaendert_am": {
+          "name": "dokument_geaendert_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "empfaenger_name": {
+          "name": "empfaenger_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "empfaenger_strasse": {
+          "name": "empfaenger_strasse",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "empfaenger_plz_ort": {
+          "name": "empfaenger_plz_ort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anrede": {
+          "name": "anrede",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "betreff": {
+          "name": "betreff",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "einleitung_datum": {
+          "name": "einleitung_datum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "einleitung_medium": {
+          "name": "einleitung_medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vorbemerkung_einfuegen": {
+          "name": "vorbemerkung_einfuegen",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ergebnis_absatz": {
+          "name": "ergebnis_absatz",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auswertungsstand": {
+          "name": "auswertungsstand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auswertungsschritt": {
+          "name": "auswertungsschritt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auswertungs_prozent": {
+          "name": "auswertungs_prozent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "auswertungsfehler": {
+          "name": "auswertungsfehler",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auswertung_aktualisiert_am": {
+          "name": "auswertung_aktualisiert_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pruefbericht_daten": {
+          "name": "pruefbericht_daten",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_von": {
+          "name": "erstellt_von",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erstellt_am": {
+          "name": "erstellt_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "versendet_am": {
+          "name": "versendet_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "stellungnahme_fall_idx": {
+          "name": "stellungnahme_fall_idx",
+          "columns": [
+            {
+              "expression": "fall_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "stellungnahme_fall_id_fall_id_fk": {
+          "name": "stellungnahme_fall_id_fall_id_fk",
+          "tableFrom": "stellungnahme",
+          "tableTo": "fall",
+          "columnsFrom": [
+            "fall_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "stellungnahme_erstellt_von_benutzer_id_fk": {
+          "name": "stellungnahme_erstellt_von_benutzer_id_fk",
+          "tableFrom": "stellungnahme",
+          "tableTo": "benutzer",
+          "columnsFrom": [
+            "erstellt_von"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.wbw_lauf": {
+      "name": "wbw_lauf",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "fall_id": {
+          "name": "fall_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zustand": {
+          "name": "zustand",
+          "type": "wbw_zustand",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'laeuft'"
+        },
+        "eingabe": {
+          "name": "eingabe",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "protokoll": {
+          "name": "protokoll",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "ergebnis": {
+          "name": "ergebnis",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "markenfremd": {
+          "name": "markenfremd",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fehler": {
+          "name": "fehler",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordner": {
+          "name": "ordner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "begonnen_am": {
+          "name": "begonnen_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "beendet_am": {
+          "name": "beendet_am",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "wbw_lauf_fall_idx": {
+          "name": "wbw_lauf_fall_idx",
+          "columns": [
+            {
+              "expression": "fall_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "wbw_lauf_zustand_idx": {
+          "name": "wbw_lauf_zustand_idx",
+          "columns": [
+            {
+              "expression": "zustand",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "wbw_lauf_fall_id_fall_id_fk": {
+          "name": "wbw_lauf_fall_id_fall_id_fk",
+          "tableFrom": "wbw_lauf",
+          "tableTo": "fall",
+          "columnsFrom": [
+            "fall_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.baustein_herkunft": {
+      "name": "baustein_herkunft",
+      "schema": "public",
+      "values": [
+        "vorschlag",
+        "bibliothekssuche",
+        "eigener_text"
+      ]
+    },
+    "public.baustein_typ": {
+      "name": "baustein_typ",
+      "schema": "public",
+      "values": [
+        "bibliothek",
+        "eigener_text"
+      ]
+    },
+    "public.behandlung": {
+      "name": "behandlung",
+      "schema": "public",
+      "values": [
+        "offen",
+        "bestritten",
+        "anerkannt",
+        "nicht_bestreiten"
+      ]
+    },
+    "public.beleg_typ": {
+      "name": "beleg_typ",
+      "schema": "public",
+      "values": [
+        "urteil",
+        "norm",
+        "literatur",
+        "regelwerk"
+      ]
+    },
+    "public.bereich": {
+      "name": "bereich",
+      "schema": "public",
+      "values": [
+        "kalkulation",
+        "wertminderung",
+        "wbw",
+        "restwert",
+        "sonderfall"
+      ]
+    },
+    "public.eintrag_status": {
+      "name": "eintrag_status",
+      "schema": "public",
+      "values": [
+        "entwurf",
+        "pruefung",
+        "freigegeben",
+        "zurueckgezogen"
+      ]
+    },
+    "public.herkunft": {
+      "name": "herkunft",
+      "schema": "public",
+      "values": [
+        "migration",
+        "manuell",
+        "ki_vorschlag",
+        "aus_stellungnahme"
+      ]
+    },
+    "public.modus": {
+      "name": "modus",
+      "schema": "public",
+      "values": [
+        "standard",
+        "schnell",
+        "individuell"
+      ]
+    },
+    "public.platzhalter_art": {
+      "name": "platzhalter_art",
+      "schema": "public",
+      "values": [
+        "wert",
+        "regieanweisung"
+      ]
+    },
+    "public.platzhalter_quelle": {
+      "name": "platzhalter_quelle",
+      "schema": "public",
+      "values": [
+        "autoixpert",
+        "pruefbericht",
+        "manuell",
+        "berechnet"
+      ]
+    },
+    "public.rolle": {
+      "name": "rolle",
+      "schema": "public",
+      "values": [
+        "ersteller",
+        "freigeber",
+        "admin"
+      ]
+    },
+    "public.wbw_zustand": {
+      "name": "wbw_zustand",
+      "schema": "public",
+      "values": [
+        "laeuft",
+        "fertig",
+        "fehler"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
