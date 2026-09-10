@@ -22,17 +22,26 @@ import { protokolliereWarnung } from '@/protokoll'
  *
  * **Was das Modell entscheidet und was nicht.** Es liefert Kategorie und
  * Beschreibung. Die vier Verwendungshäkchen folgen daraus über die feste
- * Tabelle in `vorschlag.ts` — siehe die Begründung dort.
+ * Tabelle in `vorschlag.ts` — siehe die Begründung dort. Bei den sieben
+ * Positionskategorien (Kennzeichen, Fahrgestellnummer, Tachostand, die vier
+ * Eckansichten) wird selbst die Beschreibung nicht vom Modell übernommen,
+ * siehe `bildunterschrift` weiter unten.
  *
- * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut.** Ist im Haus ein
- * Teil hinterlegt (Seite, Beschädigungsarten mit Begriff), muss das Modell
- * für das eine erkannte Teil genau einen Treffer (Teil, Seite,
- * Beschädigungsart) liefern, nur aus dieser Liste — nie mehr als einen je
- * Foto, auch wenn mehrere Teile zu sehen sind: ein Foto zeigt einen Schaden,
- * nicht eine Liste. Der Satz wird serverseitig aus dem Treffer zusammengesetzt
+ * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut — nur bei
+ * `schaden`.** Ist im Haus ein Teil hinterlegt (Seite, Beschädigungsarten
+ * mit Begriff), muss das Modell für ein Schadendetail-Foto mit dem einen
+ * erkannten Teil genau einen Treffer (Teil, Seite, Beschädigungsart)
+ * liefern, nur aus dieser Liste — nie mehr als einen je Foto, auch wenn
+ * mehrere Teile zu sehen sind: ein Foto zeigt einen Schaden, nicht eine
+ * Liste. Der Satz wird serverseitig aus dem Treffer zusammengesetzt
  * (`zusammensetzen` in `lexikon.ts`), nicht vom Modell formuliert. Ein nicht
  * gelistetes Teil bleibt freier Text wie zuvor — für ein gelistetes Teil darf
- * das Modell nie selbst formulieren, auch nicht zusätzlich zum Treffer.
+ * das Modell nie selbst formulieren, auch nicht zusätzlich zum Treffer. Bei
+ * jeder anderen Kategorie bleibt `treffer` unbeachtet, selbst wenn das
+ * Modell es trotzdem befüllt — am 10.09.2026 beobachtet: eine
+ * Übersichtsaufnahme („Ansicht hinten links") bekam sonst dieselbe
+ * Schadensformulierung wie ein ganz anderes Detailfoto und verlor damit
+ * ihre eigentliche Übersichts-Bildunterschrift.
  *
  * **Was bei einem Fehler passiert.** Ein gescheitertes Paket nimmt die
  * übrigen nicht mit; seine Fotos bleiben schlicht ohne Vorschlag. Der
@@ -114,8 +123,8 @@ const antwortSchema = z.object({ vorschlaege: z.array(vorschlagSchema) })
  * mit einem 400 ab — der Aufruf kommt gar nicht erst beim Modell an (vgl.
  * `PRUEF_WERKZEUG` in `wbw/pruefung.ts`, wo derselbe Fehler am 08.09.2026
  * auffiel). Grenzen gehören deshalb in den Beschreibungstext; die
- * Drei-Treffer-Grenze für `treffer` erzwingt erst `beschriftePaket` per
- * `.slice(0, 3)`, nicht dieses Schema.
+ * Ein-Treffer-Grenze für `treffer` erzwingt erst `bildunterschrift` per
+ * `.slice(0, 1)`, nicht dieses Schema.
  */
 function bauWerkzeug(teile: readonly FotoTeil[]) {
   const teilNamen = teile.map((t) => t.name)
@@ -222,15 +231,21 @@ Grundsätze:
 - Benenne Bauteil und Seite, wenn beides erkennbar ist: "Heckstossfänger
   links, Kratzer über die gesamte Breite".
 - Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
-- Für treffer gilt ausschliesslich das Teile-Lexikon weiter unten im
-  Auftrag, sofern eines mitgeschickt wurde. Erkennst du eines der dort
-  gelisteten Teile beschädigt, trage GENAU EINEN Eintrag in treffer ein —
-  auch wenn mehrere Teile im Bild zu sehen sind, wähle nur das eine
-  deutlichste. teil und beschaedigungsart müssen dabei Zeichen für Zeichen
-  aus der Liste für GENAU DIESES Teil stammen, nie aus der eines anderen
-  Teils und nie ein eigener, naheliegender Begriff. Ist keines der
-  gelisteten Teile zu sehen, lass treffer leer und beschreibe wie gewohnt
-  frei im Feld beschreibung.
+- Für die Positionskategorien (kennzeichen, vin, tacho und die vier
+  ansicht_*) wird beschreibung ohnehin ignoriert und durch den
+  Kategorienamen ersetzt. Formuliere dort trotzdem kurz und sachlich, falls
+  es doch verwendet wird — aber verschwende keine Mühe auf den Wortlaut.
+- treffer gilt ausschliesslich bei kategorie "schaden" und ausschliesslich
+  aus dem Teile-Lexikon weiter unten im Auftrag, sofern eines mitgeschickt
+  wurde. Bei jeder anderen Kategorie bleibt treffer leer — auch dann, wenn
+  irgendwo im Bild zufällig ein gelistetes Teil zu erkennen ist. Erkennst du
+  bei kategorie "schaden" eines der gelisteten Teile beschädigt, trage
+  GENAU EINEN Eintrag in treffer ein — auch wenn mehrere Teile im Bild zu
+  sehen sind, wähle nur das eine deutlichste. teil und beschaedigungsart
+  müssen dabei Zeichen für Zeichen aus der Liste für GENAU DIESES Teil
+  stammen, nie aus der eines anderen Teils und nie ein eigener,
+  naheliegender Begriff. Ist keines der gelisteten Teile zu sehen, lass
+  treffer leer und beschreibe wie gewohnt frei im Feld beschreibung.
 - Sobald ein Treffer eingetragen ist, wird beschreibung verworfen und der
   Satz stattdessen aus dem Lexikon zusammengesetzt. Formuliere für ein
   gelistetes Teil deshalb NIE selbst in beschreibung — weder statt eines
@@ -326,6 +341,59 @@ function kurz(text: string | null, hoechstens = 600): string {
 }
 
 /**
+ * Die reinen Positionsfotos — hier ersetzt der Kategoriename immer die
+ * Bildunterschrift, siehe `bildunterschrift`.
+ */
+const POSITIONSKATEGORIEN: readonly Kategorie[] = [
+  'kennzeichen',
+  'vin',
+  'tacho',
+  'ansicht_vorne_links',
+  'ansicht_vorne_rechts',
+  'ansicht_hinten_links',
+  'ansicht_hinten_rechts',
+]
+
+/**
+ * Welche Bildunterschrift ein Vorschlag am Ende bekommt — je nach Kategorie
+ * unterschiedlich gebunden:
+ *
+ * - **Positionsfotos** (`POSITIONSKATEGORIEN`) bekommen immer den
+ *   Kategorienamen, nie Modelltext und nie einen Lexikon-Treffer. Sonst
+ *   verdrängt ein zufällig erkannter Treffer die eigentliche
+ *   Übersichtsbeschriftung — am 10.09.2026 beobachtet: eine „Ansicht hinten
+ *   links" bekam dieselbe Schadensformulierung wie ein ganz anderes
+ *   Detailfoto.
+ * - **`schaden`** nutzt den Lexikon-Treffer, mit Rückfall auf freien Text,
+ *   wenn keiner gültig ist (siehe `zusammensetzen` in `lexikon.ts`).
+ * - **Alles andere** (Reifen, Innenraum, Papiere, Sonstiges) bleibt freier
+ *   Modelltext — dort gibt es kein Lexikon, und die Aufnahmen unterscheiden
+ *   sich zu stark für eine feste Formulierung.
+ */
+function bildunterschrift(
+  vorschlag: z.infer<typeof vorschlagSchema>,
+  teile: readonly FotoTeil[],
+): string {
+  if (POSITIONSKATEGORIEN.includes(vorschlag.kategorie)) {
+    return kategoriename(vorschlag.kategorie)
+  }
+
+  let text = vorschlag.beschreibung
+  if (vorschlag.kategorie === 'schaden') {
+    // `.slice(0, 1)` erzwingt serverseitig, was der Auftragstext nur bitten
+    // kann: nie mehr als ein Treffer je Foto.
+    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
+      teil: t.teil,
+      seite: istSeite(t.seite) ? t.seite : null,
+      begriff: t.beschaedigungsart,
+    }))
+    text = zusammensetzen(teile, rohtreffer) ?? vorschlag.beschreibung
+  }
+
+  return text.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)
+}
+
+/**
  * Beschriftet ein Paket Bilder.
  *
  * Gibt nur zurück, wozu ein brauchbarer Vorschlag kam. Fotos ohne Eintrag
@@ -387,22 +455,7 @@ export async function beschriftePaket(
     const vorschlag = nachId.get(bild.fotoId)
     if (!vorschlag) continue
 
-    // Passt der Treffer zu einem gelisteten Teil, gilt sein Wortlaut. Bleibt
-    // keiner übrig, bleibt es beim freien Text des Modells (kein gelistetes
-    // Teil, oder das Modell hat sich trotz Vorgabe nicht an das Lexikon
-    // gehalten). `.slice(0, 1)` erzwingt serverseitig, was der Auftragstext
-    // nur bitten kann: nie mehr als ein Treffer je Foto.
-    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
-      teil: t.teil,
-      seite: istSeite(t.seite) ? t.seite : null,
-      begriff: t.beschaedigungsart,
-    }))
-    const zusammengesetzt = zusammensetzen(teile, rohtreffer)
-
-    const beschreibung = (zusammengesetzt ?? vorschlag.beschreibung)
-      .trim()
-      .replace(/[.;:,\s]+$/, '')
-      .slice(0, 120)
+    const beschreibung = bildunterschrift(vorschlag, teile)
     if (!beschreibung) continue
     vorschlaege.push({
       fotoId: bild.fotoId,

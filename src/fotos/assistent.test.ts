@@ -126,6 +126,57 @@ describe('beschriftePaket', () => {
     expect(vorschlaege.map((v) => v.fotoId)).toEqual(['a'])
   })
 
+  it('ersetzt die Beschreibung eines Positionsfotos immer durch den Kategorienamen', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        { id: 'a', kategorie: 'ansicht_hinten_links', beschreibung: 'Frei erfundener Text', sicherheit: 80 },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Ansicht hinten links')
+  })
+
+  it('ignoriert einen Treffer auf einem Positionsfoto, statt ihn zu übernehmen', async () => {
+    // Genau der Fehler vom 10.09.2026: eine Übersichtsaufnahme bekam die
+    // Schadensformulierung eines ganz anderen Fotos, weil das Modell dort
+    // einen Treffer mitgeschickt hatte.
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'ansicht_hinten_links',
+          beschreibung: 'wird ignoriert',
+          treffer: [{ teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' }],
+          sicherheit: 75,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Ansicht hinten links')
+  })
+
+  it('ignoriert einen Treffer ausserhalb von kategorie schaden', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'reifen',
+          beschreibung: 'Reifen vorne links mit gutem Profil',
+          treffer: [{ teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' }],
+          sicherheit: 80,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Reifen vorne links mit gutem Profil')
+  })
+
   it('leitet die vier Häkchen aus der Kategorie ab', async () => {
     ruf.mockResolvedValue(
       antwort([
