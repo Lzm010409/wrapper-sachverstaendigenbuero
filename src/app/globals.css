@@ -3238,9 +3238,19 @@ body {
   justify-content: center;
 }
 
+/*
+  `max-height: 100%` bezieht sich auf die tatsächlich zugeteilte Höhe von
+  `.foto-buehne-bild` (flex-schrumpfbar dank `min-height: 0` oben) — nicht
+  auf einen festen Bruchteil der Bildschirmhöhe. Vorher stand hier `72vh`,
+  unabhängig davon, wieviel Platz die Leiste und das Formular darunter
+  gerade brauchen. Im Prüfmodus wächst das Formular mit dem Klickmenü
+  (Teil → Seite → Schadensart → aktive Kombinationen); mit einem starren
+  `72vh` schrumpfte das Bild dabei nicht mit und schob sich über die
+  Navigationsleiste — genau das beobachtete Überlagern der Pfeile.
+*/
 .foto-buehne-bild img {
   max-width: 100%;
-  max-height: 72vh;
+  max-height: 100%;
   object-fit: contain;
   border-radius: var(--radius);
   transition: opacity 0.2s ease;
@@ -3303,7 +3313,6 @@ body {
 
 @media (max-width: 700px) {
   .foto-buehne { padding: 10px; }
-  .foto-buehne-bild img { max-height: 58vh; }
 }
 
 /* ------------------------------------------------------------------ *
