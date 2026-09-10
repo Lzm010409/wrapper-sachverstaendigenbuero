@@ -1,38 +1,20 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
 import { beleg, eintrag, eintragPlatzhalter, eintragVorbedingung } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { leiteAb, type Eintragstexte } from './ableitungen'
-import { BEREICHE, pruefeEingabe, type Eintragseingabe } from './eingabe'
+import { pruefeEingabe, type Eintragseingabe } from './eingabe'
 import { naechsteNummer } from './nummer'
+import { istDublette, sperreBereichZurNummernvergabe } from './sperre'
 
 export interface AktionsErgebnis {
   fehler?: string
   erfolg?: string
 }
-
-/**
- * Die Sperre, unter der eine Nummer vergeben wird.
- *
- * Die Vergabe liest den Bestand und schreibt dann eine Nummer, die es beim
- * Lesen noch nicht gab. Zwei gleichzeitige Anlagen im selben Bereich lesen
- * denselben Bestand und errechnen dieselbe Nummer — die zweite liefe in den
- * eindeutigen Index über (Bereich, Nummer). `SELECT … FOR UPDATE` hilft
- * dagegen nicht: Postgres sperrt vorhandene Zeilen, nicht die Lücke
- * dahinter. Eine Vorgangssperre je Bereich tut genau das Richtige und ist
- * mit dem Ende der Transaktion von selbst wieder fort.
- *
- * Die zweite Zahl ist der Bereich, die erste unterscheidet diese Sperre von
- * anderen Verwendungen desselben Mechanismus. Beide werden als Literal
- * eingesetzt, weil die Funktion `int` verlangt und ein Bindeparameter je
- * nach Treiber als `numeric` ankäme; beide sind hier errechnet und kommen
- * nicht aus einer Eingabe.
- */
-const SPERRE_NUMMERNVERGABE = 8419
 
 /**
  * Legt einen neuen Bibliothekseintrag an.
@@ -50,15 +32,9 @@ export async function legeEintragAn(
   const { fehler, sauber } = pruefeEingabe(roheEingabe)
   if (!sauber) return { fehler }
 
-  const bereichsschluessel = BEREICHE.indexOf(sauber.bereich)
-
   try {
     const id = await db.transaction(async (tx) => {
-      await tx.execute(
-        sql.raw(
-          `select pg_advisory_xact_lock(${SPERRE_NUMMERNVERGABE}, ${bereichsschluessel})`,
-        ),
-      )
+      await sperreBereichZurNummernvergabe(tx, sauber.bereich)
 
       const bestand = await tx
         .select({ nummer: eintrag.nummer, abschnitt: eintrag.abschnitt })
@@ -102,16 +78,6 @@ export async function legeEintragAn(
     }
     throw ausnahme
   }
-}
-
-/** Postgres meldet die Verletzung eines eindeutigen Index als `23505`. */
-function istDublette(ausnahme: unknown): boolean {
-  return (
-    typeof ausnahme === 'object' &&
-    ausnahme !== null &&
-    'code' in ausnahme &&
-    (ausnahme as { code?: unknown }).code === '23505'
-  )
 }
 
 /**

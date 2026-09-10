@@ -15,6 +15,7 @@ import { eintraegeJePosition, selbstGeschriebeneAbschnitte } from '@/dokument/sp
 import { abschnitteVollstaendig, istDokument, type Elementknoten } from '@/dokument/typen'
 import { formulierePosition } from './komposition'
 import { ladeStellungnahme } from './abfragen'
+import { istDublette, sperreBereichZurNummernvergabe } from '@/bibliothek/sperre'
 
 /* ------------------------------------------------------------------ *
  * Speichern
@@ -297,31 +298,57 @@ export async function uebernehmeAbschnittInBibliothek(
   const s = await ladeStellungnahme(stellungnahmeId)
   const p = s?.positionen.find((x) => x.id === positionId)
 
-  const vorhandene = await db
-    .select({ nummer: eintrag.nummer })
-    .from(eintrag)
-    .where(eq(eintrag.bereich, 'kalkulation'))
-    .orderBy(asc(eintrag.nummer))
+  /*
+    Lesen und Schreiben unter derselben Sperre wie das Anlegeformular.
 
-  let naechste = 1
-  for (const v of vorhandene) {
-    const treffer = v.nummer.match(/^99\.(\d+)$/)
-    if (treffer) naechste = Math.max(naechste, Number(treffer[1]) + 1)
+    Vorher lagen die beiden Anweisungen frei nebeneinander: Zwei Bearbeiter,
+    die gleichzeitig je einen Abschnitt übernehmen, lasen denselben Bestand,
+    errechneten beide „99.5" und schrieben beide — einer lief in den
+    eindeutigen Index über (Bereich, Nummer), und der rohe Datenbankfehler
+    schlug bis in die Oberfläche durch. Dieselbe Sperre greift auch gegen
+    das Anlegeformular, das in denselben Bereich schreibt; nähme nur eine
+    Seite sie, wäre sie wertlos.
+  */
+  let nummer = ''
+  try {
+    await db.transaction(async (tx) => {
+      await sperreBereichZurNummernvergabe(tx, 'kalkulation')
+
+      const vorhandene = await tx
+        .select({ nummer: eintrag.nummer })
+        .from(eintrag)
+        .where(eq(eintrag.bereich, 'kalkulation'))
+
+      let naechste = 1
+      for (const v of vorhandene) {
+        const treffer = v.nummer.match(/^99\.(\d+)$/)
+        if (treffer) naechste = Math.max(naechste, Number(treffer[1]) + 1)
+      }
+
+      nummer = `99.${naechste}`
+      await tx.insert(eintrag).values({
+        nummer,
+        titel: abschnitt.ueberschrift || p?.bezeichnung || 'Ohne Titel',
+        bereich: 'kalkulation',
+        abschnitt: '99. Aus Stellungnahmen übernommen',
+        typischeBegruendung: p?.begruendungVersicherer ?? null,
+        gegenargument: abschnitt.text,
+        status: 'entwurf',
+        herkunft: 'aus_stellungnahme',
+        erstelltVon: benutzer.id,
+        quelldatei: `Stellungnahme ${s?.betreff ?? stellungnahmeId}`,
+      })
+    })
+  } catch (ausnahme) {
+    if (istDublette(ausnahme)) {
+      return {
+        fehler:
+          'Die Nummer für den Bibliothekseintrag war einen Augenblick später schon belegt. ' +
+          'Bitte noch einmal übernehmen.',
+      }
+    }
+    throw ausnahme
   }
-
-  const nummer = `99.${naechste}`
-  await db.insert(eintrag).values({
-    nummer,
-    titel: abschnitt.ueberschrift || p?.bezeichnung || 'Ohne Titel',
-    bereich: 'kalkulation',
-    abschnitt: '99. Aus Stellungnahmen übernommen',
-    typischeBegruendung: p?.begruendungVersicherer ?? null,
-    gegenargument: abschnitt.text,
-    status: 'entwurf',
-    herkunft: 'aus_stellungnahme',
-    erstelltVon: benutzer.id,
-    quelldatei: `Stellungnahme ${s?.betreff ?? stellungnahmeId}`,
-  })
 
   revalidatePath('/bibliothek')
   return { hinweis: `Als Entwurf ${nummer} in der Bibliothek angelegt — noch nicht freigegeben.` }

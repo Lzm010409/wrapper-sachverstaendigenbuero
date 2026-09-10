@@ -11,17 +11,24 @@
  * **Die Regel.** Der neue Eintrag setzt die Gliederung seines Abschnitts
  * fort, statt eine zweite danebenzustellen:
  *
- * - Abschnitt gibt es schon → nächste freie Zahl auf **derselben Ebene**,
- *   auf der die Nummern dieses Abschnitts stehen: aus `1.1 … 1.10` wird
- *   `1.11`, aus `B.7 … B.8` wird `B.9`.
- * - Abschnitt ist neu → nächste freie Hauptnummer im Bereich, in der Form,
- *   die im Bereich üblich ist: `3.1` in der Kalkulation, `B.9` bei den
- *   Sonderfällen.
+ * - Abschnitt gibt es schon → die höchste Nummer dieses Abschnitts wird um
+ *   eins weitergezählt, auf ihrer Ebene und unter ihrem Elternzweig: aus
+ *   `1.1 … 1.10` wird `1.11`, aus `B.7 … B.8` wird `B.9`, aus `1.2.1 …
+ *   1.2.2` wird `1.2.3`.
+ * - Abschnitt ist neu → hinter dem letzten Zweig des Bereichs wird ein
+ *   neuer eröffnet, in derselben Form: `3.1` in der Kalkulation, `B.9` bei
+ *   den Sonderfällen.
+ *
+ * **Warum überall das Maximum und nirgends eine Mehrheit entscheidet.** Der
+ * Bestand kommt ohne festgelegte Reihenfolge aus der Datenbank — Postgres
+ * darf sie nach einem UPDATE oder VACUUM ändern. Eine Regel, die bei
+ * Gleichstand „das zuerst Gesehene" nimmt, vergibt dann heute `A.3` und
+ * morgen `B.3`. Das Maximum hängt von keiner Reihenfolge ab.
  *
  * Reine Rechnung, kein Datenbankzugriff: die Einträge kommen von aussen
  * herein, damit Vergabe und Einfügen im Aufrufer in **einer** Transaktion
- * liegen können — zwei gleichzeitige Anlagen dürfen nicht auf dieselbe
- * Nummer laufen.
+ * unter Sperre liegen können (`sperre.ts`) — zwei gleichzeitige Anlagen
+ * dürfen nicht auf dieselbe Nummer laufen.
  */
 
 export interface Nummernbestand {
@@ -32,26 +39,46 @@ export interface Nummernbestand {
 export interface Zerlegte {
   /** Der Buchstabenteil der Sonderfall-Notation, z.B. `"B."` — sonst leer. */
   praefix: string
-  haupt: number
-  /** `null` bei einstufiger Gliederung wie `"B.7"`. */
-  unter: number | null
+  /**
+   * Die Zahlen der Gliederung: `1.2.3` → `[1, 2, 3]`. Leer beim blossen
+   * Buchstaben `"A"`, den die Vorbemerkung der Sonderfälle trägt.
+   */
+  teile: number[]
 }
 
-const MUSTER = /^\s*([A-Z]\.)?(\d+)(?:\.(\d+))?\s*$/
+const MUSTER = /^\s*(?:([A-Z])\.?)?((?:\d+)(?:\.\d+)*)?\s*$/
 
-/** Zerlegt `"1.2"`, `"7"` oder `"B.7"`. `null`, wenn nichts davon zutrifft. */
+/**
+ * Die Grenzen, ab denen eine Zeichenkette keine Gliederungsnummer mehr ist.
+ *
+ * Die Spalte ist Text ohne Prüfung, und `teileUeberschrift` im Parser lässt
+ * beliebig viele Ziffern durch. `Number('1'+'0'.repeat(22))` ist `1e22`:
+ * daraus entstünde die „Nummer" `1e+22`, und weiterzählen liesse sie sich
+ * auch nicht mehr, weil `1e22 + 1 === 1e22` — die Ausweichschleife am Ende
+ * käme nie zum Ende. Solche Zeichenketten werden übergangen, statt Unsinn
+ * zu erzeugen.
+ */
+const HOECHSTE_ZAHL = 999_999
+const HOECHSTE_TIEFE = 6
+
+/** Zerlegt `"1.2"`, `"7"`, `"B.7"`, `"1.2.3"` oder `"A"`. Sonst `null`. */
 export function zerlegeNummer(nummer: string): Zerlegte | null {
   const treffer = MUSTER.exec(nummer)
   if (!treffer) return null
-  return {
-    praefix: treffer[1] ?? '',
-    haupt: Number(treffer[2]),
-    unter: treffer[3] === undefined ? null : Number(treffer[3]),
-  }
+
+  const buchstabe = treffer[1]
+  const zahlen = treffer[2]
+  if (!buchstabe && !zahlen) return null
+
+  const teile = zahlen ? zahlen.split('.').map(Number) : []
+  if (teile.length > HOECHSTE_TIEFE) return null
+  if (teile.some((z) => !Number.isSafeInteger(z) || z > HOECHSTE_ZAHL)) return null
+
+  return { praefix: buchstabe ? `${buchstabe}.` : '', teile }
 }
 
-function baue(praefix: string, haupt: number, unter: number | null): string {
-  return unter === null ? `${praefix}${haupt}` : `${praefix}${haupt}.${unter}`
+function baue(praefix: string, teile: number[]): string {
+  return `${praefix}${teile.join('.')}`
 }
 
 /** Abschnitte werden von Hand getippt — „ Restwert" und „restwert" sind derselbe. */
@@ -59,19 +86,30 @@ function schluessel(abschnitt: string): string {
   return abschnitt.trim().toLowerCase()
 }
 
-/** Was am häufigsten vorkommt; bei Gleichstand das zuerst gesehene. */
-function haeufigste<T>(werte: T[]): T | undefined {
-  const zaehler = new Map<T, number>()
-  for (const w of werte) zaehler.set(w, (zaehler.get(w) ?? 0) + 1)
-  let beste: T | undefined
-  let bestZahl = 0
-  for (const [wert, zahl] of zaehler) {
-    if (zahl > bestZahl) {
-      beste = wert
-      bestZahl = zahl
-    }
+/**
+ * Ordnet zwei Nummern: erst der Buchstabenteil, dann Zahl für Zahl.
+ * Negativ, wenn `a` vor `b` steht.
+ */
+function vergleiche(a: Zerlegte, b: Zerlegte): number {
+  if (a.praefix !== b.praefix) return a.praefix < b.praefix ? -1 : 1
+  const tiefe = Math.max(a.teile.length, b.teile.length)
+  for (let i = 0; i < tiefe; i++) {
+    const links = a.teile[i] ?? -1
+    const rechts = b.teile[i] ?? -1
+    if (links !== rechts) return links - rechts
   }
-  return beste
+  return 0
+}
+
+function hoechste(nummern: Zerlegte[]): Zerlegte | undefined {
+  return nummern.reduce<Zerlegte | undefined>(
+    (bisher, jetzt) => (bisher === undefined || vergleiche(jetzt, bisher) > 0 ? jetzt : bisher),
+    undefined,
+  )
+}
+
+function gleicherZweig(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((z, i) => z === b[i])
 }
 
 /**
@@ -81,46 +119,80 @@ function haeufigste<T>(werte: T[]): T | undefined {
  * Abschnitte, denn der eindeutige Index kennt den Abschnitt nicht.
  */
 export function naechsteNummer(bestand: Nummernbestand[], abschnitt: string): string {
-  const zerlegt = bestand
-    .map((e) => ({ ...zerlegeNummer(e.nummer), abschnitt: schluessel(e.abschnitt) }))
-    .filter((e): e is Zerlegte & { abschnitt: string } => e.haupt !== undefined)
-
+  const gesucht = schluessel(abschnitt)
   const vergeben = new Set(bestand.map((e) => e.nummer.trim()))
-  const imAbschnitt = zerlegt.filter((e) => e.abschnitt === schluessel(abschnitt))
 
-  // Die Form (Buchstabenteil und Gliederungstiefe) richtet sich nach dem
-  // Abschnitt, wenn es ihn gibt — sonst nach dem, was im Bereich üblich ist.
-  const massgeblich = imAbschnitt.length > 0 ? imAbschnitt : zerlegt
-  const praefix = haeufigste(massgeblich.map((e) => e.praefix)) ?? ''
-  const zweistufig = massgeblich.length === 0 || haeufigste(massgeblich.map((e) => e.unter !== null))
-
-  const gleicheForm = zerlegt.filter((e) => e.praefix === praefix)
-
-  let haupt: number
-  let unter: number | null
-
-  if (imAbschnitt.length > 0 && zweistufig) {
-    // Bestehender Abschnitt, zweistufig: dieselbe Hauptnummer weiterzählen.
-    haupt = haeufigste(imAbschnitt.filter((e) => e.praefix === praefix).map((e) => e.haupt)) ?? 1
-    const belegt = gleicheForm.filter((e) => e.haupt === haupt && e.unter !== null)
-    unter = Math.max(0, ...belegt.map((e) => e.unter as number)) + 1
-  } else if (zweistufig) {
-    // Neuer Abschnitt: eine neue Hauptnummer eröffnen.
-    haupt = Math.max(0, ...gleicheForm.map((e) => e.haupt)) + 1
-    unter = 1
-  } else {
-    // Einstufige Gliederung: die Hauptnummer selbst zählt weiter.
-    haupt = Math.max(0, ...gleicheForm.map((e) => e.haupt)) + 1
-    unter = null
+  const zerlegt: { nummer: Zerlegte; abschnitt: string }[] = []
+  for (const e of bestand) {
+    const nummer = zerlegeNummer(e.nummer)
+    if (nummer) zerlegt.push({ nummer, abschnitt: schluessel(e.abschnitt) })
   }
 
-  // Der eindeutige Index über (Bereich, Nummer) kennt keine Abschnitte. Ist
-  // die errechnete Nummer anderswo schon vergeben, wird weitergezählt statt
-  // in eine Fehlermeldung zu laufen, die niemand versteht.
-  while (vergeben.has(baue(praefix, haupt, unter))) {
-    if (unter === null) haupt++
-    else unter++
+  /*
+    Ob es den Abschnitt gibt, wird am **rohen** Bestand entschieden, nicht an
+    den lesbaren Nummern. Der Bereich `sonderfall` enthält genau den Fall:
+    „Teil A: Vorbemerkung" hat einen einzigen Eintrag, und der trägt die
+    Nummer „A". Wurde er beim Zerlegen übergangen, sah der Abschnitt leer aus
+    — der neue Eintrag bekam die Fortsetzung von Teil B und landete in einer
+    fremden Gliederung.
+  */
+  const abschnittBekannt = bestand.some((e) => schluessel(e.abschnitt) === gesucht)
+  const imAbschnitt = zerlegt.filter((e) => e.abschnitt === gesucht).map((e) => e.nummer)
+
+  const leitend = abschnittBekannt
+    ? (hoechste(imAbschnitt) ?? hoechste(zerlegt.map((e) => e.nummer)))
+    : hoechste(zerlegt.map((e) => e.nummer))
+
+  // Ein Bereich ohne eine einzige lesbare Nummer fängt bei „1.1" an.
+  if (!leitend) return ausweichen(vergeben, '', [1, 1])
+
+  const setztAbschnittFort = abschnittBekannt && imAbschnitt.length > 0
+
+  if (setztAbschnittFort) {
+    /*
+      Weitergezählt wird die höchste Nummer des Abschnitts, auf ihrer Ebene
+      und unter ihrem Elternzweig. Der blosse Buchstabe „A" hat keine Ebene:
+      unter ihm wird eine eröffnet, also „A.1".
+    */
+    const zweig = leitend.teile.slice(0, -1)
+    const geschwister = zerlegt
+      .map((e) => e.nummer)
+      .filter(
+        (n) =>
+          n.praefix === leitend.praefix &&
+          n.teile.length === zweig.length + 1 &&
+          gleicherZweig(n.teile.slice(0, -1), zweig),
+      )
+    const hoechsteZahl = Math.max(0, ...geschwister.map((n) => n.teile[n.teile.length - 1] ?? 0))
+    return ausweichen(vergeben, leitend.praefix, [...zweig, hoechsteZahl + 1])
   }
 
-  return baue(praefix, haupt, unter)
+  /*
+    Ein neuer Abschnitt eröffnet einen neuen Zweig — hinter dem letzten des
+    Bereichs, nicht in der Mitte eines früheren. Die Form (Buchstabenteil und
+    Gliederungstiefe) übernimmt er von dort.
+  */
+  const zweige = zerlegt.map((e) => e.nummer).filter((n) => n.praefix === leitend.praefix)
+  const hoechsterZweig = Math.max(0, ...zweige.map((n) => n.teile[0] ?? 0))
+  const tiefe = Math.max(1, leitend.teile.length)
+  const neu = [hoechsterZweig + 1, ...Array<number>(tiefe - 1).fill(1)]
+  return ausweichen(vergeben, leitend.praefix, neu)
+}
+
+/**
+ * Zählt weiter, solange die Nummer schon vergeben ist.
+ *
+ * Der eindeutige Index über (Bereich, Nummer) kennt keine Abschnitte: Die
+ * errechnete Nummer kann in einem anderen stehen. Dann weiterzuzählen ist
+ * freundlicher, als in eine Datenbankmeldung zu laufen, die niemand
+ * versteht. Da jede Zahl unter `HOECHSTE_ZAHL` liegt und der Bestand endlich
+ * ist, endet die Schleife.
+ */
+function ausweichen(vergeben: Set<string>, praefix: string, teile: number[]): string {
+  const letzte = teile.length - 1
+  const arbeit = [...teile]
+  while (vergeben.has(baue(praefix, arbeit))) {
+    arbeit[letzte] = (arbeit[letzte] ?? 0) + 1
+  }
+  return baue(praefix, arbeit)
 }
