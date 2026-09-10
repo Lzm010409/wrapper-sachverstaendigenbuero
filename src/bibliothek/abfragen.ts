@@ -10,6 +10,7 @@ import {
   eintragVorbedingung,
 } from '@/db/schema'
 import type { Sortierstand } from '@/app/teile/sortierung'
+import type { Bereich } from './eingabe'
 
 /**
  * Qualifizierter Verweis auf die Zeile der äußeren Abfrage.
@@ -22,7 +23,10 @@ import type { Sortierstand } from '@/app/teile/sortierung'
  */
 const EINTRAG_ID = sql`${sql.identifier('eintrag')}.${sql.identifier('id')}`
 
-export type Bereich = 'kalkulation' | 'wertminderung' | 'wbw' | 'restwert' | 'sonderfall'
+// Der Bereich ist auch im Formular zu wählen; seine Liste steht deshalb in
+// `eingabe.ts` — dort ohne `server-only`, damit der Browser sie mitbenutzen
+// kann. Hier nur noch weitergereicht, damit die bisherigen Importe bleiben.
+export type { Bereich }
 export type EintragStatus = 'entwurf' | 'pruefung' | 'freigegeben' | 'zurueckgezogen'
 
 export interface Suchfilter {
@@ -256,6 +260,32 @@ export async function ladeAbschnitte(filter: Suchfilter = {}) {
     .orderBy(asc(eintrag.abschnitt))
   return zeilen
 }
+
+/**
+ * Die Gliederung der ganzen Bibliothek — Bereich, Abschnitt und Nummer.
+ *
+ * Für das Anlegeformular. Dort wechselt der Bereich im Browser, und mit ihm
+ * die Abschnittsliste **und** die Nummer, die der neue Eintrag bekäme. Bei
+ * rund siebzig Einträgen sind das ein paar Dutzend kurze Zeichenketten; sie
+ * einmal mitzugeben ist billiger als ein Serveraufruf bei jedem Tastendruck
+ * — und die Nummernvergabe rechnet im Browser mit derselben Funktion wie
+ * später der Server.
+ *
+ * Verlassen wird sich auf diese Vorschau nicht: verbindlich vergeben wird
+ * die Nummer beim Speichern, unter Sperre und aus dem dann gültigen Stand.
+ */
+export async function ladeGliederung() {
+  return db
+    .select({
+      bereich: eintrag.bereich,
+      abschnitt: eintrag.abschnitt,
+      nummer: eintrag.nummer,
+    })
+    .from(eintrag)
+    .orderBy(asc(eintrag.bereich), asc(eintrag.abschnitt))
+}
+
+export type Gliederung = Awaited<ReturnType<typeof ladeGliederung>>
 
 export async function zaehleNachStatus() {
   const zeilen = await db
