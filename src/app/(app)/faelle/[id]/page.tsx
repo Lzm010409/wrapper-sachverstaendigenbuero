@@ -5,7 +5,6 @@ import { formatiereDatum } from '@/autoixpert/felder'
 import {
   ladeAuswertungsbereitschaft,
   ladeFallAnsicht,
-  leseVorgangsangaben,
   type Falldaten,
   type FallAnsicht,
   type Schreiben,
@@ -27,12 +26,6 @@ import { Vorgangsschritte } from './reiter/vorgangsschritte'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { Balken, SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
 import { Meldung } from '@/app/teile/meldung'
-
-const HERKUNFT: Record<string, string> = {
-  anwalt: 'Rechtsanwalt aus dem Gutachten',
-  versicherung: 'Versicherung aus dem Gutachten',
-  werkstatt: 'Werkstatt aus dem Gutachten',
-}
 
 /** Nur eine UUID kann eine Fall-Id sein; alles andere ist eine tote Adresse. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -390,16 +383,37 @@ async function VorgangReiter({
   aktenzeichen: string | null
   fallId: string
 }) {
-  const { vorschlag, platzhalter } = leseVorgangsangaben(d)
   const vorgang = await ladeVorgang(aktenzeichen)
+
+  const pipedriveLink =
+    vorgang.stand === 'gefunden' && process.env.PIPEDRIVE_COMPANY_DOMAIN
+      ? `https://${process.env.PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com/deal/${vorgang.deal!.dealId}`
+      : null
+  const sevdeskLink = vorgang.stand === 'gefunden' ? vorgang.deal!.sevdeskRechnungLink : null
+  const autoixpertLink = d.autoixpertId
+    ? `https://app.autoixpert.de/Gutachten/${encodeURIComponent(d.autoixpertId)}`
+    : null
 
   return (
     <div className="detail">
       <div>
+        {vorgang.stand === 'gefunden' ? (
+          <div className="block">
+            <div className="block-label">Vorgangsschritte</div>
+            <div className="karte">
+              <Suspense fallback={<VorgangsschritteSkelett />}>
+                <VorgangsschritteKarte fallId={fallId} dealId={vorgang.deal!.dealId} />
+              </Suspense>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <aside className="seitenleiste">
         <div className="block">
           <div className="block-label">Pipedrive</div>
           <div className="karte">
-            <PipedriveInhalt vorgang={vorgang} />
+            <PipedriveInhalt vorgang={vorgang} link={pipedriveLink} />
           </div>
         </div>
 
@@ -412,7 +426,11 @@ async function VorgangReiter({
               Grenze wartete der ganze Reiter darauf.
             */}
             <Suspense fallback={<Balken breite={60} />}>
-              <Zahlungskarte aktenzeichen={aktenzeichen} phase={phaseVon(vorgang)} />
+              <Zahlungskarte
+                aktenzeichen={aktenzeichen}
+                phase={phaseVon(vorgang)}
+                sevdeskLink={sevdeskLink}
+              />
             </Suspense>
           </div>
         </div>
@@ -438,72 +456,18 @@ async function VorgangReiter({
               <dt>Fertigstellung</dt>
               <dd style={{ textAlign: 'left' }}>{formatiereDatum(d.fertigstellung) ?? '—'}</dd>
             </dl>
+            {autoixpertLink ? (
+              <a
+                href={autoixpertLink}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="knopf"
+                style={{ marginTop: 12 }}
+              >
+                autoiXpert öffnen ↗
+              </a>
+            ) : null}
           </div>
-        </div>
-
-        {vorgang.stand === 'gefunden' ? (
-          <div className="block">
-            <div className="block-label">Vorgangsschritte</div>
-            <div className="karte">
-              <Suspense fallback={<VorgangsschritteSkelett />}>
-                <VorgangsschritteKarte fallId={fallId} dealId={vorgang.deal!.dealId} />
-              </Suspense>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <aside className="seitenleiste">
-        <div className="karte">
-          <h2>Vorschlag für die Stellungnahme</h2>
-          {vorschlag.empfaenger ? (
-            <>
-              <p className="unterzeile" style={{ marginTop: 0 }}>
-                {HERKUNFT[vorschlag.herkunft ?? ''] ?? 'aus dem Gutachten'}
-              </p>
-              <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 14 }}>
-                {vorschlag.empfaenger.name}
-              </p>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>
-                {vorschlag.empfaenger.strasse}
-                {vorschlag.empfaenger.strasse ? <br /> : null}
-                {vorschlag.empfaenger.plzOrt}
-              </p>
-              {vorschlag.betreff ? (
-                <p style={{ margin: '12px 0 0', fontSize: 13 }}>
-                  <span style={{ color: 'var(--ink-soft)' }}>Betreff: </span>
-                  {vorschlag.betreff}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <p className="unterzeile" style={{ margin: 0 }}>
-              Kein Empfänger im Gutachten hinterlegt — er wird beim Erstellen abgefragt.
-            </p>
-          )}
-        </div>
-
-        <div className="karte">
-          <h2>Verfügbare Platzhalter</h2>
-          <p className="unterzeile" style={{ marginTop: 0 }}>
-            Werden beim Einfügen eines Bibliothekstexts automatisch gesetzt.
-          </p>
-          {Object.keys(platzhalter).length === 0 ? (
-            <p className="unterzeile" style={{ margin: 0 }}>
-              Keine — die Falldaten sind zu dünn.
-            </p>
-          ) : (
-            <dl className="kv">
-              {Object.entries(platzhalter).map(([schluessel, wert]) => (
-                <span key={schluessel} style={{ display: 'contents' }}>
-                  <dt>
-                    <code style={{ fontSize: 11 }}>[{schluessel}]</code>
-                  </dt>
-                  <dd style={{ textAlign: 'left', fontSize: 12.5 }}>{wert}</dd>
-                </span>
-              ))}
-            </dl>
-          )}
         </div>
       </aside>
     </div>
@@ -515,7 +479,7 @@ async function VorgangReiter({
  * „Kein Deal gefunden" für alle fünf wäre die gefährlichste davon: wer das
  * liest, legt den Vorgang womöglich ein zweites Mal in Pipedrive an.
  */
-function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
+function PipedriveInhalt({ vorgang, link }: { vorgang: VorgangAnsicht; link: string | null }) {
   if (vorgang.stand === 'nicht_eingerichtet') {
     return (
       <p className="unterzeile" style={{ margin: 0 }}>
@@ -553,20 +517,27 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
 
   const d = vorgang.deal
   return (
-    <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
-      <dt>Phase</dt>
-      <dd style={{ textAlign: 'left' }}>
-        <span className="marke-pille m-akzent">{d.phase}</span>
-      </dd>
-      <dt>Status</dt>
-      <dd style={{ textAlign: 'left' }}>
-        <span className={`marke-pille ${d.dealStatusKlasse}`}>{d.dealStatus}</span>
-      </dd>
-      <Zeile label="Deal" wert={d.titel} />
-      <Zeile label="Schadenhöhe brutto" wert={euro(d.schadenhoeheBrutto)} />
-      <Zeile label="Ausgebuchter Betrag" wert={euro(d.ausgebuchterBetrag)} />
-      <Zeile label="Rechnung (sevDesk)" wert={d.sevdeskRechnungId} />
-    </dl>
+    <>
+      <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
+        <dt>Phase</dt>
+        <dd style={{ textAlign: 'left' }}>
+          <span className="marke-pille m-akzent">{d.phase}</span>
+        </dd>
+        <dt>Status</dt>
+        <dd style={{ textAlign: 'left' }}>
+          <span className={`marke-pille ${d.dealStatusKlasse}`}>{d.dealStatus}</span>
+        </dd>
+        <Zeile label="Deal" wert={d.titel} />
+        <Zeile label="Schadenhöhe brutto" wert={euro(d.schadenhoeheBrutto)} />
+        <Zeile label="Ausgebuchter Betrag" wert={euro(d.ausgebuchterBetrag)} />
+        <Zeile label="Rechnung (sevDesk)" wert={d.sevdeskRechnungId} />
+      </dl>
+      {link ? (
+        <a href={link} target="_blank" rel="noreferrer noopener" className="knopf" style={{ marginTop: 12 }}>
+          Pipedrive öffnen ↗
+        </a>
+      ) : null}
+    </>
   )
 }
 
@@ -632,9 +603,11 @@ function phaseVon(vorgang: VorgangAnsicht): string | undefined {
 async function Zahlungskarte({
   aktenzeichen,
   phase,
+  sevdeskLink,
 }: {
   aktenzeichen: string | null
   phase: string | undefined
+  sevdeskLink: string | null
 }) {
   const { eingerichtet, ampel, spiegel } = await ladeAmpel(aktenzeichen)
 
@@ -660,6 +633,17 @@ async function Zahlungskarte({
       <div style={{ marginBottom: 10 }}>
         <Geldpille stand={ampel.stand} offenCent={ampel.offenCent} />
       </div>
+      {sevdeskLink ? (
+        <a
+          href={sevdeskLink}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="knopf"
+          style={{ marginBottom: 12 }}
+        >
+          Rechnung in sevDesk öffnen ↗
+        </a>
+      ) : null}
       <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
         <dt>Rechnungsbetrag</dt>
         <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.bruttoCent)}</dd>
