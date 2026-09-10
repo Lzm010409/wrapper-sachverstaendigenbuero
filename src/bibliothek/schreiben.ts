@@ -15,6 +15,32 @@ export interface SchreibErgebnis {
   neu: number
   ersetzt: number
   unveraendert: number
+  /** Von Hand angelegte Einträge, die der Import stehen gelassen hat. */
+  geschuetzt: string[]
+}
+
+export type Bestandsentscheidung = 'neu' | 'ersetzt' | 'unveraendert' | 'geschuetzt'
+
+/**
+ * Was mit einem Eintrag geschieht, den der Import unter derselben Nummer
+ * vorfindet.
+ *
+ * **Der geschützte Fall.** Seit Einträge auch von Hand angelegt werden
+ * können, ist die Nummer nicht mehr allein Sache der Referenzdateien: Die
+ * Vergabe nimmt die nächste freie, und dieselbe Nummer kann später in einer
+ * Referenzdatei auftauchen. Ohne diese Unterscheidung hätte der nächste
+ * Importlauf den handgeschriebenen Eintrag samt Varianten, Platzhaltern und
+ * bestätigten Fundstellen gelöscht und durch den Dateiinhalt ersetzt — ohne
+ * Rückfrage und ohne Spur. Der Import ist die Quelle für das, was er selbst
+ * angelegt hat, und für nichts sonst.
+ */
+export function entscheideUeberEintrag(
+  vorhanden: { abdruck: string | null; herkunft: string } | undefined,
+  neuerAbdruck: string,
+): Bestandsentscheidung {
+  if (!vorhanden) return 'neu'
+  if (vorhanden.herkunft !== 'migration') return 'geschuetzt'
+  return vorhanden.abdruck === neuerAbdruck ? 'unveraendert' : 'ersetzt'
 }
 
 /**
@@ -69,24 +95,36 @@ export async function schreibeEintraege(
   let neu = 0
   let ersetzt = 0
   let unveraendert = 0
+  const geschuetzt: string[] = []
 
   for (const e of eintraege) {
     const abdruck = fingerabdruck(e)
 
     await db.transaction(async (tx) => {
       const vorhanden = await tx
-        .select({ id: eintrag.id, abdruck: eintrag.inhaltsfingerabdruck })
+        .select({
+          id: eintrag.id,
+          abdruck: eintrag.inhaltsfingerabdruck,
+          herkunft: eintrag.herkunft,
+        })
         .from(eintrag)
         .where(and(eq(eintrag.bereich, e.bereich), eq(eintrag.nummer, e.nummer)))
         .limit(1)
 
-      if (vorhanden[0]?.abdruck === abdruck) {
+      const entscheidung = entscheideUeberEintrag(vorhanden[0], abdruck)
+
+      if (entscheidung === 'unveraendert') {
         unveraendert++
         return
       }
 
+      if (entscheidung === 'geschuetzt') {
+        geschuetzt.push(`${e.bereich} ${e.nummer} — ${e.titel}`)
+        return
+      }
+
       const bestehendeId = vorhanden[0]?.id
-      if (bestehendeId) {
+      if (entscheidung === 'ersetzt' && bestehendeId) {
         // Unterdatensätze hängen per ON DELETE CASCADE am Eintrag.
         await tx.delete(eintrag).where(eq(eintrag.id, bestehendeId))
         ersetzt++
@@ -174,5 +212,5 @@ export async function schreibeEintraege(
     })
   }
 
-  return { neu, ersetzt, unveraendert }
+  return { neu, ersetzt, unveraendert, geschuetzt }
 }

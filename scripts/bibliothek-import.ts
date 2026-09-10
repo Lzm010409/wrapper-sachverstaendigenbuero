@@ -36,6 +36,23 @@ async function main() {
       `  Neue und geänderte Einträge stehen auf „entwurf" — Freigabe über die\n` +
       `  Oberfläche. Unveränderte behalten ihren Status samt Freigabe.\n`,
   )
+
+  /*
+    Ein von Hand angelegter Eintrag unter derselben Nummer bleibt stehen —
+    aber nicht stillschweigend: Sonst fehlte der Eintrag aus der Datei in der
+    Bibliothek, und niemand wüsste, warum.
+  */
+  if (ergebnis.geschuetzt.length > 0) {
+    const eine = ergebnis.geschuetzt.length === 1
+    console.log(
+      `  NICHT geschrieben: ${ergebnis.geschuetzt.length} Eintrag${eine ? '' : 'e'} aus den Referenzdateien.\n` +
+        `  Unter dieser Nummer steht ein von Hand angelegter Eintrag, den der\n` +
+        `  Import nicht überschreibt.\n` +
+        ergebnis.geschuetzt.map((z) => `    · ${z}\n`).join('') +
+        `  Entweder den handgeschriebenen Eintrag umnummerieren oder die Nummer\n` +
+        `  in der Referenzdatei ändern.\n`,
+    )
+  }
   process.exit(0)
 }
 

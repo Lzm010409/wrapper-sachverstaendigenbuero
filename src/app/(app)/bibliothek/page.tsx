@@ -100,6 +100,9 @@ export default async function BibliothekSeite({
               : 'Alle Einträge sind gesichtet'}
           </p>
         </div>
+        <Link href="/bibliothek/neu" className="knopf haupt">
+          Neuer Eintrag
+        </Link>
       </div>
 
       <Sortierleiste felder={EINTRAG_SORTIERFELDER} />

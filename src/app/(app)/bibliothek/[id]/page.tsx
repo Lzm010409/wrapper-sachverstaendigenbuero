@@ -6,6 +6,7 @@ import { setzeWerteEin } from '@/dokument/platzhalter'
 import { StatusPille } from '../status-pille'
 import { Freigabeleiste } from './freigabeleiste'
 import { BelegPruefung } from './beleg-pruefung'
+import { Textbearbeitung } from './textbearbeitung'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
 
@@ -109,92 +110,58 @@ export default async function EintragSeite({ params }: { params: Promise<{ id: s
 
       <div className="detail">
         <div>
-          {e.typischeBegruendung ? (
-            <div className="block">
-              <div className="block-label">Typische Begründung des Prüfdienstleisters</div>
-              <div className="karte fliesstext" style={{ fontStyle: 'italic' }}>
-                {e.typischeBegruendung}
-              </div>
-            </div>
-          ) : null}
-
-          {e.gegenargument?.trim() ? (
-            <div className="block">
-              <div className="block-label">Gegenargument</div>
-              <div className="zitat fliesstext">{e.gegenargument}</div>
-            </div>
-          ) : (
-            /*
-              Ein leeres Gegenargument darf nicht einfach als Lücke
-              erscheinen: sonst sieht der Leser nur, dass etwas fehlt, aber
-              nicht, ob es fehlt oder nie da war.
-            */
-            <div className="block">
-              <div className="block-label">Gegenargument</div>
-              <div className="hinweis warn">
-                Kein ausformulierter Text hinterlegt.
-                {e.vorgehen?.trim()
-                  ? ' Es gibt nur das Vorgehen unten — daraus ist im Einzelfall selbst zu formulieren.'
-                  : ' Dieser Eintrag liefert nichts, was sich übernehmen liesse.'}
-              </div>
-            </div>
-          )}
-
-          {e.vorgehen ? (
-            <div className="block">
-              <div className="block-label">
-                Vorgehen
-                <span className="marke-pille m-akzent">kein fertiger Text</span>
-              </div>
-              <div className="karte fliesstext">{e.vorgehen}</div>
-            </div>
-          ) : null}
-
-          {e.varianten.length > 0 ? (
-            <div className="block">
-              <div className="block-label">Varianten ({e.varianten.length})</div>
-              <div className="liste">
-                {e.varianten.map((v) => (
-                  <div key={v.id} className="zeile" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
-                    <div>
-                      <div className="zeile-titel">{v.bezeichnung}</div>
-                      <div className="fliesstext" style={{ fontSize: 14, marginTop: 4 }}>
-                        {v.text}
+          {/*
+            Lesen und Ändern an derselben Stelle. Varianten und Ergänzungen
+            gehen als Kinder hinein: Sie stehen im Lesestand zwischen
+            Vorgehen und internen Hinweisen und bleiben auch während der
+            Bearbeitung sichtbar — geändert werden sie hier nicht.
+          */}
+          <Textbearbeitung
+            id={e.id}
+            status={e.status}
+            texte={{
+              typischeBegruendung: e.typischeBegruendung,
+              gegenargument: e.gegenargument,
+              vorgehen: e.vorgehen,
+              hinweise: e.hinweise,
+            }}
+          >
+            {e.varianten.length > 0 ? (
+              <div className="block">
+                <div className="block-label">Varianten ({e.varianten.length})</div>
+                <div className="liste">
+                  {e.varianten.map((v) => (
+                    <div key={v.id} className="zeile" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
+                      <div>
+                        <div className="zeile-titel">{v.bezeichnung}</div>
+                        <div className="fliesstext" style={{ fontSize: 14, marginTop: 4 }}>
+                          {v.text}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {e.ergaenzungen.length > 0 ? (
-            <div className="block">
-              <div className="block-label">Ergänzungen ({e.ergaenzungen.length})</div>
-              <div className="liste">
-                {e.ergaenzungen.map((x) => (
-                  <div key={x.id} className="zeile" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
-                    <div>
-                      <div className="zeile-titel">{x.titel}</div>
-                      <div className="fliesstext" style={{ fontSize: 14, marginTop: 4 }}>
-                        {x.text}
+            {e.ergaenzungen.length > 0 ? (
+              <div className="block">
+                <div className="block-label">Ergänzungen ({e.ergaenzungen.length})</div>
+                <div className="liste">
+                  {e.ergaenzungen.map((x) => (
+                    <div key={x.id} className="zeile" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
+                      <div>
+                        <div className="zeile-titel">{x.titel}</div>
+                        <div className="fliesstext" style={{ fontSize: 14, marginTop: 4 }}>
+                          {x.text}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
-
-          {e.hinweise ? (
-            <div className="block">
-              <div className="block-label">
-                Interne Hinweise
-                <span className="marke-pille m-warn">nie im Schreiben</span>
-              </div>
-              <div className="intern fliesstext">{e.hinweise}</div>
-            </div>
-          ) : null}
+            ) : null}
+          </Textbearbeitung>
         </div>
 
         <aside className="seitenleiste">
