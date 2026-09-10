@@ -10,6 +10,7 @@ import type { Portal } from '@/wbw/lauf'
 import { WbwLauf } from './wbw-lauf'
 import type { WbwVorschlag } from '@/wbw/vorschlag'
 import type { Merkmal } from '@/wbw/ausstattung'
+import { KRAFTSTOFFE } from '@/wbw/portalvokabular'
 import { pruefeModellname, type Modellpruefung } from '@/wbw/aktionen'
 
 /**
@@ -139,6 +140,7 @@ export function WbwReiter({
       plz: params.plz,
       sollAusstattung: params.sollAusstattung,
       ...(params.getriebe ? { getriebe: params.getriebe } : {}),
+      ...(params.kraftstoff ? { kraftstoff: params.kraftstoff } : {}),
       ...(params.tueren ? { tueren: params.tueren } : {}),
       radiusKm: params.radiusKm,
       kmToleranz: params.kmToleranz,
@@ -276,6 +278,30 @@ export function WbwReiter({
                   <option value="egal">egal</option>
                   <option value="Automatik">Automatik</option>
                   <option value="Manuell">Manuell</option>
+                </select>
+              </div>
+              <div className="feld" style={{ flex: 1, minWidth: 150 }}>
+                <label htmlFor="wbw-kraftstoff">Kraftstoff</label>
+                {/*
+                  Neu, und keine Kosmetik: bei Modellen, die es als Verbrenner
+                  und als Stromer gibt (Smart, Fiat 500, Mini), entscheidet
+                  der Kraftstoff über den halben Korb. Das Gutachten führt
+                  ihn nicht, also muss er hier gewählt werden. „egal" heisst
+                  nicht filtern.
+                */}
+                <select
+                  id="wbw-kraftstoff"
+                  value={eingaben.kraftstoff ?? 'egal'}
+                  onChange={(e) =>
+                    setze('kraftstoff', e.target.value as WbwEingaben['kraftstoff'])
+                  }
+                >
+                  <option value="egal">egal</option>
+                  {KRAFTSTOFFE.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="feld" style={{ flex: 1, minWidth: 110 }}>

@@ -8,6 +8,7 @@
  * Deshalb einmal hier, benutzt von beiden.
  */
 import type { Portal, WbwEingabe } from './lauf'
+import type { Kraftstoff } from './portalvokabular'
 
 export interface LaufEingaben {
   /** Der Untertyp als Suchbegriff, z. B. `E 53 AMG 4Matic+`. */
@@ -23,6 +24,8 @@ export interface LaufEingaben {
   plz: string
   sollAusstattung: string[]
   getriebe?: 'Automatik' | 'Manuell'
+  /** Leer heisst: nicht danach filtern. */
+  kraftstoff?: Kraftstoff
   tueren?: number
   radiusKm: number
   kmToleranz: number

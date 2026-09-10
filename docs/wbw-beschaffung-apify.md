@@ -360,6 +360,66 @@ gemessen dasselbe und wird nicht gebraucht. Dass ein Tippfehler dort **still**
 nicht filtert, bleibt wahr — dagegen steht die Selbstprüfung, nicht der
 zweite Weg.
 
+### 1b. Die Merkmale des Subjekts — nachgezogen 11.09.2026
+
+**Der Befund.** `params.json` trug bereits `karosserie`, `getriebe` und
+`tueren` — der Sachverständige gibt sie in der Maske ein — und **keine
+einzige Portaleingabe benutzte sie.** Die Angaben wurden erhoben und
+fallengelassen. In der Apify-Konsole waren deshalb Abfragen ohne diese Filter
+zu sehen. Dasselbe galt für `leistungToleranzKw`: der Baustein rechnete mit
+festen 20 % und liess das Feld liegen, das dafür ausgefüllt wird.
+
+Dazu fehlte ein Merkmal ganz: **der Kraftstoff.** Das Gutachten führt kein
+Feld dafür. Bei Modellen, die es als Verbrenner und als Stromer gibt — Smart,
+Fiat 500, Mini — entscheidet er über den halben Korb. Er ist jetzt eine
+Auswahl in der Maske, neben dem Getriebe; leer heisst nicht filtern.
+
+| Merkmal | AutoScout24 | mobile.de | Kleinanzeigen |
+| --- | --- | --- | --- |
+| Kraftstoff | `fuelType: "electric"` | `fuelType: ["ELECTRIC"]` | `autos.fuel_s: "elektro"` |
+| Getriebe | `transmission: "automatic"` | `transmission: ["AUTOMATIC_GEAR"]` | `autos.shift_s: "automatik"` |
+| Zustand | `condition: "used"` | `condition: ["USED"]` | `autos.schaden_s: "nein"` |
+| Leistung | — | `powerMin`/`Max` in PS | `autos.power_i` |
+| Türen | — (Actor kennt keins) | — (Actor kennt keins) | `autos.anzahl_tueren_s: "2_3"` |
+| Bauart | `bodyType: "hatchback"` | `bodyType: ["KLEINWAGEN"]` | `autos.typ_s: "kleinwagen"` |
+
+**Drei Formen für dieselbe Sache.** mobile.de nimmt **Listen** in Versalien
+mit Suffix (`["AUTOMATIC_GEAR"]`), AutoScout24 kleingeschriebene
+Zeichenketten (`"automatic"`), Kleinanzeigen deutsche Tokens (`"automatik"`).
+Ein Wert in der falschen Form wird von keinem dieser Actors abgelehnt — er
+wird durchgereicht und filtert nichts. Die Zuordnung steht deshalb an **einer**
+Stelle: `wbw-plugin/portalvokabular.js`, jeder Wert aus dem `enum` des
+Eingabeschemas. Ein Test hält alle 112 Kombinationen aus Bauart, Kraftstoff
+und Getriebe gegen diese Listen.
+
+**Die Bauart geht nur in den engen Zyklus.** Zyklus 1 sucht mit ihr, und der
+Filter ist in Apify zu sehen. Reicht der Korb nicht, sucht Zyklus 2 ohne sie —
+so kann die gemessene Falle (`bodyType: "van"`, Korb von 10 auf 1) den Lauf
+nicht mehr kosten. Getriebe und Kraftstoff gehen in jedem Zyklus hinaus; ihr
+Vokabular ist eindeutig, das der Bauart nachweislich nicht.
+
+**Was nicht übernommen wurde**, aus den Vorgabe-Objekten des
+Sachverständigen — jeweils mit Grund:
+
+| Vorgabe | stattdessen | warum |
+| --- | --- | --- |
+| `damageStatus: "ANY"` | `EXCLUDE` | Ein Unfallfahrzeug ist kein Vergleichsfahrzeug; mobile.de meldet den Status im Datensatz gar nicht |
+| `includeDetails: false` | `true` | Ohne Details keine Koordinaten und keine Ausstattung — bei mobile.de hängt der ganze Umkreis daran |
+| `"eletric"`, `"automatic"`, `"sedan"` | `elektro`, `automatik`, `limousine` | Kleinanzeigen führt deutsche Tokens; `"eletric"` ist zudem ein Tippfehler |
+| `autos.km_i: 37000` | `"17000,57000"` | Eine einzelne Zahl filtert auf genau diesen Kilometerstand |
+| `autos.marke: "Smart"` | `autos.marke_s: "smart"` | Kürzel `_s`, und die Tokens des Portals sind kleingeschrieben |
+
+**Nachweisbar gemacht.** Die vollständige Eingabe je Portal und Zyklus steht
+als `gesendeteEingabe` im Beschaffungsprotokoll des Laufs — Zeile für Zeile
+gegen die Apify-Konsole haltbar, ohne den Lauf zu wiederholen.
+
+**Und eine Selbstprüfung für den einen ungemessenen Wert.** Ob Kleinanzeigen
+für Elektro wirklich `elektro` heisst, steht in keiner vorliegenden Quelle;
+die Filterleiste zeigte nur benzin, diesel, lpg und hybrid. Statt zu raten und
+zu hoffen, zählt die Beschaffung nach dem Abruf, wie viele gelieferte
+Fahrzeuge einen anderen Kraftstoff tragen. Sind es welche, steht im
+Protokoll, dass der Filter nicht gegriffen hat.
+
 ### 2. Feldkarte je Actor — umgesetzt
 
 `wbw-plugin/adapters/feldkarte.js`, geprüft an 75 echten Datensätzen in

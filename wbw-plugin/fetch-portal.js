@@ -152,6 +152,10 @@ async function beschaffe(portal, eingaben, opts = {}) {
         // Der Gesamtdeckel des Laufs. Die Portale laufen als eigene Prozesse,
         // deshalb ist das Hauptbuch eine Datei im Ordner des Vorgangs.
         budgetDatei: opts.budgetDatei || process.env.WBW_BUDGET_DATEI || null,
+        // Was gesucht WURDE, in deutschen Begriffen. Der Adapter haelt die
+        // gelieferten Fahrzeuge dagegen: ein Filter, der lautlos nichts tut,
+        // faellt nur so auf.
+        erwartet: (eingaben && eingaben._abgeleitet) || null,
       };
       let ergebnis;
       if (stufe.adapter === "unlocker") {
