@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import {
   ladeStellungnahmen,
+  STELLUNGNAHME_SORTIERFELDER,
   stellungnahmenfilterGesetzt,
   zaehleStellungnahmen,
   type Stellungnahmenfilter,
+  type StellungnahmeSortierfeld,
 } from '@/stellungnahme/abfragen'
 import { ladeFaelle } from '@/autoixpert/abfragen'
 import { kiVerfuegbar } from '@/ki/client'
@@ -15,6 +17,10 @@ import { Loeschknopf } from './loeschknopf'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
 import { Filterleiste } from '@/app/teile/filterleiste'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
+import { Sortierleiste } from '@/app/teile/sortierleiste'
+import { leseSortierung } from '@/app/teile/sortierung'
 
 /**
  * Die Beschriftung einer Zeile.
@@ -74,9 +80,14 @@ export default async function StellungnahmenSeite({
     bis: wert(roh.bis),
   }
   const gefiltert = stellungnahmenfilterGesetzt(filter)
+  const { seite, groesse, versatz } = leseSeite(roh.seite, roh.groesse)
+  const sortierung = leseSortierung<StellungnahmeSortierfeld>(
+    { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
+    STELLUNGNAHME_SORTIERFELDER.map((f) => f.wert),
+  )
 
   const [liste, gesamt, faelle, werkzeuge] = await Promise.all([
-    ladeStellungnahmen(filter),
+    ladeStellungnahmen(filter, sortierung ?? undefined, groesse, versatz),
     zaehleStellungnahmen(filter),
     ladeFaelle(),
     werkzeugeVorhanden(),
@@ -132,9 +143,11 @@ export default async function StellungnahmenSeite({
 
       <BerichtFormular faelle={fallAuswahl} aktiv={kiVerfuegbar() && werkzeuge.ok} />
 
+      <Sortierleiste felder={STELLUNGNAHME_SORTIERFELDER} />
+
       <Filterleiste
         weitereAb={2}
-        treffer={liste.length < gesamt ? `${liste.length} von ${gesamt} gezeigt` : undefined}
+        zusatzParameter={{ sortiert: sortierung?.feld, richtung: sortierung?.richtung }}
         felder={[
           { art: 'suche', name: 'suche', platzhalter: 'Betreff, Empfänger oder Aktenzeichen' },
           {
@@ -240,6 +253,8 @@ export default async function StellungnahmenSeite({
           ))}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

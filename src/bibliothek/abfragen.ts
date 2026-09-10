@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, count, eq, ilike, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   beleg,
@@ -9,6 +9,7 @@ import {
   eintragVariante,
   eintragVorbedingung,
 } from '@/db/schema'
+import type { Sortierstand } from '@/app/teile/sortierung'
 
 /**
  * Qualifizierter Verweis auf die Zeile der äußeren Abfrage.
@@ -105,11 +106,81 @@ function grundbedingungen(filter: Suchfilter): SQL[] {
   return bedingungen
 }
 
-export async function sucheEintraege(filter: Suchfilter) {
+/** Die Filterbedingungen mitsamt Abschnitt — für Liste und Zählung dieselben. */
+function vollstaendigeBedingungen(filter: Suchfilter): SQL[] {
   const bedingungen = grundbedingungen(filter)
   if (filter.abschnitt) bedingungen.push(eq(eintrag.abschnitt, filter.abschnitt))
+  return bedingungen
+}
 
+/** Unverifizierte Belege eines Eintrags — geteilt zwischen Auswahl und Sortierung. */
+function belegeUnverifiziertAusdruck() {
+  return sql<number>`(
+    select count(*) from ${beleg} b
+    where b.eintrag_id = ${EINTRAG_ID} and b.verifiziert_am is null
+  )`
+}
+
+/**
+ * Wonach sich die Bibliothek sortieren lässt.
+ *
+ * Die „Marker"-Spalte der Liste zeigt drei Zahlen nebeneinander (offene
+ * Platzhalter, Vorbedingungen, unverifizierte Belege) — kein einzelnes
+ * Feld. Sortiert wird hier nach `belegeUnverifiziert`: das ist die Zahl, die
+ * die Freigabe sperrt, also die, die beim Sortieren am ehesten interessiert.
+ */
+export type EintragSortierfeld =
+  | 'nummer'
+  | 'titel'
+  | 'bereich'
+  | 'abschnitt'
+  | 'status'
+  | 'belegeUnverifiziert'
+
+export const EINTRAG_SORTIERFELDER: { wert: EintragSortierfeld; text: string }[] = [
+  { wert: 'nummer', text: 'Nummer' },
+  { wert: 'titel', text: 'Titel' },
+  { wert: 'bereich', text: 'Bereich' },
+  { wert: 'abschnitt', text: 'Abschnitt' },
+  { wert: 'status', text: 'Status' },
+  { wert: 'belegeUnverifiziert', text: 'Unverifizierte Belege' },
+]
+
+function eintragSortierAusdruck(feld: EintragSortierfeld): SQL {
+  switch (feld) {
+    case 'titel':
+      return sql`${eintrag.titel}`
+    case 'bereich':
+      return sql`${eintrag.bereich}`
+    case 'abschnitt':
+      return sql`${eintrag.abschnitt}`
+    case 'status':
+      return sql`${eintrag.status}`
+    case 'belegeUnverifiziert':
+      return belegeUnverifiziertAusdruck()
+    default:
+      return sortierSchluessel()
+  }
+}
+
+export async function sucheEintraege(
+  filter: Suchfilter,
+  sortierung?: Sortierstand<EintragSortierfeld>,
+  hoechstens = 50,
+  versatz = 0,
+) {
+  const bedingungen = vollstaendigeBedingungen(filter)
   const wo = bedingungen.length > 0 ? and(...bedingungen) : undefined
+
+  // Eine gewählte Sortierung ersetzt die Standardreihenfolge vollständig —
+  // nur ohne Wunsch gilt „nach Bereich, dann natürliche Gliederungsnummer".
+  const ordnung = sortierung
+    ? [
+        sortierung.richtung === 'absteigend'
+          ? desc(eintragSortierAusdruck(sortierung.feld))
+          : asc(eintragSortierAusdruck(sortierung.feld)),
+      ]
+    : [asc(eintrag.bereich), asc(sortierSchluessel())]
 
   const zeilen = await db
     .select({
@@ -126,19 +197,31 @@ export async function sucheEintraege(filter: Suchfilter) {
       platzhalterOffen: sql<number>`(
         select count(*) from ${eintragPlatzhalter} p where p.eintrag_id = ${EINTRAG_ID}
       )`.mapWith(Number),
-      belegeUnverifiziert: sql<number>`(
-        select count(*) from ${beleg} b
-        where b.eintrag_id = ${EINTRAG_ID} and b.verifiziert_am is null
-      )`.mapWith(Number),
+      belegeUnverifiziert: belegeUnverifiziertAusdruck().mapWith(Number),
       vorbedingungen: sql<number>`(
         select count(*) from ${eintragVorbedingung} v where v.eintrag_id = ${EINTRAG_ID}
       )`.mapWith(Number),
     })
     .from(eintrag)
     .where(wo)
-    .orderBy(asc(eintrag.bereich), asc(sortierSchluessel()))
+    .orderBy(...ordnung)
+    .limit(hoechstens)
+    .offset(versatz)
 
   return zeilen
+}
+
+/**
+ * Wie viele Einträge der Filter trifft.
+ *
+ * Getrennt von der Liste, weil die jetzt bei `hoechstens` abschneidet — die
+ * Kopfzeile und die Seitennavigation brauchen die ungekappte Zahl.
+ */
+export async function zaehleEintraege(filter: Suchfilter): Promise<number> {
+  const bedingungen = vollstaendigeBedingungen(filter)
+  const wo = bedingungen.length > 0 ? and(...bedingungen) : undefined
+  const zeilen = await db.select({ anzahl: count() }).from(eintrag).where(wo)
+  return zeilen[0]?.anzahl ?? 0
 }
 
 /**

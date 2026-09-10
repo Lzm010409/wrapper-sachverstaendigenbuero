@@ -11,6 +11,10 @@ import {
   type Schreiben,
 } from '@/fall/ansicht'
 import { ladeVorgang, type VorgangAnsicht } from '@/fall/vorgang'
+import { ladeAmpel } from '@/geld/stand'
+import { widerspruch } from '@/geld/ampel'
+import { Geldpille, euroAusCent } from '@/app/teile/geldpille'
+import { ladeVorgangsschritte } from '@/fall/vorgangsschritte'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
@@ -19,8 +23,10 @@ import { KalkulationReiter } from './reiter/kalkulation'
 import { WbwReiterMitVorschlag } from './reiter/wbw-laden'
 import { BeteiligtenZeile, Ohne, SchreibenZeile, Zeile } from './reiter/bausteine'
 import { Reichtext } from './reiter/reichtext'
+import { Vorgangsschritte } from './reiter/vorgangsschritte'
 import { verlangeAnmeldung } from '@/auth/wache'
-import { SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
+import { Balken, SkelettRaster, SkelettReiter } from '@/app/teile/skelett'
+import { Meldung } from '@/app/teile/meldung'
 
 const HERKUNFT: Record<string, string> = {
   anwalt: 'Rechtsanwalt aus dem Gutachten',
@@ -146,7 +152,7 @@ export default async function FallSeite({
           ) : null}
           {aktiv === 'vorgang' ? (
             <Suspense fallback={<SkelettReiter was="Der Vorgang" />}>
-              <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} />
+              <VorgangReiter d={fall.daten} aktenzeichen={fall.aktenzeichen} fallId={fall.id} />
             </Suspense>
           ) : null}
         </>
@@ -378,9 +384,11 @@ async function StellungnahmenReiter({ fall }: { fall: FallAnsicht }) {
 async function VorgangReiter({
   d,
   aktenzeichen,
+  fallId,
 }: {
   d: Falldaten
   aktenzeichen: string | null
+  fallId: string
 }) {
   const { vorschlag, platzhalter } = leseVorgangsangaben(d)
   const vorgang = await ladeVorgang(aktenzeichen)
@@ -392,6 +400,20 @@ async function VorgangReiter({
           <div className="block-label">Pipedrive</div>
           <div className="karte">
             <PipedriveInhalt vorgang={vorgang} />
+          </div>
+        </div>
+
+        <div className="block">
+          <div className="block-label">Rechnung</div>
+          <div className="karte">
+            {/*
+              Eigene Suspense-Grenze wie bei Pipedrive: der erste Abgleich
+              mit sevDesk holt 1444 Rechnungen und dauert Sekunden. Ohne die
+              Grenze wartete der ganze Reiter darauf.
+            */}
+            <Suspense fallback={<Balken breite={60} />}>
+              <Zahlungskarte aktenzeichen={aktenzeichen} phase={phaseVon(vorgang)} />
+            </Suspense>
           </div>
         </div>
 
@@ -418,6 +440,17 @@ async function VorgangReiter({
             </dl>
           </div>
         </div>
+
+        {vorgang.stand === 'gefunden' ? (
+          <div className="block">
+            <div className="block-label">Vorgangsschritte</div>
+            <div className="karte">
+              <Suspense fallback={<VorgangsschritteSkelett />}>
+                <VorgangsschritteKarte fallId={fallId} dealId={vorgang.deal!.dealId} />
+              </Suspense>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <aside className="seitenleiste">
@@ -478,8 +511,8 @@ async function VorgangReiter({
 }
 
 /**
- * Die vier Ausgänge des Pipedrive-Abrufs, jeder mit eigener Aussage.
- * „Kein Deal gefunden" für alle vier wäre die gefährlichste davon: wer das
+ * Die fünf Ausgänge des Pipedrive-Abrufs, jeder mit eigener Aussage.
+ * „Kein Deal gefunden" für alle fünf wäre die gefährlichste davon: wer das
  * liest, legt den Vorgang womöglich ein zweites Mal in Pipedrive an.
  */
 function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
@@ -500,6 +533,16 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
     )
   }
 
+  if (vorgang.stand === 'mehrdeutig') {
+    return (
+      <div className="hinweis warn" style={{ margin: 0 }}>
+        <strong className="hinweis-titel">Mehrere Deals tragen dieses Aktenzeichen als Titel.</strong>
+        Das muss in Pipedrive geprüft werden, bevor eine Phase verlässlich stimmt: Deal-IDs{' '}
+        {vorgang.treffer?.map((t) => t.id).join(', ')}.
+      </div>
+    )
+  }
+
   if (vorgang.stand === 'ohne_treffer' || !vorgang.deal) {
     return (
       <p className="unterzeile" style={{ margin: 0 }}>
@@ -515,6 +558,10 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
       <dd style={{ textAlign: 'left' }}>
         <span className="marke-pille m-akzent">{d.phase}</span>
       </dd>
+      <dt>Status</dt>
+      <dd style={{ textAlign: 'left' }}>
+        <span className={`marke-pille ${d.dealStatusKlasse}`}>{d.dealStatus}</span>
+      </dd>
       <Zeile label="Deal" wert={d.titel} />
       <Zeile label="Schadenhöhe brutto" wert={euro(d.schadenhoeheBrutto)} />
       <Zeile label="Ausgebuchter Betrag" wert={euro(d.ausgebuchterBetrag)} />
@@ -526,4 +573,166 @@ function PipedriveInhalt({ vorgang }: { vorgang: VorgangAnsicht }) {
 function euro(wert: number | undefined): string | null {
   if (wert === undefined) return null
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(wert)
+}
+
+/**
+ * Eigene Suspense-Grenze für Notizen und Mails, getrennt von der Deal-Karte
+ * darüber: zwei zusätzliche Pipedrive-Aufrufe (Notizen, Mail-Metadaten)
+ * sollen die bereits geladene Phase nicht mit ausbremsen.
+ */
+async function VorgangsschritteKarte({ fallId, dealId }: { fallId: string; dealId: number }) {
+  const { schritte, notizenFehler, mailsFehler } = await ladeVorgangsschritte(dealId)
+
+  return (
+    <>
+      {notizenFehler ? (
+        <Meldung art="warnung" style={{ marginBottom: 12 }}>
+          {notizenFehler}
+        </Meldung>
+      ) : null}
+      {mailsFehler ? (
+        <Meldung art="warnung" style={{ marginBottom: 12 }}>
+          {mailsFehler}
+        </Meldung>
+      ) : null}
+      <Vorgangsschritte fallId={fallId} schritte={schritte} />
+    </>
+  )
+}
+
+function VorgangsschritteSkelett() {
+  return (
+    <div aria-busy="true" aria-live="polite">
+      <span className="nur-vorlesen">Die Vorgangsschritte werden geladen …</span>
+      <Balken breite={70} />
+      <div style={{ marginTop: 8 }}>
+        <Balken breite={55} />
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <Balken breite={62} />
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- Der Zahlungsstand aus sevDesk ---------------- */
+
+function phaseVon(vorgang: VorgangAnsicht): string | undefined {
+  return vorgang.stand === 'gefunden' ? vorgang.deal?.phase : undefined
+}
+
+/**
+ * Was in sevDesk zu diesem Aktenzeichen an Rechnungen liegt.
+ *
+ * Gefunden werden sie über die Rechnungsnummer: sie ist das Aktenzeichen
+ * mit einer laufenden Nummer dahinter. Der Umweg über den Pipedrive-Deal
+ * entfällt damit — und mit ihm die Fälle, die keinen Deal haben und sonst
+ * unbeobachtet blieben.
+ */
+async function Zahlungskarte({
+  aktenzeichen,
+  phase,
+}: {
+  aktenzeichen: string | null
+  phase: string | undefined
+}) {
+  const { eingerichtet, ampel, spiegel } = await ladeAmpel(aktenzeichen)
+
+  if (!eingerichtet) {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        sevDesk ist auf diesem Server nicht eingerichtet — <code>SEVDESK_API_TOKEN</code> fehlt.
+      </p>
+    )
+  }
+  if (!ampel || ampel.stand === 'ohne_rechnung') {
+    return (
+      <>
+        <p style={{ margin: 0 }}>Zu diesem Aktenzeichen liegt in sevDesk keine Rechnung.</p>
+        <Streitfall text={widerspruch('ohne_rechnung', phase)} />
+        <Abgleichstand abgeglichenAm={spiegel.abgeglichenAm} />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div style={{ marginBottom: 10 }}>
+        <Geldpille stand={ampel.stand} offenCent={ampel.offenCent} />
+      </div>
+      <dl className="kv" style={{ gridTemplateColumns: 'minmax(160px,auto) 1fr' }}>
+        <dt>Rechnungsbetrag</dt>
+        <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.bruttoCent)}</dd>
+        <dt>Davon bezahlt</dt>
+        <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.bezahltCent)}</dd>
+        {/*
+          Bei „bezahlt" bleibt der Restbetrag weg. sevDesk bucht mitunter
+          einen Cent weniger als die Rechnung ausweist (855,49 zu 855,50);
+          „Noch offen 0,01 €" unter der Marke „Bezahlt" ist kein Hinweis,
+          sondern Rauschen.
+        */}
+        {ampel.offenCent > 0 && ampel.stand !== 'bezahlt' ? (
+          <>
+            <dt>Noch offen</dt>
+            <dd style={{ textAlign: 'left' }}>{euroAusCent(ampel.offenCent)}</dd>
+          </>
+        ) : null}
+        {ampel.faelligAm && ampel.stand !== 'bezahlt' ? (
+          <>
+            <dt>Fällig am</dt>
+            <dd style={{ textAlign: 'left' }}>
+              {ampel.faelligAm.toLocaleDateString('de-DE')}
+            </dd>
+          </>
+        ) : null}
+        {ampel.zahldatum ? (
+          <>
+            <dt>Bezahlt am</dt>
+            <dd style={{ textAlign: 'left' }}>{ampel.zahldatum.toLocaleDateString('de-DE')}</dd>
+          </>
+        ) : null}
+        {ampel.mahnstufe ? (
+          <>
+            <dt>Mahnstufe</dt>
+            <dd style={{ textAlign: 'left' }}>{ampel.mahnstufe}</dd>
+          </>
+        ) : null}
+        <dt>{ampel.nummern.length === 1 ? 'Rechnungsnummer' : 'Rechnungsnummern'}</dt>
+        <dd style={{ textAlign: 'left', fontFamily: 'var(--mono)', fontSize: 12 }}>
+          {ampel.nummern.join(', ')}
+        </dd>
+      </dl>
+      <Streitfall text={widerspruch(ampel.stand, phase)} />
+      {ampel.doppelt.length > 0 ? (
+        <Streitfall
+          text={`In sevDesk liegt ${ampel.doppelt.length === 1 ? 'die Rechnungsnummer' : 'die Rechnungsnummern'} ${ampel.doppelt.join(', ')} mehrfach. Gezählt wurde sie nur einmal — bitte in sevDesk aufräumen.`}
+        />
+      ) : null}
+      <Abgleichstand abgeglichenAm={spiegel.abgeglichenAm} />
+    </>
+  )
+}
+
+function Streitfall({ text }: { text: string | null }) {
+  if (!text) return null
+  return (
+    <div style={{ marginTop: 10 }}>
+      <Meldung art="warnung">{text}</Meldung>
+    </div>
+  )
+}
+
+/**
+ * Wann zuletzt mit sevDesk gesprochen wurde.
+ *
+ * Eine Aussage über Geld ohne ihr Alter ist eine halbe Aussage — wer sie
+ * liest, soll sehen, ob sie von heute früh oder von letzter Woche ist.
+ */
+function Abgleichstand({ abgeglichenAm }: { abgeglichenAm: Date | null }) {
+  if (!abgeglichenAm) return null
+  return (
+    <p className="unterzeile" style={{ margin: '10px 0 0' }}>
+      Stand: {abgeglichenAm.toLocaleString('de-DE')}
+    </p>
+  )
 }

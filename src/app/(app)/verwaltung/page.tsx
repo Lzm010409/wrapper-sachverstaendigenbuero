@@ -1,10 +1,16 @@
 import Link from 'next/link'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
-import { alleBenutzer } from '@/rechte/benutzerverwaltung'
+import {
+  alleBenutzer,
+  BENUTZER_SORTIERFELDER,
+  type BenutzerSortierfeld,
+} from '@/rechte/benutzerverwaltung'
 import { BESCHREIBUNGEN, ROLLENRECHTE } from '@/rechte/katalog'
 import { Meldung } from '@/app/teile/meldung'
 import { Benutzerzeile } from './benutzerzeile'
+import { Sortierleiste } from '@/app/teile/sortierleiste'
+import { leseSortierung } from '@/app/teile/sortierung'
 
 /**
  * Die Benutzerverwaltung.
@@ -15,7 +21,17 @@ import { Benutzerzeile } from './benutzerzeile'
  * Diese Datei **stellt nur dar**. Wer was darf, entscheidet
  * `src/rechte/`; was gespeichert wird, entscheiden die Aktionen dort.
  */
-export default async function Verwaltung() {
+/** Nimmt einen Wert aus der Adresse — mehrfach gesetzt zählt der erste. */
+function wert(roh: string | string[] | undefined): string | undefined {
+  const einzeln = Array.isArray(roh) ? roh[0] : roh
+  return einzeln?.trim() || undefined
+}
+
+export default async function Verwaltung({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   await verlangeAnmeldung()
 
   if (!(await darf('benutzer.verwalten'))) {
@@ -26,7 +42,13 @@ export default async function Verwaltung() {
     )
   }
 
-  const benutzer = await alleBenutzer()
+  const roh = await searchParams
+  const sortierung = leseSortierung<BenutzerSortierfeld>(
+    { sortiert: wert(roh.sortiert), richtung: wert(roh.richtung) },
+    BENUTZER_SORTIERFELDER.map((f) => f.wert),
+  )
+
+  const benutzer = await alleBenutzer(sortierung ?? undefined)
 
   return (
     <>
@@ -38,9 +60,17 @@ export default async function Verwaltung() {
             einzeln zu- und abschalten, sperren
           </p>
         </div>
-        <Link href="/verwaltung/protokoll" className="knopf-schlicht">
-          Fehlerprotokoll
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link href="/verwaltung/kontakte" className="knopf-schlicht">
+            Doppelte Kontakte
+          </Link>
+          <Link href="/verwaltung/fotolexikon" className="knopf-schlicht">
+            Fotolexikon
+          </Link>
+          <Link href="/verwaltung/protokoll" className="knopf-schlicht">
+            Fehlerprotokoll
+          </Link>
+        </div>
       </div>
 
       <div className="karte" style={{ marginBottom: 16 }}>
@@ -64,6 +94,8 @@ export default async function Verwaltung() {
           ))}
         </dl>
       </div>
+
+      <Sortierleiste felder={BENUTZER_SORTIERFELDER} />
 
       <div className="liste">
         {benutzer.map((b) => (

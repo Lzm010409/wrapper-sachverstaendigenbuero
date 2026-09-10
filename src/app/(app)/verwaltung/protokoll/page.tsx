@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { verlangeAnmeldung } from '@/auth/wache'
 import { darf } from '@/rechte/zugriff'
-import { ereignisse, type Ereigniszeile } from '@/protokoll/ablage'
+import { ereignisse, zaehleEreignisse, type Ereigniszeile } from '@/protokoll/ablage'
 import { Meldung } from '@/app/teile/meldung'
+import { Pagination } from '@/app/teile/pagination'
+import { leseSeite } from '@/app/teile/seitenwahl'
 
 /**
  * Die Fehlerliste.
@@ -20,7 +22,7 @@ import { Meldung } from '@/app/teile/meldung'
 export default async function Protokollseite({
   searchParams,
 }: {
-  searchParams: Promise<{ suche?: string; stufe?: string }>
+  searchParams: Promise<{ suche?: string; stufe?: string; seite?: string; groesse?: string }>
 }) {
   await verlangeAnmeldung()
 
@@ -32,12 +34,21 @@ export default async function Protokollseite({
     )
   }
 
-  const { suche, stufe } = await searchParams
-  const zeilen = await ereignisse({
+  const { suche, stufe, seite: seiteRoh, groesse: groesseRoh } = await searchParams
+  const filter = {
     suche,
-    stufe: stufe === 'fehler' || stufe === 'warnung' ? stufe : undefined,
+    stufe: (stufe === 'fehler' || stufe === 'warnung' ? stufe : undefined) as
+      | 'fehler'
+      | 'warnung'
+      | undefined,
     tage: 30,
-  })
+  }
+  const { seite, groesse, versatz } = leseSeite(seiteRoh, groesseRoh)
+
+  const [zeilen, gesamt] = await Promise.all([
+    ereignisse(filter, groesse, versatz),
+    zaehleEreignisse(filter),
+  ])
 
   return (
     <>
@@ -45,8 +56,8 @@ export default async function Protokollseite({
         <div>
           <h1>Fehlerprotokoll</h1>
           <p className="unterzeile">
-            Die letzten 30 Tage · {zeilen.length}{' '}
-            {zeilen.length === 1 ? 'Eintrag' : 'Einträge'} · Auskünfte bleiben im Containerprotokoll
+            Die letzten 30 Tage · {gesamt} {gesamt === 1 ? 'Eintrag' : 'Einträge'} · Auskünfte
+            bleiben im Containerprotokoll
           </p>
         </div>
         <Link href="/verwaltung" className="knopf-schlicht">
@@ -85,6 +96,8 @@ export default async function Protokollseite({
           ))}
         </div>
       )}
+
+      <Pagination seite={seite} groesse={groesse} gesamt={gesamt} />
     </>
   )
 }

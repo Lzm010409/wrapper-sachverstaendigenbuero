@@ -44,13 +44,25 @@ export interface FilterleisteEigenschaften {
   weitereAb?: number
   /** Rechts in der Leiste, z. B. „12 von 340". */
   treffer?: string
+  /**
+   * Parameter, die dieses Formular nicht zeigt, aber beim Abschicken
+   * mitschicken muss — z. B. `sortiert`/`richtung` aus der `Sortierleiste`.
+   * Ohne das würde jeder Filterwechsel die Sortierung verwerfen: `abschicken`
+   * baut die neue Adresse nur aus den eigenen Formularfeldern.
+   */
+  zusatzParameter?: Record<string, string | undefined>
 }
 
 function beschriftungVon(feld: Filterfeld): string {
   return feld.art === 'suche' ? 'Suche' : feld.beschriftung
 }
 
-export function Filterleiste({ felder, weitereAb, treffer }: FilterleisteEigenschaften) {
+export function Filterleiste({
+  felder,
+  weitereAb,
+  treffer,
+  zusatzParameter,
+}: FilterleisteEigenschaften) {
   const parameter = useSearchParams()
   const router = useRouter()
   const pfad = usePathname()
@@ -89,6 +101,9 @@ export function Filterleiste({ felder, weitereAb, treffer }: FilterleisteEigensc
   function entferne(name: string) {
     const naechste = new URLSearchParams(parameter.toString())
     naechste.delete(name)
+    // Ein geänderter Filter macht die vorherige Seite ungültig — sie könnte
+    // jetzt über das Ende der (grösseren) Trefferliste hinausragen.
+    naechste.delete('seite')
     router.replace(naechste.size > 0 ? `${pfad}?${naechste}` : pfad)
   }
 
@@ -104,6 +119,10 @@ export function Filterleiste({ felder, weitereAb, treffer }: FilterleisteEigensc
 
   return (
     <form className="filterleiste" method="get" role="search" onSubmit={abschicken}>
+      {Object.entries(zusatzParameter ?? {}).map(([name, wert]) =>
+        wert ? <input key={name} type="hidden" name={name} value={wert} /> : null,
+      )}
+
       <div className="filterleiste-reihe">
         {vorn.map((feld) => (
           <Feld key={feld.name} feld={feld} wert={wertVon(feld.name)} beiAuswahl={gleichAbschicken} />

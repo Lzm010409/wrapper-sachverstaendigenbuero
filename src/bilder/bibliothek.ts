@@ -67,11 +67,8 @@ function musterFuerSuche(begriff: string): string {
   return `%${begriff.replace(/[\\%_]/g, (z) => `\\${z}`)}%`
 }
 
-export async function sucheBilder(
-  begriff = '',
-  thema = '',
-  hoechstens = 60,
-): Promise<Bibliotheksbild[]> {
+/** Die Filterbedingungen der Bildsuche. Ausgelagert, damit Liste und Zählung dieselben nehmen. */
+function bilderBedingungen(begriff: string, thema: string) {
   const gesucht = begriff.trim()
   const muster = musterFuerSuche(gesucht)
 
@@ -89,6 +86,16 @@ export async function sucheBilder(
   if (thema.trim()) {
     bedingungen.push(sql`${bild.themen} @> array[${thema.trim()}]::text[]`)
   }
+  return bedingungen
+}
+
+export async function sucheBilder(
+  begriff = '',
+  thema = '',
+  hoechstens = 60,
+  versatz = 0,
+): Promise<Bibliotheksbild[]> {
+  const bedingungen = bilderBedingungen(begriff, thema)
 
   return db
     .select(FELDER)
@@ -97,6 +104,17 @@ export async function sucheBilder(
     .where(and(...bedingungen))
     .orderBy(desc(bild.erstelltAm))
     .limit(hoechstens)
+    .offset(versatz)
+}
+
+/** Wie viele Bilder der Bibliothekssuche der Filter trifft. */
+export async function zaehleBilder(begriff = '', thema = ''): Promise<number> {
+  const bedingungen = bilderBedingungen(begriff, thema)
+  const zeilen = await db
+    .select({ anzahl: sql<number>`count(*)`.mapWith(Number) })
+    .from(bild)
+    .where(and(...bedingungen))
+  return zeilen[0]?.anzahl ?? 0
 }
 
 /**
@@ -106,7 +124,10 @@ export async function sucheBilder(
  * Der natürliche Weg, wie sich die Bibliothek füllt: nicht durch Vorratshaltung,
  * sondern aus der Arbeit heraus — genau wie bei den Argumenten (F9).
  */
-export async function nochNichtUebernommen(hoechstens = 40): Promise<Bibliotheksbild[]> {
+export async function nochNichtUebernommen(
+  hoechstens = 40,
+  versatz = 0,
+): Promise<Bibliotheksbild[]> {
   return db
     .select(FELDER)
     .from(bild)
@@ -114,6 +135,16 @@ export async function nochNichtUebernommen(hoechstens = 40): Promise<Bibliotheks
     .where(and(eq(bild.inBibliothek, false), isNotNull(bild.stellungnahmeId)))
     .orderBy(desc(bild.erstelltAm))
     .limit(hoechstens)
+    .offset(versatz)
+}
+
+/** Wie viele Bilder aus Schreiben noch nicht in die Bibliothek übernommen sind. */
+export async function zaehleNochNichtUebernommen(): Promise<number> {
+  const zeilen = await db
+    .select({ anzahl: sql<number>`count(*)`.mapWith(Number) })
+    .from(bild)
+    .where(and(eq(bild.inBibliothek, false), isNotNull(bild.stellungnahmeId)))
+  return zeilen[0]?.anzahl ?? 0
 }
 
 /**

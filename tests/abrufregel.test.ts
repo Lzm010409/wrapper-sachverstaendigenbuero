@@ -33,13 +33,13 @@ describe("pruefeGutachten", () => {
     ).not.toThrow();
   });
 
-  it("weist ein abgeschlossenes Gutachten ab", () => {
+  it("laesst ein abgeschlossenes Gutachten durch — der Abschluss ist keine Sperre mehr", () => {
     expect(() =>
       pruefeGutachten(
         { state: "locked", created_at: "2026-09-06T08:00:00Z", token: "0926/2078TG" },
         enge,
       ),
-    ).toThrow(AbrufregelVerletzt);
+    ).not.toThrow();
   });
 
   it("weist ein zu altes Gutachten ab", () => {

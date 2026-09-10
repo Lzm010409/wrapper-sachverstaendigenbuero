@@ -47,6 +47,9 @@ export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfo
 /** Die Stufe eines Protokolleintrags. */
 export const protokollstufeEnum = pgEnum('protokollstufe', ['fehler', 'warnung', 'info'])
 
+/** Die Seite eines Fahrzeugteils im Fotolexikon — siehe `fotoTeil`. */
+export const fotoTeilSeiteEnum = pgEnum('foto_teil_seite', ['links', 'rechts', 'vorne', 'hinten'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -138,6 +141,9 @@ export const benutzer = pgTable(
   (t) => [
     uniqueIndex('benutzer_email_idx').on(sql`lower(${t.email})`),
     uniqueIndex('benutzer_entra_idx').on(t.entraOid),
+    // Keine eigenen Sortier-Indizes: die Benutzerverwaltung listet die
+    // Zugänge dieses einen Büros vollständig, ohne Grenze — ein Sortierfeld
+    // sortiert hier eine Handvoll Zeilen.
   ],
 )
 
@@ -264,6 +270,11 @@ export const eintrag = pgTable(
   },
   (t) => [
     uniqueIndex('eintrag_bereich_nummer_idx').on(t.bereich, t.nummer),
+    // `bereich` und `status` sind bereits indiziert und decken die
+    // wählbaren Sortierfelder mit ab, die eigene Spalten sind. `titel` und
+    // die abgeleitete Zählung (Marker) bleiben bei ~70 Einträgen ohne
+    // eigenen Index — dieselbe Größenordnungs-Abwägung wie bei der
+    // Volltextsuche in `bibliothek/abfragen.ts`.
     index('eintrag_status_idx').on(t.status),
     index('eintrag_bereich_idx').on(t.bereich),
   ],
@@ -386,6 +397,16 @@ export const fall = pgTable(
   (t) => [
     index('fall_aktenzeichen_idx').on(t.aktenzeichen),
     index('fall_autoixpert_idx').on(t.autoixpertId),
+    /*
+     * `abgerufenAm` ist die Standardsortierung der Fallliste (siehe
+     * `ladeFaelle` in `abfragen.ts`) und eine ihrer wählbaren Sortierfelder
+     * — mit `ORDER BY … LIMIT 100` ist der Index hier der eine, der sich
+     * bei „einige tausend Fälle" schon lohnt. Die übrigen Sortierfelder
+     * liegen im JSON-Feld `daten`; ein Ausdrucksindex je JSON-Pfad wäre bei
+     * dieser Größenordnung mehr Pflegeaufwand, als er einbringt — siehe die
+     * Begründung an `Fallfilter`.
+     */
+    index('fall_abgerufen_idx').on(t.abgerufenAm),
   ],
 )
 
@@ -440,6 +461,199 @@ export const wbwLauf = pgTable(
     beendetAm: timestamp({ withTimezone: true }),
   },
   (t) => [index('wbw_lauf_fall_idx').on(t.fallId), index('wbw_lauf_zustand_idx').on(t.zustand)],
+)
+
+/**
+ * Was der Fotoassistent zu den Bildern eines Falls vorgeschlagen hat.
+ *
+ * **Eine Zeile je Fall, nicht je Lauf.** Ein zweiter Lauf ersetzt den
+ * ersten: die Vorschläge sind kein Nachweis, sondern ein Arbeitsstand, und
+ * zwei Stände nebeneinander wären nur die Frage, welcher gilt. Was
+ * übernommen wurde, steht ohnehin in autoiXpert — dort, wo es hingehört.
+ *
+ * `vorschlaege` enthält **alle** analysierten Fotos, auch die längst
+ * beschrifteten. Der Prüfmodus zeigt davon nur die offenen; die
+ * Vollständigkeitsprüfung braucht dagegen die Kategorie jedes Bildes, sonst
+ * meldete sie eine Lücke, die der Sachverständige selbst schon gefüllt hat.
+ *
+ * **`lauf*` trägt denselben Hintergrundlauf wie `wbwLauf`.** Ein Fall mit 67
+ * Fotos braucht mehrere Modellaufrufe hintereinander — zu lang für eine
+ * einzelne Serverantwort. Der Lauf arbeitet deshalb im selben Prozess weiter,
+ * während die Antwort längst hinaus ist (`analyse-aktionen.ts`); diese drei
+ * Spalten sind der Stand, den die Oberfläche abfragt, und überleben damit
+ * ein Neuladen der Seite und den Weggang des Sachverständigen.
+ */
+export const fotoAnalyse = pgTable(
+  'foto_analyse',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    fallId: uuid()
+      .notNull()
+      .references(() => fall.id, { onDelete: 'cascade' }),
+    /** Ein Eintrag je Foto: Kategorie, Beschreibungsvorschlag, Häkchen, Stand. */
+    vorschlaege: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /**
+     * Die Fotos, zu denen kein Vorschlag zustande kam — als Liste ihrer IDs,
+     * nicht als Zahl. Der Grund ist der Lauf selbst: er holt sich Paket für
+     * Paket die Fotos, die noch keinen Vorschlag haben. Stünde hier bloss
+     * eine Anzahl, käme ein Bild, das sich nicht laden lässt, in jedem
+     * weiteren Paket wieder mit und verbrauchte dort einen Platz — vierzig
+     * Runden lang.
+     */
+    ohneVorschlag: jsonb().notNull().default(sql`'[]'::jsonb`),
+    /** `laeuft`, solange der Hintergrundlauf arbeitet — siehe oben. */
+    laufZustand: wbwZustandEnum().notNull().default('fertig'),
+    laufBegonnenAm: timestamp({ withTimezone: true }),
+    /** Nur bei `laufZustand = 'fehler'`: die Meldung, unverändert. */
+    laufFehler: text(),
+    angestossenVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('foto_analyse_fall_idx').on(t.fallId)],
+)
+
+/**
+ * Das Fotolexikon: welche Teile es gibt, welche Seiten dafür gelten und mit
+ * welchem Wortlaut eine Beschädigung daran heisst.
+ *
+ * **Warum eine Zeile je Teil und nicht drei Tabellen.** Die Seiten sind ein
+ * festes, kleines Vokabular (`fotoTeilSeiteEnum`) — ein Array reicht. Die
+ * Beschädigungsarten dagegen sind je Teil ein eigener, kurzer Wortschatz
+ * (Blech "deformiert", Kunststoff "plastisch verformt") und werden nie
+ * unabhängig vom Teil gesucht oder angezeigt — eine eigene Tabelle dafür wäre
+ * ein Join, den niemand braucht, für eine Handvoll Einträge je Teil.
+ *
+ * **Warum das den Fotoassistenten überhaupt bindet.** Ohne dieses Lexikon
+ * formuliert das Sprachmodell frei — mit ihm liefert es nur noch Teil, Seite
+ * und Beschädigungsart aus dieser Liste, und der Satz wird daraus
+ * zusammengesetzt (`src/fotos/lexikon.ts`). Ein Haus mit eigenem Wording
+ * bekommt damit durchgehend denselben Begriff statt einer KI-Interpretation
+ * je Fall.
+ */
+export const fotoTeil = pgTable(
+  'foto_teil',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    seiten: fotoTeilSeiteEnum().array().notNull().default(sql`'{}'::foto_teil_seite[]`),
+    /** Wie sich dieses Teil optisch von Nachbarteilen abgrenzt — frei für den Auftragstext. */
+    erkennungsmerkmal: text(),
+    /**
+     * `[{ begriff: string, hinweis: string }]` — geprüft beim Lesen mit Zod,
+     * siehe `src/fotos/lexikon-ablage.ts`.
+     */
+    beschaedigungsarten: jsonb().notNull().default(sql`'[]'::jsonb`),
+    erstelltVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    geaendertAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('foto_teil_name_idx').on(sql`lower(${t.name})`)],
+)
+
+/**
+ * Der Spiegel der sevDesk-Rechnungen.
+ *
+ * **Warum gespiegelt und nicht bei jedem Blick geholt.** Am 09.09.2026
+ * lagen 1444 Rechnungen im Konto; eine Seite davon sind 2,4 MB und rund
+ * eine Sekunde. Das bei jedem Aufruf der Fallliste zu holen wäre absurd.
+ * Abgeglichen wird deshalb inkrementell: sevDesk liefert nach
+ * Änderungszeitpunkt sortiert, und geholt wird nur, was seit dem letzten
+ * Mal jünger ist — im Alltag eine Handvoll Zeilen.
+ *
+ * **Warum es kein Wasserzeichenfeld gibt.** Der Stand des Abgleichs ist
+ * `max(geaendertAm)` über diese Tabelle. Ein zweiter Ort, an dem dasselbe
+ * steht, wäre der Ort, der irgendwann nicht mehr stimmt.
+ *
+ * **Was der Spiegel nicht kann:** eine in sevDesk gelöschte Rechnung
+ * bemerken. Sie taucht in keiner Änderungsliste mehr auf und bliebe hier
+ * stehen. Für die Ampel ist das verschmerzbar — gelöscht wird an
+ * Ausgangsrechnungen praktisch nie, und storniert wird über den Zustand.
+ */
+export const rechnung = pgTable(
+  'rechnung',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /**
+     * Die Kennung der Rechnung in sevDesk — der Schlüssel des Spiegels.
+     * Nicht die Nummer: die kann doppelt vergeben sein (am Konto belegt
+     * am 09.09.2026), und ein Spiegel, der zwei echte Rechnungen zu einer
+     * verschmilzt, verliert genau den Fehler, den man sehen will.
+     */
+    sevdeskId: text().notNull(),
+    /** Die Rechnungsnummer aus sevDesk, z. B. `0926/2081TG01`. */
+    nummer: text().notNull(),
+    /**
+     * Das Aktenzeichen ohne laufende Nummer und ohne Trennzeichen. Darüber
+     * finden Fall und Rechnung zueinander, ohne dass jemand `/` und `_`
+     * von Hand vergleichen muss.
+     */
+    schluessel: text().notNull(),
+    /** 50 Entwurf, 100 offen, 200 versendet, 750 teilbezahlt, 1000 bezahlt. */
+    status: integer().notNull(),
+    /** In Cent. Als Gleitkommazahl summierte sich sonst ein Rundungsfehler auf. */
+    bruttoCent: integer().notNull().default(0),
+    bezahltCent: integer().notNull().default(0),
+    rechnungsdatum: timestamp({ withTimezone: true }),
+    zahldatum: timestamp({ withTimezone: true }),
+    zahlungszielTage: integer(),
+    mahnstufe: integer(),
+    /** Wann sevDesk die Rechnung zuletzt geändert hat. */
+    geaendertAm: timestamp({ withTimezone: true }).notNull(),
+    abgeglichenAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('rechnung_sevdesk_idx').on(t.sevdeskId),
+    index('rechnung_nummer_idx').on(t.nummer),
+    index('rechnung_schluessel_idx').on(t.schluessel),
+    index('rechnung_geaendert_idx').on(t.geaendertAm),
+  ],
+)
+
+/**
+ * Das Umhängeprotokoll: was beim Zusammenführen doppelter sevDesk-Kontakte
+ * tatsächlich passiert ist.
+ *
+ * **Warum je Schritt eine Zeile und nicht je Vorgang eine Zusammenfassung.**
+ * Ein Zusammenführen ist kein atomarer Vorgang — sevDesk kennt keine
+ * Transaktion über mehrere Belege. Es kann also auf halbem Weg stehen
+ * bleiben, und dann muss nachvollziehbar sein, welche Rechnung schon
+ * umgehängt ist und welche nicht. Nur so lässt sich der Rückbau auf genau
+ * die geglückten Schritte anwenden.
+ *
+ * **Warum auch die misslungenen Schritte hier stehen.** „sevDesk hat die
+ * Rechnung nicht umgehängt" ist die Auskunft, die jemand später braucht —
+ * sie in ein Anwendungsprotokoll zu schreiben, das nach 30 Tagen verfällt,
+ * hiesse sie zu verlieren.
+ */
+export const kontaktumhang = pgTable(
+  'kontaktumhang',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** Klammert die Schritte einer Zusammenführung. */
+    vorgang: uuid().notNull(),
+    benutzerId: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    /** Der Kontakt, der bleibt. */
+    siegerId: text().notNull(),
+    /** Der Kontakt, von dem umgehängt wurde. */
+    verliererId: text().notNull(),
+    /** `Invoice`, `Voucher` oder `Contact`. */
+    objektArt: text().notNull(),
+    objektId: text().notNull(),
+    /** Wozu die Bezeichnung dient: im Protokoll steht die Rechnungsnummer, nicht nur eine ID. */
+    bezeichnung: text(),
+    /** `umgehaengt`, `markiert`, `geloescht`, `adresse`, `kommunikation`. */
+    schritt: text().notNull(),
+    erfolg: boolean().notNull(),
+    /** Bei Misserfolg: was sevDesk gesagt hat, unverändert. */
+    meldung: text(),
+    /** Gesetzt, wenn der Schritt zurückgenommen wurde. */
+    rueckgaengigAm: timestamp({ withTimezone: true }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('kontaktumhang_vorgang_idx').on(t.vorgang),
+    index('kontaktumhang_verlierer_idx').on(t.verliererId),
+  ],
 )
 
 /**
@@ -604,7 +818,13 @@ export const stellungnahme = pgTable(
     erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
     versendetAm: timestamp({ withTimezone: true }),
   },
-  (t) => [index('stellungnahme_fall_idx').on(t.fallId)],
+  (t) => [
+    index('stellungnahme_fall_idx').on(t.fallId),
+    // Standardsortierung und häufigste Sortierwahl der Schreibenliste
+    // (siehe `ladeStellungnahmen` in `abfragen.ts`) — derselbe Grund wie
+    // bei `fall_abgerufen_idx`.
+    index('stellungnahme_erstellt_idx').on(t.erstelltAm),
+  ],
 )
 
 /** Eine Kürzungsposition aus dem Prüfbericht. */
@@ -791,3 +1011,4 @@ export type WbwLauf = typeof wbwLauf.$inferSelect
 export type Gemeldetes = typeof meldung.$inferSelect
 export type Ereignis = typeof ereignis.$inferSelect
 export type BenutzerRecht = typeof benutzerRecht.$inferSelect
+export type FotoTeilZeile = typeof fotoTeil.$inferSelect

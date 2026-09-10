@@ -1,7 +1,8 @@
 import 'server-only'
-import { and, desc, eq, gte, ilike, lte, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/db'
 import { fall } from '@/db/schema'
+import type { Sortierstand } from '@/app/teile/sortierung'
 
 /**
  * Lesende Abfragen auf die abgelegten Fälle.
@@ -118,9 +119,88 @@ function bedingungen(filter: Fallfilter = {}): SQL[] {
   return alle
 }
 
+/**
+ * Wonach sich die Fallliste sortieren lässt.
+ *
+ * Nur `aktenzeichen` und `abgerufenAm` sind eigene Spalten; der Rest steht
+ * im JSON-Feld `daten` (siehe die Begründung an `Fallfilter` oben) und wird
+ * über den JSON-Pfad sortiert — bei „einige tausend Fälle" ohne eigenen
+ * Index tragbar, siehe `fallSortierAusdruck`.
+ */
+export type FallSortierfeld =
+  | 'abgerufenAm'
+  | 'aktenzeichen'
+  | 'anspruchsteller'
+  | 'marke'
+  | 'modell'
+  | 'gutachtentyp'
+  | 'versicherung'
+  | 'zustand'
+
+export const FALL_SORTIERFELDER: { wert: FallSortierfeld; text: string }[] = [
+  { wert: 'abgerufenAm', text: 'Datum' },
+  { wert: 'aktenzeichen', text: 'Aktenzeichen' },
+  { wert: 'anspruchsteller', text: 'Anspruchsteller' },
+  { wert: 'marke', text: 'Marke' },
+  { wert: 'modell', text: 'Modell' },
+  { wert: 'gutachtentyp', text: 'Gutachtentyp' },
+  { wert: 'versicherung', text: 'Versicherung' },
+  { wert: 'zustand', text: 'Zustand' },
+]
+
+/**
+ * Der SQL-Ausdruck je Sortierfeld.
+ *
+ * `anspruchsteller` und `versicherung` sind in der Anzeige zusammengesetzte
+ * Namen (siehe `beteiligter()` in `felder.ts`); hier steht ein Näherungswert
+ * aus denselben JSON-Pfaden — `anspruchsteller` teilt sich den Ausdruck
+ * bewusst mit der Suche in `bedingungen()`, damit beide dasselbe meinen.
+ */
+function fallSortierAusdruck(feld: FallSortierfeld): SQL {
+  switch (feld) {
+    case 'aktenzeichen':
+      return sql`${fall.aktenzeichen}`
+    case 'anspruchsteller':
+      return sql`concat_ws(' ',
+        ${fall.daten}->'claimant'->>'organization_name',
+        ${fall.daten}->'claimant'->>'first_name',
+        ${fall.daten}->'claimant'->>'last_name'
+      )`
+    case 'marke':
+      return sql`${fall.daten}->'car'->>'make'`
+    case 'modell':
+      return sql`${fall.daten}->'car'->>'model'`
+    case 'gutachtentyp':
+      return sql`${fall.daten}->>'type'`
+    case 'versicherung':
+      return sql`coalesce(
+        nullif(${fall.daten}->'insurance'->>'organization_name', ''),
+        nullif(trim(concat_ws(' ',
+          ${fall.daten}->'insurance'->>'first_name',
+          ${fall.daten}->'insurance'->>'last_name'
+        )), '')
+      )`
+    case 'zustand':
+      return sql`${fall.daten}->>'state'`
+    default:
+      return sql`${fall.abgerufenAm}`
+  }
+}
+
 /** Die zuletzt abgerufenen Fälle, eingeschränkt durch den Filter. */
-export function ladeFaelle(filter?: Fallfilter, hoechstens = 100) {
+export function ladeFaelle(
+  filter?: Fallfilter,
+  sortierung?: Sortierstand<FallSortierfeld>,
+  hoechstens = 100,
+  versatz = 0,
+) {
   const wo = bedingungen(filter)
+  const ordnung = sortierung
+    ? sortierung.richtung === 'absteigend'
+      ? desc(fallSortierAusdruck(sortierung.feld))
+      : asc(fallSortierAusdruck(sortierung.feld))
+    : desc(fall.abgerufenAm)
+
   return db
     .select({
       id: fall.id,
@@ -131,8 +211,9 @@ export function ladeFaelle(filter?: Fallfilter, hoechstens = 100) {
     })
     .from(fall)
     .where(wo.length > 0 ? and(...wo) : undefined)
-    .orderBy(desc(fall.abgerufenAm))
+    .orderBy(ordnung)
     .limit(hoechstens)
+    .offset(versatz)
 }
 
 /**
