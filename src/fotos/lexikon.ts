@@ -92,3 +92,18 @@ export function zusammensetzen(
   const klauseln = treffer.map((t) => klausel(teile, t)).filter((k): k is string => k !== null)
   return klauseln.length > 0 ? klauseln.join(', ') : null
 }
+
+/**
+ * Fügt einen Treffer der aktiven Liste hinzu, oder entfernt ihn wieder,
+ * falls exakt derselbe (teil, seite, begriff) schon aktiv ist — das
+ * Toggle-Verhalten der Chips im Klickmenü des Prüfmodus (`foto-assistent.
+ * tsx`). Anders als beim KI-Vorschlag gibt es hier keine Ein-Treffer-Grenze:
+ * ein Mensch klickt nur an, was er wirklich sieht.
+ */
+export function toggleTreffer(aktiv: readonly Rohtreffer[], neu: Rohtreffer): Rohtreffer[] {
+  const index = aktiv.findIndex(
+    (r) => r.teil === neu.teil && r.seite === neu.seite && r.begriff === neu.begriff,
+  )
+  if (index === -1) return [...aktiv, neu]
+  return aktiv.filter((_, i) => i !== index)
+}

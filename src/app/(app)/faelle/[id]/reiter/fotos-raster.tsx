@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from 'react'
 import type { Foto } from '@/fotos/ansicht'
 import { beschrifteFoto } from '@/fotos/aktionen'
 import type { Fotoanalyse } from '@/fotos/vorschlag'
+import type { FotoTeil } from '@/fotos/lexikon'
 import { Fotoassistent } from './foto-assistent'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis, fehler as alsFehler } from '@/melden/typen'
@@ -46,12 +47,14 @@ export function Fotoraster({
   fotos,
   schreibenErlaubt,
   analyse,
+  teile,
   kiEingerichtet,
 }: {
   fallId: string
   fotos: Foto[]
   schreibenErlaubt: boolean
   analyse: Fotoanalyse | null
+  teile: FotoTeil[]
   kiEingerichtet: boolean
 }) {
   const [filter, setzeFilter] = useState<Filter>('alle')
@@ -84,6 +87,7 @@ export function Fotoraster({
         fallId={fallId}
         fotos={fotos}
         analyse={analyse}
+        teile={teile}
         schreibenErlaubt={schreibenErlaubt}
         kiEingerichtet={kiEingerichtet}
       />

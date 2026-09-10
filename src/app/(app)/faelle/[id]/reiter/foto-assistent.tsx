@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Foto } from '@/fotos/ansicht'
 import type { Fotoanalyse, Fotovorschlag } from '@/fotos/vorschlag'
 import { PFLICHT, kategoriename, luecken, type Kategorie } from '@/fotos/kategorien'
+import { toggleTreffer, zusammensetzen, type FotoTeil, type Rohtreffer, type Seite } from '@/fotos/lexikon'
 import {
   frageAnalyseStandAb,
   setzeAnalyseZurueck,
@@ -43,12 +44,14 @@ export function Fotoassistent({
   fallId,
   fotos,
   analyse,
+  teile,
   schreibenErlaubt,
   kiEingerichtet,
 }: {
   fallId: string
   fotos: Foto[]
   analyse: Fotoanalyse | null
+  teile: FotoTeil[]
   schreibenErlaubt: boolean
   kiEingerichtet: boolean
 }) {
@@ -234,6 +237,7 @@ export function Fotoassistent({
         <Pruefmodus
           fallId={fallId}
           fotos={fotos}
+          teile={teile}
           vorschlaege={pruefung}
           erledigt={erledigt}
           schreibenErlaubt={schreibenErlaubt}
@@ -273,6 +277,7 @@ function Pflichtsatz({ fehlend }: { fehlend: Kategorie[] }) {
 function Pruefmodus({
   fallId,
   fotos,
+  teile,
   vorschlaege,
   erledigt,
   schreibenErlaubt,
@@ -281,6 +286,7 @@ function Pruefmodus({
 }: {
   fallId: string
   fotos: Foto[]
+  teile: FotoTeil[]
   vorschlaege: Fotovorschlag[]
   erledigt: Erledigt
   schreibenErlaubt: boolean
@@ -350,6 +356,7 @@ function Pruefmodus({
           key={vorschlag.fotoId}
           fallId={fallId}
           vorschlag={vorschlag}
+          teile={teile}
           stand={erledigt[vorschlag.fotoId]}
           schreibenErlaubt={schreibenErlaubt}
           fertig={(wie) => {
@@ -372,21 +379,42 @@ const HAEKCHEN: { schluessel: keyof Fotovorschlag['verwendung']; name: string }[
 function Vorschlagsformular({
   fallId,
   vorschlag,
+  teile,
   stand,
   schreibenErlaubt,
   fertig,
 }: {
   fallId: string
   vorschlag: Fotovorschlag
+  teile: FotoTeil[]
   stand: 'uebernommen' | 'verworfen' | undefined
   schreibenErlaubt: boolean
   fertig: (wie: 'uebernommen' | 'verworfen') => void
 }) {
   const [beschreibung, setzeBeschreibung] = useState(vorschlag.beschreibung)
   const [verwendung, setzeVerwendung] = useState(vorschlag.verwendung)
+  // Bewusst leer und nicht aus `vorschlag.beschreibung` rückwärts geparst:
+  // ein Vorschlag speichert nur den fertigen Satz, keine Struktur. Das
+  // Klickmenü ist ein rein additives Schnellwerkzeug, kein Abbild dessen,
+  // was die KI schon gewählt hat.
+  const [aktiv, setzeAktiv] = useState<Rohtreffer[]>([])
   const [laeuft, starte] = useTransition()
   const { melde } = useMelder()
   const feld = useRef<HTMLInputElement>(null)
+
+  // Solange mindestens ein Chip aktiv ist, gewinnt die Chip-Komposition —
+  // direkt im selben Zug wie die Chip-Änderung, nicht über einen Effekt:
+  // hier ist immer schon bekannt, was sich geändert hat, ein Effekt würde
+  // nur einen zweiten, unnötigen Renderdurchlauf einschieben. Werden alle
+  // Chips wieder entfernt, bleibt das Feld unangetastet — kein
+  // überraschendes Leeren dessen, was der Sachverständige zuletzt selbst
+  // hineingeschrieben hat.
+  function aendereAktiv(naechste: Rohtreffer[]) {
+    setzeAktiv(naechste)
+    if (naechste.length === 0) return
+    const komponiert = zusammensetzen(teile, naechste)
+    if (komponiert) setzeBeschreibung(komponiert)
+  }
 
   function uebernimm() {
     starte(async () => {
@@ -438,6 +466,10 @@ function Vorschlagsformular({
         />
       </div>
 
+      {vorschlag.kategorie === 'schaden' && teile.length > 0 ? (
+        <Klickmenue teile={teile} aktiv={aktiv} setzeAktiv={aendereAktiv} />
+      ) : null}
+
       <div className="foto-haekchen">
         {HAEKCHEN.map((h) => (
           <label key={h.schluessel}>
@@ -476,6 +508,112 @@ function Vorschlagsformular({
           Zum Übernehmen muss <code>AUTOIXPERT_SCHREIBEN=erlaubt</code> gesetzt und das Recht
           „Nach autoiXpert zurückschreiben“ vergeben sein.
         </p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Schnellauswahl für ein Schadendetail-Foto: Teil, Seite, Schadensart per
+ * Klick statt Tippen — dieselbe Bindung wie beim KI-Vorschlag
+ * (`zusammensetzen` in `lexikon.ts`), nur von Hand statt vom Modell
+ * geraten. Mehrere Kombinationen sind erlaubt: ein Mensch klickt nur an,
+ * was er wirklich sieht, die Ein-Treffer-Grenze der KI gilt hier nicht.
+ *
+ * Sequentiell: erst ein Teil wählen, dann erscheinen nur dessen gültige
+ * Seiten (ganz ausgeblendet, wenn das Teil keine hat) und Schadensarten —
+ * eine ungültige Kombination ist so gar nicht erst anklickbar.
+ */
+function Klickmenue({
+  teile,
+  aktiv,
+  setzeAktiv,
+}: {
+  teile: FotoTeil[]
+  aktiv: Rohtreffer[]
+  setzeAktiv: (naechste: Rohtreffer[]) => void
+}) {
+  const [teil, setzeTeil] = useState<FotoTeil | null>(null)
+  const [seite, setzeSeite] = useState<Seite | null>(null)
+
+  function schliesseAb(begriff: string) {
+    if (!teil) return
+    const treffer: Rohtreffer = {
+      teil: teil.name,
+      seite: teil.seiten.length > 0 ? seite : null,
+      begriff,
+    }
+    setzeAktiv(toggleTreffer(aktiv, treffer))
+    setzeTeil(null)
+    setzeSeite(null)
+  }
+
+  return (
+    <div className="klickmenue">
+      <div className="klickmenue-reihe" role="group" aria-label="Teil wählen">
+        {teile.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`label-chip ${teil?.id === t.id ? 'aktiv' : ''}`}
+            aria-pressed={teil?.id === t.id}
+            onClick={() => {
+              setzeTeil(t)
+              setzeSeite(null)
+            }}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+
+      {teil && teil.seiten.length > 0 ? (
+        <div className="klickmenue-reihe" role="group" aria-label="Seite wählen">
+          {teil.seiten.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`label-chip ${seite === s ? 'aktiv' : ''}`}
+              aria-pressed={seite === s}
+              onClick={() => setzeSeite(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {teil && (teil.seiten.length === 0 || seite) ? (
+        <div className="klickmenue-reihe" role="group" aria-label="Schadensart wählen">
+          {teil.beschaedigungsarten.map((b) => (
+            <button
+              key={b.begriff}
+              type="button"
+              className="label-chip"
+              title={b.hinweis}
+              onClick={() => schliesseAb(b.begriff)}
+            >
+              {b.begriff}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {aktiv.length > 0 ? (
+        <div className="klickmenue-reihe klickmenue-aktiv" role="group" aria-label="Ausgewählte Kombinationen">
+          {aktiv.map((r) => (
+            <button
+              key={`${r.teil}-${r.seite}-${r.begriff}`}
+              type="button"
+              className="label-chip aktiv"
+              title="Klicken zum Entfernen"
+              onClick={() => setzeAktiv(toggleTreffer(aktiv, r))}
+            >
+              {r.teil}
+              {r.seite ? ` ${r.seite}` : ''} {r.begriff} ✕
+            </button>
+          ))}
+        </div>
       ) : null}
     </div>
   )
