@@ -15,6 +15,7 @@
  *   Rumpf = das Actor-Input-Objekt, Antwort = das Dataset als JSON-Array.
  */
 const { holeJson, zahl, ez, ausstattung, leeresFahrzeug, fehlendeZugangsdaten } = require("./gemeinsam.js");
+const { mappeMitKarte } = require("./feldkarte.js");
 
 const BASIS = "https://api.apify.com/v2";
 
@@ -37,11 +38,23 @@ function token() {
 
 /**
  * Rohdatensatz eines Apify-Actors -> kanonisches Fahrzeug.
- * Die Kandidatenlisten decken die Formate der drei bisher genutzten Actors ab;
- * normalize.js versteht daneben weiterhin die Apify-Rohformate direkt.
+ *
+ * Zuerst die Feldkarte des Actors (feldkarte.js): sie weiss, wie die Felder
+ * bei diesem Actor wirklich heissen, und meldet ein fehlendes Pflichtfeld,
+ * statt es still auf `null` zu lassen.
+ *
+ * Für einen Actor ohne Karte bleibt die alte Kandidatenliste stehen. Sie
+ * trifft schlechter, aber sie trifft irgendetwas — und ein neu eingetragener
+ * Actor soll Treffer liefern und nicht null, bis jemand die Karte ergänzt.
+ * Dass er ohne Karte läuft, steht in den Warnungen.
  */
 function mappe(raw, quelle, warnungen) {
   if (!raw || typeof raw !== "object") return null;
+  const nachKarte = mappeMitKarte(raw, quelle, warnungen);
+  if (nachKarte) return nachKarte;
+  if (Array.isArray(warnungen) && !warnungen.some((w) => String(w).includes("ohne Feldkarte"))) {
+    warnungen.push(`${quelle}: ohne Feldkarte abgebildet — Felder werden geraten (feldkarte.js ergänzen)`);
+  }
   const g = (...pfade) => {
     for (const p of pfade) {
       const v = p.split(".").reduce((o, k) => (o == null ? undefined : o[k]), raw);

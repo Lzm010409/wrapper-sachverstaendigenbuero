@@ -360,22 +360,62 @@ gemessen dasselbe und wird nicht gebraucht. Dass ein Tippfehler dort **still**
 nicht filtert, bleibt wahr — dagegen steht die Selbstprüfung, nicht der
 zweite Weg.
 
-### 2. Feldkarte je Actor
+### 2. Feldkarte je Actor — umgesetzt
 
-Statt der heutigen generischen `mappe()` mit Kandidatenlisten eine
-deklarative Karte je Actor. Die drei liefern verschiedene Namen, und Raten ist
-das, was brüchig wird:
+`wbw-plugin/adapters/feldkarte.js`, geprüft an 75 echten Datensätzen in
+`tests/fixtures/apify/`. Was die Karte an Ausbeute geändert hat:
 
-| Ziel | AutoScout24 | mobile.de | Kleinanzeigen |
+| Feld | AutoScout24 (20) | mobile.de (20) | Kleinanzeigen (35) |
 | --- | --- | --- | --- |
-| `url` | `url` | `canonicalUrl` | `url` |
-| `leistungKw` | `powerKw` | `powerKw` | `powerKw / 1,35962` |
-| `bauart` | `bodyType` | `bodyType` | `attributes.Fahrzeugtyp` |
-| `verkaeuferart` | `sellerType` | `sellerType` | `seller.type` |
-| `unfall` | `hadAccident` | — (gefiltert) | `vehicleCondition` |
-| `ausstattung` | `equipment` | `features` | `attributes` |
-| `lat`/`lon` | `latitude`/`longitude` | `sellerLatitude`/`sellerLongitude` | `latitude`/`longitude` |
-| `plz` | `zip` | — (nur `location`) | `zipCode` |
+| `fahrzeugtyp` | 20 | 20 | **0 → 34** |
+| `ausstattung` | 20 | 20 | **0 → 35** |
+| `tueren` | 20 | 20 | **0 → 35** |
+| `ort` | 20 | **0 → 20** | **0 → 35** |
+| `lat` / `lon` | 20 | **0 → 20** | 35 |
+| `variante` | **Bauform → Linie** | 20 | — |
+| `leistungKw` | 20 | 20 | 35, **jetzt in kW** |
+
+Die übrigen Felder — `url`, `preis`, `kilometerstand`, `erstzulassung`,
+`getriebe`, `kraftstoff`, `bilder`, `beschreibung` — trafen schon vorher.
+
+**Warum es überhaupt danebenging.** Die alte `mappe()` riet über
+Kandidatenlisten: `g("bodyType", "vehicleType", "Fahrzeugtyp")`. Kleinanzeigen
+legt die Bauart unter `attributes.Fahrzeugtyp` ab, und `g` sah nur die oberste
+Ebene. Eine Liste, die danebengreift, meldet nichts — sie liefert `null`, und
+`null` sieht aus wie „das Portal weiss es nicht". So kam der Golf in den
+Sharan-Korb.
+
+**Drei Feldnamen, die lügen:**
+
+| Feld | heisst | ist |
+| --- | --- | --- |
+| Kleinanzeigen `powerKw` | Kilowatt | **PS** — 170 neben `Leistung: "170 PS"` |
+| AutoScout24 `variant` | Variante | **Bauform** — „Crew Van", „Cargo Van" |
+| mobile.de `location` | Ort | Ortsname, **keine PLZ** — dafür `sellerLatitude` |
+
+Bei `variant` hat mich die Messung korrigiert: `detectLinie` erkennt daraus
+**0 von 20** Ausstattungslinien, aus `modelVersion` dagegen **9** (Highline,
+Comfortline, Trendline). Die alte Liste fragte `variant` zuerst und schrieb
+damit bei der Hälfte der Inserate eine Bauform in das Feld, aus dem der
+Linienfilter liest.
+
+**Die Selbstprüfung ist eingebaut.** `PFLICHTFELDER` nennt fünf Felder — Adresse,
+Preis, Laufleistung, Erstzulassung, Bauart. Fehlt eines, steht es mit
+Inseratkennung in den Warnungen des Beschaffungsprotokolls, statt still `null`
+zu sein. Ein Actor ohne Karte wird weiter über die alte Liste abgebildet
+(Treffer gehen nie verloren) — dass er ohne Karte läuft, steht ebenfalls dort.
+
+**Der Vertrag hält.** Ein Test vergleicht die Feldnamen jedes abgebildeten
+Fahrzeugs mit `leeresFahrzeug()`; ein zweiter prüft, dass keine Karte ein Feld
+beschreibt, das der Vertrag nicht kennt. Beim Schreiben hiess ein Feld erst
+`bauart` statt `fahrzeugtyp` — der Vertrag wäre still um ein Feld gewachsen
+und um eines ärmer geworden. Genau der Weg, auf dem der Golf kam.
+
+**Was nicht in der Karte steht.** `unfall` und `verkaeuferart` stehen in
+keinem Vertragsfeld, und im ganzen Plugin liest sie niemand. Sie jetzt
+mitzuschleppen hiesse, Werte zu tragen, die nirgends ankommen. Der
+Unfallstatus wird bei mobile.de ohnehin am Portal gefiltert
+(`damageStatus: EXCLUDE`).
 
 ### 3. Ausstattung: Übersetzungstabelle
 
@@ -436,7 +476,7 @@ Oberfläche.
 | 1b | Probelauf 3: Kleinanzeigen-Schlüssel, EZ, `startUrls`, Bauart | ✅ abgeschlossen, 0,060 $ |
 | 1c | Probelauf 4: sieht Kleinanzeigen mehr als den heutigen Tag? | ✅ ja, 0,068 $ — es war `sortBy` |
 | 1d | Probelauf 5: enge Filter plus grosse Tiefe — trägt der Korb? | ✅ ja, 0,035 $ — 17 und 18 im Korb |
-| 2 | Feldkarte + `mappe()` gegen die echten Datensätze | Vertrag hält, Tests grün |
+| 2 | Feldkarte + `mappe()` gegen die echten Datensätze | ✅ 30 Tests, Vertrag hält |
 | 3 | Filter je Portal setzen, Gesuche nachfiltern, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | Sharan-Regressionsfall |
 | 5 | Umhängen auf L0, Gesamtdeckel, Rückfall-Hinweis | ein echter Lauf im Cockpit |
