@@ -10,7 +10,7 @@
 const fs = require("fs");
 const { geoFilter } = require("./geo-filter.js");
 const { dedupeFahrzeuge } = require("./dedup-fahrzeuge.js");
-const { bewerteKorb, detectLinie, detectKarosserie, detectGetriebe } = require("./ausstattung-matcher.js");
+const { bewerteKorb, detectLinie, detectKarosserie, sindVerwandt, detectGetriebe } = require("./ausstattung-matcher.js");
 const { wbwVorschlag } = require("./wbw-vorschlag.js");
 const { ezToYear } = require("./normalize.js");
 
@@ -69,6 +69,9 @@ function runPipeline(cfg) {
   const {
     subject = {}, plz, zentrum,
     radiusKm = 200, kmToleranz = 25000, ezToleranzJahre = 1, leistungToleranzKw = 10,
+    // Unter dieser Zahl traegt kein Median. Der Bauartfilter gibt dann nach,
+    // statt einen sauberen, aber nichtssagenden Korb zu hinterlassen.
+    mindestKorb = 4,
     fahrzeuge = [], wbwOpts = {},
   } = cfg;
 
@@ -123,11 +126,28 @@ function runPipeline(cfg) {
     }
   }
 
-  // Karosserie/Bauart: nur Fahrzeuge der Subjekt-Bauart. Ist sie beim Subjekt nicht
-  // angegeben (z. B. "T-Roc Style" sagt nicht "SUV"), wird die häufigste Bauart im
-  // bereits linien-gefilterten Korb als Referenz genommen und Abweichler (z. B. ein
-  // Cabrio bei lauter SUV) ausgeschlossen. Unbekannte Bauart wird nicht verworfen.
-  const karoInfo = { subjekt: null, referenz: null, abgeleitet: false, gefiltert: false, fallback: false, ausgeschlossen: [] };
+  /*
+    Karosserie/Bauart — weich in drei Stufen.
+
+    Gefiltert wird auf die Bauart des Subjekts; fehlt sie, gilt die haeufigste
+    Bauart im bereits linien-gefilterten Korb als Referenz.
+
+    Drei Dinge halten den Filter davon ab, echte Vergleichsfahrzeuge zu
+    verwerfen — jedes davon gemessen am 10.09.2026:
+
+      1. **Unbekannt bleibt drin.** "Other", "OTHER", "Andere Fahrzeugtypen":
+         drei Portale, drei Sammeltoepfe. Im Berlingo-Korb aus 18 Fahrzeugen
+         trugen drei davon "Andere Fahrzeugtypen" und eines gar nichts.
+      2. **Verwandte bleiben drin.** AutoScout24 fuehrte denselben Sharan mal
+         als "Van", mal als "Station Wagon"; Kleinanzeigen einen Berlingo als
+         "Kombi". Van und Kombi schliessen einander deshalb nicht aus.
+      3. **Unter der Untergrenze gibt er auf.** Bleiben weniger als
+         `mindestKorb` Fahrzeuge uebrig, wird die Bauart fallengelassen und
+         das steht im Ergebnis. Ein weiter Korb ist besser als ein sauberer,
+         der nichts aussagt — dieselbe Regel wie beim Linienfilter.
+  */
+  const karoInfo = { subjekt: null, referenz: null, abgeleitet: false, gefiltert: false,
+    fallback: false, aufgegeben: false, grund: null, ausgeschlossen: [] };
   {
     const subjKaro = cfg.karosserie
       ?? detectKarosserie([subject.marke, subject.modell, subject.variante].filter(Boolean).join(" "));
@@ -144,16 +164,22 @@ function runPipeline(cfg) {
     karoInfo.subjekt = subjKaro;
     karoInfo.referenz = referenz;
     if (referenz) {
-      const matching = mitKaro.filter((x) => x.k === referenz || x.k == null).map((x) => x.f);
-      const raus = mitKaro.filter((x) => x.k != null && x.k !== referenz);
-      if (matching.length > 0 && raus.length > 0) {
+      const matching = mitKaro.filter((x) => x.k == null || sindVerwandt(x.k, referenz)).map((x) => x.f);
+      const raus = mitKaro.filter((x) => x.k != null && !sindVerwandt(x.k, referenz));
+      if (matching.length === 0) {
+        karoInfo.fallback = true;
+      } else if (raus.length === 0) {
+        // Nichts zu filtern - alle Fahrzeuge passen ohnehin.
+      } else if (matching.length < mindestKorb) {
+        karoInfo.aufgegeben = true;
+        karoInfo.grund = `Bauartfilter fallengelassen: er liesse ${matching.length} `
+          + `Fahrzeug(e) uebrig, unter der Untergrenze von ${mindestKorb}.`;
+      } else {
         korbInput = matching;
         karoInfo.gefiltert = true;
         karoInfo.ausgeschlossen = raus.map((x) => ({
           id: x.f.id, source: x.f.source, model: x.f.model, karosserie: x.k,
         }));
-      } else if (matching.length === 0) {
-        karoInfo.fallback = true;
       }
     }
   }

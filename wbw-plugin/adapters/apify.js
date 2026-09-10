@@ -15,6 +15,8 @@
  *   Rumpf = das Actor-Input-Objekt, Antwort = das Dataset als JSON-Array.
  */
 const { holeJson, zahl, ez, ausstattung, leeresFahrzeug, fehlendeZugangsdaten } = require("./gemeinsam.js");
+const { mappeMitKarte } = require("./feldkarte.js");
+const { reserviere, erstatte, schaetzeKosten } = require("../budget.js");
 
 const BASIS = "https://api.apify.com/v2";
 
@@ -37,11 +39,23 @@ function token() {
 
 /**
  * Rohdatensatz eines Apify-Actors -> kanonisches Fahrzeug.
- * Die Kandidatenlisten decken die Formate der drei bisher genutzten Actors ab;
- * normalize.js versteht daneben weiterhin die Apify-Rohformate direkt.
+ *
+ * Zuerst die Feldkarte des Actors (feldkarte.js): sie weiss, wie die Felder
+ * bei diesem Actor wirklich heissen, und meldet ein fehlendes Pflichtfeld,
+ * statt es still auf `null` zu lassen.
+ *
+ * Für einen Actor ohne Karte bleibt die alte Kandidatenliste stehen. Sie
+ * trifft schlechter, aber sie trifft irgendetwas — und ein neu eingetragener
+ * Actor soll Treffer liefern und nicht null, bis jemand die Karte ergänzt.
+ * Dass er ohne Karte läuft, steht in den Warnungen.
  */
 function mappe(raw, quelle, warnungen) {
   if (!raw || typeof raw !== "object") return null;
+  const nachKarte = mappeMitKarte(raw, quelle, warnungen);
+  if (nachKarte) return nachKarte;
+  if (Array.isArray(warnungen) && !warnungen.some((w) => String(w).includes("ohne Feldkarte"))) {
+    warnungen.push(`${quelle}: ohne Feldkarte abgebildet — Felder werden geraten (feldkarte.js ergänzen)`);
+  }
   const g = (...pfade) => {
     for (const p of pfade) {
       const v = p.split(".").reduce((o, k) => (o == null ? undefined : o[k]), raw);
@@ -78,6 +92,24 @@ function mappe(raw, quelle, warnungen) {
   return f;
 }
 
+/**
+ * Wirft Gesuche weg — nicht am Portal, sondern hier.
+ *
+ * Der Eingabeschalter `adType: "angebote"` wirkt bei Kleinanzeigen
+ * nachweislich nicht: in allen vier gemessenen Formen kamen Gesuche durch,
+ * auch über eine Portaladresse mit `anzeige:angebote` (1 von 19, 2 von 50,
+ * 1 von 14, 1 von 19 Treffern). Ein Gesuch trägt den Wunschpreis eines
+ * Käufers — im Probelauf stand ein „Gesucht: SHARAN 7-Sitzer 2.0TDI" mit
+ * 11.000 € bei 20.000 km zwischen den Angeboten. Ungefiltert wäre er als
+ * Vergleichsfahrzeug in den Median gegangen.
+ *
+ * Geprüft wird nur, was eine Angabe trägt. AutoScout24 und mobile.de führen
+ * kein `adType`; für sie ist das hier ein Durchreicher.
+ */
+function nurAngebote(roh) {
+  return (roh || []).filter((x) => x == null || x.adType == null || x.adType === "OFFERED");
+}
+
 /** Führt den Actor synchron aus und liefert die Dataset-Items. */
 async function holen(eingaben, opts = {}) {
   pruefeFreigabe();
@@ -87,9 +119,32 @@ async function holen(eingaben, opts = {}) {
   const input = inputKey ? eingaben[inputKey] : eingaben;
   if (!input) throw new Error(`L3 Apify: Eingabeblock "${inputKey}" fehlt in search-inputs.json`);
 
+  /*
+    Zwei Deckel, und beide werden gebraucht.
+
+    `maxTotalChargeUsd` gilt bei Apify **je Aufruf** — bei drei Portalen in bis
+    zu drei Zyklen sind das neun Aufrufe. Der alte Wert 0,50 $ je Aufruf ergab
+    also bis zu 4,50 $, ohne dass irgendwo eine Grenze gerissen wäre.
+
+    Das Hauptbuch in `budget.js` deckelt den ganzen Lauf. Reserviert wird
+    pessimistisch: der volle Betrag vor dem Aufruf, der ungenutzte Teil danach
+    zurück. Fehlt das Hauptbuch, bleibt es beim Deckel je Aufruf — dann
+    verhält sich alles wie bisher.
+  */
+  const wunsch = opts.maxTotalChargeUsd ?? 0.5;
+  const deckel = reserviere(opts.budgetDatei, wunsch, `${opts.quelle || actor}`);
+  if (opts.budgetDatei && deckel <= 0) {
+    const e = new Error(
+      `L3 Apify: Der Gesamtdeckel des Laufs ist erschöpft (${opts.budgetDatei}). ` +
+      "Kein weiterer kostenpflichtiger Aufruf."
+    );
+    e.code = "BUDGET_ERSCHOEPFT";
+    throw e;
+  }
+
   const url = `${BASIS}/acts/${encodeURIComponent(actor.replace("/", "~"))}/run-sync-get-dataset-items`
     + `?token=${encodeURIComponent(token())}`
-    + `&maxTotalChargeUsd=${encodeURIComponent(String(opts.maxTotalChargeUsd ?? 0.5))}`;
+    + `&maxTotalChargeUsd=${encodeURIComponent(String(deckel))}`;
   const t0 = Date.now();
   const r = await holeJson(url, {
     method: "POST",
@@ -97,19 +152,33 @@ async function holen(eingaben, opts = {}) {
     body: JSON.stringify(input),
     timeoutMs: opts.timeoutMs ?? 600000,
   });
-  if (r.status < 200 || r.status >= 300) throw new Error(`L3 Apify: HTTP ${r.status} für Actor ${actor}`);
+  if (r.status < 200 || r.status >= 300) {
+    // Auch ein gescheiterter Aufruf kann den Grundpreis gekostet haben —
+    // erstattet wird deshalb nur, was darüber hinaus reserviert war.
+    erstatte(opts.budgetDatei, Math.max(0, deckel - schaetzeKosten(0, opts)), `${opts.quelle || actor} (HTTP ${r.status})`);
+    throw new Error(`L3 Apify: HTTP ${r.status} für Actor ${actor}`);
+  }
   const roh = Array.isArray(r.daten) ? r.daten : [];
+  const geschaetzt = schaetzeKosten(roh.length, opts);
+  erstatte(opts.budgetDatei, Math.max(0, deckel - geschaetzt), `${opts.quelle || actor}`);
   const warnungen = [];
-  const items = roh.map((x) => mappe(x, opts.quelle || "apify", warnungen)).filter(Boolean);
+  const quelle = opts.quelle || "apify";
+
+  const angebote = nurAngebote(roh);
+  const gesuche = roh.length - angebote.length;
+  if (gesuche > 0) warnungen.push(`${quelle}: ${gesuche} Gesuch(e) verworfen (adType != OFFERED)`);
+
+  const items = angebote.map((x) => mappe(x, quelle, warnungen)).filter(Boolean);
   return {
     items,
     protokoll: {
       abrufe: [{ url: `${BASIS}/acts/${actor}/run-sync-get-dataset-items`, status: r.status, ms: Date.now() - t0, zeitpunkt: new Date().toISOString() }],
-      actor, maxTotalChargeUsd: opts.maxTotalChargeUsd ?? 0.5, rohTreffer: roh.length, warnungen,
+      actor, maxTotalChargeUsd: deckel, geschaetzteKostenUsd: geschaetzt,
+      rohTreffer: roh.length, gesuche, warnungen,
       kostenpflichtig: true,
     },
     roh,
   };
 }
 
-module.exports = { holen, mappe, pruefeFreigabe, BASIS };
+module.exports = { holen, mappe, nurAngebote, pruefeFreigabe, BASIS };

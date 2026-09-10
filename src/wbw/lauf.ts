@@ -126,6 +126,14 @@ export interface WbwErgebnis {
   ergebnis: unknown
   /** Was der Markenfilter je Portal entfernt hat. */
   markenfremd: { portal: Portal; anzahl: number; erkannt: (string | null)[] }[]
+  /**
+   * Portale, die über eine andere als die erste Stufe beschafft wurden.
+   *
+   * Steht hier etwas, gehört es in die Benachrichtigung: der Korb kann
+   * anders zustande gekommen sein als geplant. Ein stiller Rückfall ist
+   * derselbe Fehler wie die stille PDF-Stufe.
+   */
+  rueckfaelle: Rueckfall[]
   protokoll: Schritt[]
   /** Was jeder gelaufene Zyklus ergeben hat. */
   zyklen: Zyklusbericht[]
@@ -307,6 +315,35 @@ export function setzeModelle(
 }
 
 /** Was ein Zyklus je Portal ergeben hat — Grundlage der Zyklus-Reports. */
+/**
+ * Ein Portal, das über eine andere als die erste Stufe beschafft wurde.
+ *
+ * Apify steht bewusst vorn: nur dafür ist gemessen, dass Umkreis,
+ * Laufleistung und Baujahr am Portal wirken. Trägt stattdessen eine der
+ * kostenlosen Stufen, ist der Korb anders zustande gekommen als geplant —
+ * und das muss der Sachverständige sehen, bevor er das Gutachten
+ * unterschreibt. Ein stiller Rückfall ist derselbe Fehler wie die stille
+ * PDF-Stufe: es sieht aus, als sei alles wie immer gelaufen.
+ */
+export interface Rueckfall {
+  portal: Portal
+  zyklus: string
+  /** Die Stufe, die getragen hat. */
+  stufe: string
+  /** Die Stufe, die hätte tragen sollen. */
+  stattdessen: string
+  /** Warum die erste Stufe nicht getragen hat, soweit protokolliert. */
+  grund: string | null
+  /**
+   * Ob der Rückfall eine Entscheidung war und keine Überraschung.
+   *
+   * Die kostenpflichtige Stufe ist ein bewusster Haken in der Oberfläche.
+   * Wer ihn nicht setzt, bekommt den kostenlosen Weg — das ist gewollt und
+   * keine Warnung. Ein Rückfall, weil Apify **gescheitert** ist, ist eine.
+   */
+  bewusst: boolean
+}
+
 export interface Portalbericht {
   portal: Portal
   /** Der Modellname, mit dem gesucht wurde. */
@@ -440,6 +477,87 @@ async function leseBeschaffungsprotokoll(pfad: string): Promise<unknown> {
 }
 
 /**
+ * Ob ein Portal über eine andere als die erste Stufe beschafft wurde.
+ *
+ * Die erste Stufe in `providers.json` ist Apify — nur dafür ist gemessen,
+ * dass Umkreis, Laufleistung und Baujahr am Portal wirken und ein
+ * tragfähiger Korb herauskommt. Trägt eine andere, ist der Korb anders
+ * zustande gekommen als geplant.
+ *
+ * Erkannt wird das am Protokoll selbst: `versuche[0]` ist immer die erste
+ * Stufe — auch wenn sie übersprungen wurde. Steht dort eine andere als die,
+ * die getragen hat, war es ein Rückfall. Das kommt ohne einen zweiten Blick
+ * in `providers.json` aus, und damit können die beiden nicht auseinanderlaufen.
+ */
+export function erkenneRueckfall(
+  portal: Portal,
+  zyklus: string,
+  beschaffung: unknown,
+): Rueckfall | null {
+  const p = beschaffung as
+    | { getrageneStufe?: string | null; versuche?: { stufe?: string; ergebnis?: string; grund?: string; fehler?: string }[] }
+    | null
+    | undefined
+  const getragen = p?.getrageneStufe
+  const versuche = Array.isArray(p?.versuche) ? p.versuche : []
+  // Ohne Ergebnis gibt es keinen Rückfall, sondern einen Fehlschlag — den
+  // meldet der Aufrufer bereits an anderer Stelle.
+  if (!getragen || versuche.length === 0) return null
+  const erste = versuche[0]?.stufe
+  if (!erste || erste === getragen) return null
+  const gescheitert = versuche.find((v) => v.stufe === erste)
+  const grund = gescheitert?.fehler ?? gescheitert?.grund ?? gescheitert?.ergebnis ?? null
+  return {
+    portal,
+    zyklus,
+    stufe: getragen,
+    stattdessen: erste,
+    grund,
+    // Der Kostenschutz des Plugins wirft mit code L3_GESPERRT und einer
+    // Meldung, die "WBW_ALLOW_PAID" nennt. Das ist der Haken in der
+    // Oberfläche, nicht ein Fehler.
+    bewusst: /WBW_ALLOW_PAID|kostenpflichtig und gesperrt/i.test(String(grund ?? "")),
+  }
+}
+
+/**
+ * Der Satz, der aus Rückfällen in die Benachrichtigung geht.
+ *
+ * Ohne Rückfall: `null` — dann steht in der Meldung nichts Zusätzliches.
+ * Mehrfach dasselbe Portal (mehrere Zyklen) zählt einmal; wen es interessiert,
+ * welcher Zyklus, der findet es im Protokoll.
+ */
+export function rueckfallHinweis(rueckfaelle: Rueckfall[]): {
+  text: string
+  warnung: boolean
+} | null {
+  if (!rueckfaelle || rueckfaelle.length === 0) return null
+  const jePortal = new Map<Portal, Rueckfall>()
+  for (const r of rueckfaelle) if (!jePortal.has(r.portal)) jePortal.set(r.portal, r)
+  const eintraege = [...jePortal.values()]
+  const teile = eintraege.map((r) => `${r.portal} über ${r.stufe}`)
+  const liste =
+    teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} und ${teile.at(-1)}`
+
+  // Wurde die kostenpflichtige Stufe schlicht nicht freigegeben, ist der
+  // kostenlose Weg die getroffene Entscheidung — Hinweis, keine Warnung.
+  if (eintraege.every((r) => r.bewusst)) {
+    return {
+      text:
+        `${liste} beschafft — die kostenpflichtige Stufe war für diesen Lauf ` +
+        'nicht freigegeben.',
+      warnung: false,
+    }
+  }
+  return {
+    text:
+      `Achtung: ${liste} beschafft, nicht über die vorgesehene Stufe. ` +
+      'Der Korb kann anders zustande gekommen sein als geplant.',
+    warnung: true,
+  }
+}
+
+/**
  * Vereint die Rohtreffer zweier Zyklen desselben Portals.
  *
  * **Warum das nötig ist.** Der Gesamtkorb entsteht aus `run-report.js`, und
@@ -553,6 +671,14 @@ export async function fuehreLaufAus(
   */
   const rohProPortal = new Map<Portal, Record<string, unknown>[]>()
   const protokollProPortal = new Map<Portal, unknown>()
+  /** Portale, die über eine andere als die erste Stufe beschafft wurden. */
+  const rueckfaelle: Rueckfall[] = []
+  /*
+    Das Hauptbuch für den Gesamtdeckel. Es liegt im Ordner des Vorgangs, weil
+    die Portale als eigene Kindprozesse laufen — eine Zahl im Speicher würde
+    das nicht überleben. Gleichzeitig ist es damit Teil des Belegs.
+  */
+  const budgetDatei = join(ordner, 'budget.json')
   /** Die Auswertung des zuletzt gelaufenen Zyklus — sie ist das Ergebnis. */
   let ergebnis: unknown = null
   /** Wo Bericht, Linkliste und PDF dieser Auswertung liegen. */
@@ -663,7 +789,7 @@ export async function fuehreLaufAus(
       try {
         await rufeSkript('fetch-portal.js', [portal, eingabedatei, datei], {
           cwd: ordner,
-          umgebung: eingabe.umgebung,
+          umgebung: { ...eingabe.umgebung, WBW_BUDGET_DATEI: budgetDatei },
         })
       } catch (fehler) {
         const grund = fehler instanceof Error ? fehler.message.slice(0, 300) : String(fehler)
@@ -677,6 +803,18 @@ export async function fuehreLaufAus(
       // Beschaffungsprotokoll stünde danach nicht mehr darin.
       const beschaffung = await leseBeschaffungsprotokoll(join(ordner, datei))
       if (beschaffung) protokollProPortal.set(portal, beschaffung)
+      const rueckfall = erkenneRueckfall(portal, stufe.name, beschaffung)
+      if (rueckfall) {
+        rueckfaelle.push(rueckfall)
+        halteFest({
+          name: `${schrittname}: Rückfall auf ${rueckfall.stufe}`,
+          stand: 'fehler',
+          text:
+            `Beschafft über ${rueckfall.stufe} statt ${rueckfall.stattdessen}` +
+            (rueckfall.grund ? ` — ${rueckfall.grund}` : '') +
+            '. Der Korb kann anders zustande gekommen sein als geplant.',
+        })
+      }
       if (gefunden.length === 0) {
         berichte.push({ portal, modell, gefunden: 0, behalten: 0, reportordner: null })
         halteFest({ name: schrittname, stand: 'leer', text: 'keine Treffer' })
@@ -858,6 +996,7 @@ export async function fuehreLaufAus(
     ordner,
     ergebnis,
     markenfremd,
+    rueckfaelle,
     protokoll,
     zyklen,
     urteile: Object.fromEntries(urteile),

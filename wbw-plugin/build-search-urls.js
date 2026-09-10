@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 /**
  * Baut DETERMINISTISCH die Such-Eingaben für die drei Apify-Actors aus
- * params.json und schreibt search-inputs.json:
+ * params.json und schreibt search-inputs.json.
  *
- *   - mobileDe      : strukturiertes Input-Objekt (Actor blackfalcondata/mobile-de-scraper).
- *                     Native zipCode/radiusKm + includeDetails (Ausstattung/Beschreibung/GPS).
- *   - autoScout     : strukturiertes Input-Objekt (Actor blackfalcondata/autoscout24-scraper).
- *                     make/model-Slug, countries:["DE"], includeDetails (+ GPS); kein
- *                     PLZ-Umkreis am Actor -> Geo wird in pipeline.js per Luftlinie gefiltert.
- *   - kleinanzeigen : strukturiertes Input-Objekt (Actor fatihtahta/ebay-kleinanzeigen-scraper).
- *                     car_make/car_model + Jahr/km-Filter + enrich_data (km/EZ/Leistung/
- *                     Fahrzeugtyp/PLZ+GPS/Ausstattung/Bilder).
+ * **Jeder Wert hier ist gemessen.** Ein Filter, den ein Actor nicht kennt,
+ * wird laut Schema „sent as-is and may simply not narrow results" — er
+ * scheitert **lautlos** und liefert nur einen schlechteren Korb. Deshalb
+ * steht hinter jeder Zeile ein Probelauf und keine Vermutung; die
+ * Messwerte stehen in `docs/wbw-beschaffung-apify.md`.
+ *
+ * Drei Dinge, die dieser Baustein bewusst NICHT tut:
+ *
+ *   1. **Keine Bauart am Portal.** Bei AutoScout24 schnitt `bodyType: "van"`
+ *      den Korb von zehn auf eins — dort heisst `van` Nutzfahrzeug. Bei
+ *      Kleinanzeigen warf `autos.typ_s: "bus"` einen echten Sharan hinaus,
+ *      den der Verkäufer als „Kombi" eingetragen hatte. Die Bauart wird
+ *      nachträglich aus dem gelieferten Feld gefiltert (pipeline.js).
+ *   2. **Keine geratenen Schlüssel.** Was nicht in einer echten Antwort
+ *      gewirkt hat, steht hier nicht.
+ *   3. **Kein `null` als Filterwert.** Fehlt eine Angabe, fehlt der Filter —
+ *      ein gesendetes `null` ist ein Filter auf „nichts".
  *
  * Aufruf: node build-search-urls.js <params.json> <search-inputs.json>
  */
@@ -23,25 +32,62 @@ const MARKEN_SLUG = {
   bmw: "bmw", audi: "audi", opel: "opel", ford: "ford", skoda: "skoda", seat: "seat",
   toyota: "toyota", renault: "renault", peugeot: "peugeot", fiat: "fiat", hyundai: "hyundai",
   kia: "kia", mazda: "mazda", nissan: "nissan", volvo: "volvo", mini: "mini",
+  citroen: "citroen", "citroën": "citroen", dacia: "dacia",
 };
-// mobile.de erwartet im models-Feld die Portal-Schreibweise der Marke ("BMW|328").
+// mobile.de erwartet die Portal-Schreibweise der Marke ("VW", nicht "volkswagen").
 const MARKEN_MOBILE = {
   volkswagen: "VW", "mercedes-benz": "Mercedes-Benz", bmw: "BMW", audi: "Audi",
   opel: "Opel", ford: "Ford", skoda: "Skoda", seat: "Seat", toyota: "Toyota",
   renault: "Renault", peugeot: "Peugeot", fiat: "Fiat", hyundai: "Hyundai",
   kia: "Kia", mazda: "Mazda", nissan: "Nissan", volvo: "Volvo", mini: "MINI",
+  citroen: "Citroen", dacia: "Dacia",
 };
 
-// Vom Kleinanzeigen-Actor (fatihtahta) unterstützte Marken (car_make-Enum).
-// Passt der Marken-Slug nicht hierein, läuft die Suche nur über das Stichwort.
-const KLEINANZEIGEN_MAKES = new Set(["audi", "bmw", "mercedes_benz", "volkswagen", "opel",
-  "ford", "skoda", "renault", "seat", "peugeot", "fiat", "hyundai", "toyota", "nissan",
-  "mazda", "tesla"]);
+/**
+ * Wörter, die ein Inserat als Vergleichsfahrzeug ausschliessen.
+ *
+ * Gemessen: ein Probelauf lieferte eine **Rückbank für 50 €** als Fahrzeug,
+ * dazu einen „Schlachter", ein „Bastlerfahrzeug" und einen Citroën XM — also
+ * ein anderes Modell. Die Freitextsuche trifft alles, was den Modellnamen im
+ * Titel trägt.
+ */
+const AUSSCHLUSSWORTE = ["teile", "ersatzteil", "rückbank", "schlachtfest", "schlachter",
+  "bastler", "export", "motorschaden", "getriebeschaden", "unfall", "teileträger"];
+
+/**
+ * Wie tief bei Kleinanzeigen geholt wird.
+ *
+ * `maxResults` zählt dort die **geholten**, nicht die gelieferten Datensätze:
+ * mit Umkreisfilter kamen 19 von 50 zurück, ohne 50 von 50 — der Umkreis
+ * wirkt lokal, und der Actor holt nicht nach. Gemessen am Sharan-Fall:
+ * Tiefe 10 ergab 2 Fahrzeuge im Korb, Tiefe 80 ergab 17.
+ */
+const KLEINANZEIGEN_TIEFE = 80;
+
+const FAKTOR_PS_JE_KW = 1.35962;
+/** Spanne um die Leistung. Breit genug für Modellpflegen desselben Motors. */
+const LEISTUNG_SPANNE = 0.2;
 
 function num(v) { if (v == null) return null; const m = String(v).replace(/[^\d]/g, ""); return m ? parseInt(m, 10) : null; }
 function jahr(ez) { const m = String(ez || "").match(/(19|20)\d{2}/); return m ? parseInt(m[0], 10) : null; }
 function markeSlug(marke) { const k = String(marke || "").toLowerCase().trim(); return MARKEN_SLUG[k] || k.replace(/\s+/g, "-"); }
 function modellSlug(modell) { return String(modell || "").toLowerCase().trim().replace(/[\/\s]+/g, "-"); }
+
+/**
+ * Marke für Kleinanzeigen: die eigenen Tokens des Portals, kleingeschrieben
+ * mit Unterstrich ("mercedes_benz"). Gemessen wirksam für "volkswagen" und
+ * "citroen".
+ */
+function markeKleinanzeigen(marke) { return markeSlug(marke).replace(/-/g, "_"); }
+
+/**
+ * mobile.de-Schreibweise. Eine unbekannte Marke wird durchgereicht statt
+ * verschluckt — lieber der Originalname als gar kein Filter.
+ */
+function markeMobile(marke) {
+  const slug = markeSlug(marke);
+  return MARKEN_MOBILE[slug] || String(marke || "").trim();
+}
 
 function build(params) {
   const s = params.subject || {};
@@ -49,77 +95,99 @@ function build(params) {
   const ezTol = params.ezToleranzJahre ?? 1;
   const kmTol = params.kmToleranz ?? 25000;
   const km = num(s.mileage);
-  const fregfrom = y != null ? y - ezTol : null;
-  const fregto   = y != null ? y + ezTol : null;
-  const kmfrom   = km != null ? Math.max(0, km - kmTol) : null;
-  const kmto     = km != null ? km + kmTol : null;
+  const jahrVon = y != null ? y - ezTol : null;
+  const jahrBis = y != null ? y + ezTol : null;
+  const kmVon   = km != null ? Math.max(0, km - kmTol) : null;
+  const kmBis   = km != null ? km + kmTol : null;
   const plz = params.plz ? String(params.plz) : null;
   const radius = params.radiusKm ?? 200;
   const maxItems = params.maxItemsProPortal ?? 60;
 
-  const mkSlug = markeSlug(s.marke);
-  const mdSlug = modellSlug(s.modell);
+  // Das Suchzentrum kommt aus dem Cockpit (zentrum.js geocodet die PLZ).
+  // Ohne Koordinate bleibt der Umkreisfilter weg, statt null zu senden.
+  const z = params.zentrum && params.zentrum.lat != null && params.zentrum.lon != null
+    ? { lat: Number(params.zentrum.lat), lon: Number(params.zentrum.lon) }
+    : null;
+  const umkreis = z ? { lat: z.lat, lon: z.lon, radiusKm: radius } : {};
 
-  const keyword = [s.marke, s.modell].filter(Boolean).join(" ").trim();
+  // Leistung in PS — beide Portale, die danach filtern, nehmen PS entgegen.
+  const ps = s.leistungKw != null ? Math.round(Number(s.leistungKw) * FAKTOR_PS_JE_KW) : null;
+  const psVon = ps != null ? Math.round(ps * (1 - LEISTUNG_SPANNE)) : null;
+  const psBis = ps != null ? Math.round(ps * (1 + LEISTUNG_SPANNE)) : null;
 
-  // ---- mobile.de: blackfalcondata/mobile-de-scraper (strukturiert + PLZ-Umkreis) ----
-  // Freitext-`query` (robust) + strukturierte Filter inkl. nativem zipCode/radiusKm.
-  // `includeDetails` liefert Ausstattung, Beschreibung und GPS-Koordinaten.
+  const stichwort = [s.marke, s.modell].filter(Boolean).join(" ").trim();
+
+  // ---- AutoScout24 -------------------------------------------------------
+  // Der Umkreis wirkt: zehn Treffer, alle innerhalb 200 km (7 … 175 km).
+  // Der Actor kennt kein `mileageFrom`, nur `mileageTo`.
+  const autoScout = {
+    make: markeSlug(s.marke),
+    model: modellSlug(s.modell),
+    countries: ["DE"],
+    ...(jahrVon != null ? { yearFrom: jahrVon } : {}),
+    ...(jahrBis != null ? { yearTo: jahrBis } : {}),
+    ...(kmBis != null ? { mileageTo: kmBis } : {}),
+    ...umkreis,
+    maxResults: maxItems,
+    includeDetails: true,
+    // Ohne Residential-Proxy blockt AutoScout24 die Detailseiten und liefert
+    // still leere Detailfelder — GPS, Ausstattung, kW. Und ohne Detailseite
+    // gibt es keine Koordinate, an der der Umkreis greifen könnte.
+    proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
+  };
+
+  // ---- mobile.de ---------------------------------------------------------
+  // Strukturierte Marke/Modell statt Freitext; nativer PLZ-Umkreis.
+  // `damageStatus: EXCLUDE` hat gewirkt — unter zehn Treffern war kein
+  // Unfallfahrzeug. Das ist wichtig, weil mobile.de den Unfallstatus im
+  // Datensatz gar nicht meldet (0 von 10). Filtern statt melden.
   const mobileDe = {
-    query: keyword,
+    make: markeMobile(s.marke),
+    ...(s.modell ? { model: String(s.modell) } : {}),
     category: "CAR",
-    ...(fregfrom != null ? { yearMin: fregfrom } : {}),
-    ...(fregto != null ? { yearMax: fregto } : {}),
-    ...(kmfrom != null ? { mileageMin: kmfrom } : {}),
-    ...(kmto != null ? { mileageMax: kmto } : {}),
+    ...(jahrVon != null ? { yearMin: jahrVon } : {}),
+    ...(jahrBis != null ? { yearMax: jahrBis } : {}),
+    ...(kmVon != null ? { mileageMin: kmVon } : {}),
+    ...(kmBis != null ? { mileageMax: kmBis } : {}),
+    ...(psVon != null ? { powerMin: psVon, powerMax: psBis } : {}),
     ...(plz ? { zipCode: plz, radiusKm: radius } : {}),
+    damageStatus: "EXCLUDE",
+    excludeKeywords: { fields: ["title", "description"], words: AUSSCHLUSSWORTE },
     maxResults: maxItems,
     includeDetails: true,
     sort: "relevance",
   };
 
-  // ---- AutoScout24: blackfalcondata/autoscout24-scraper (strukturiert) ----
-  // make/model als URL-Slug, Land DE. Kein PLZ-Radius am Actor -> bundesweit;
-  // der Geo-Bezug kommt über die mitgelieferten GPS-Koordinaten + Luftlinien-
-  // Filter in `pipeline.js`. `includeDetails` liefert Ausstattung + GPS.
-  const autoScout = {
-    make: mkSlug,
-    model: mdSlug,
-    countries: ["DE"],
-    ...(fregfrom != null ? { yearFrom: fregfrom } : {}),
-    ...(fregto != null ? { yearTo: fregto } : {}),
-    ...(kmto != null ? { mileageTo: kmto } : {}),
-    maxResults: maxItems,
-    includeDetails: true,
-    // Residential-Proxy: AutoScout blockt Datacenter-IPs auf Detailseiten und
-    // liefert sonst stillschweigend leere Detailfelder (GPS/Ausstattung/kW).
-    proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
-  };
+  // ---- Kleinanzeigen -----------------------------------------------------
+  // Die Attributschlüssel stammen aus der Filterleiste des Portals und tragen
+  // ein Typkürzel (_s Text, _i Zahl). Gemessen: ungefiltert lagen 4 von 4
+  // bzw. 5 von 5 Fahrzeugen ausserhalb der km-Spanne, gefiltert keines mehr.
+  const attributeFilters = { "autos.marke_s": markeKleinanzeigen(s.marke) };
+  if (kmVon != null) attributeFilters["autos.km_i"] = `${kmVon},${kmBis}`;
+  if (jahrVon != null) attributeFilters["autos.ez_i"] = `${jahrVon},${jahrBis}`;
 
-  // ---- Kleinanzeigen: fatihtahta/ebay-kleinanzeigen-scraper (strukturiert, auto-spezifisch).
-  // Liefert km/EZ/Leistung/Fahrzeugtyp + PLZ & GPS-Koordinaten + Ausstattung + Bilder
-  // (enrich_data). Kein PLZ-Umkreis am Actor -> bundesweit, Umkreis per GPS in pipeline.js.
-  // car_make ist ein Enum; passt der Slug nicht, nur über die Stichwortsuche (queries).
-  const kaMake = mkSlug.replace(/-/g, "_");
   const kleinanzeigen = {
-    queries: [keyword],
-    category: "216", // Autos
-    ...(KLEINANZEIGEN_MAKES.has(kaMake) ? { car_make: kaMake } : {}),
-    ...(s.modell ? { car_model: String(s.modell) } : {}),
-    ...(fregfrom != null ? { min_first_registration_year: fregfrom } : {}),
-    ...(fregto != null ? { max_first_registration_year: fregto } : {}),
-    ...(kmfrom != null ? { min_mileage: kmfrom } : {}),
-    ...(kmto != null ? { max_mileage: kmto } : {}),
-    enrich_data: true,
-    limit: maxItems,
+    query: stichwort,
+    category: "autos",
+    ...umkreis,
+    attributeFilters,
+    // Der Actor nimmt "angebote" entgegen — wirkt aber nachweislich nicht:
+    // in allen vier gemessenen Formen kamen Gesuche durch, auch über eine
+    // Portaladresse mit `anzeige:angebote`. Gesetzt bleibt es, weil es nichts
+    // kostet; verworfen werden Gesuche in adapters/apify.js am Feld `adType`.
+    adType: "angebote",
+    whatExclude: AUSSCHLUSSWORTE,
+    // sortBy bleibt auf der Voreinstellung `newest`. Jede Preissortierung
+    // verzerrt den Korb: `price_asc` lieferte 14 von 14 Fahrzeugen unter
+    // 1.000 €. Der Hebel ist die Tiefe, nicht die Sortierung.
+    maxResults: Math.max(KLEINANZEIGEN_TIEFE, maxItems),
+    includeDetails: true,
   };
 
   return {
     mobileDe, autoScout, kleinanzeigen,
-    // Von der Adapterschicht (fetch-portal.js) genutzt: AutoScout24 baut daraus
-    // seinen PLZ-Umkreis, Kleinanzeigen den Standort-Radius.
-    _abgeleitet: { jahr: y, fregfrom, fregto, kmfrom, kmto, plz, radius,
-      kleinanzeigenLocId: params.kleinanzeigenLocId ?? null },
+    _abgeleitet: { jahr: y, jahrVon, jahrBis, kmVon, kmBis, plz, radius,
+      zentrum: z, leistungPs: ps },
   };
 }
 

@@ -149,6 +149,9 @@ async function beschaffe(portal, eingaben, opts = {}) {
         maxItems: opts.maxItems,
         quelle: portal,
         inputKey,
+        // Der Gesamtdeckel des Laufs. Die Portale laufen als eigene Prozesse,
+        // deshalb ist das Hauptbuch eine Datei im Ordner des Vorgangs.
+        budgetDatei: opts.budgetDatei || process.env.WBW_BUDGET_DATEI || null,
       };
       let ergebnis;
       if (stufe.adapter === "unlocker") {
