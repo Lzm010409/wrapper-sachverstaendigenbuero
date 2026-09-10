@@ -218,14 +218,23 @@ async function befuelleFotolexikon(sql) {
   for (const teil of teile) {
     if (vorhanden.has(teil.name.toLowerCase())) continue
 
-    // Beschädigungsarten gehen als Text durch die Bindung und werden erst in
-    // der Anweisung selbst zum passenden Typ gecastet — ohne Annahmen
-    // darüber, wie `postgres` ein rohes JS-Objekt sonst serialisieren würde.
+    // Achsenlisten und Beschädigungsarten gehen als Text durch die Bindung
+    // und werden erst in der Anweisung selbst zum passenden Typ gecastet —
+    // ohne Annahmen darüber, wie `postgres` ein rohes JS-Array oder -Objekt
+    // sonst serialisieren würde.
+    const alsListe = (werte) => (werte?.length ? `{${werte.join(',')}}` : '{}')
     await sql`
-      insert into foto_teil (name, erkennungsmerkmal, beschaedigungsarten)
+      insert into foto_teil (
+        name, erkennungsmerkmal,
+        gueltige_laengsachsen, gueltige_querachsen, gueltige_hoehenachsen,
+        beschaedigungsarten
+      )
       values (
         ${teil.name},
         ${teil.erkennungsmerkmal ?? null},
+        ${alsListe(teil.gueltigeLaengsachsen)}::foto_teil_laengsachse[],
+        ${alsListe(teil.gueltigeQuerachsen)}::foto_teil_querachse[],
+        ${alsListe(teil.gueltigeHoehenachsen)}::foto_teil_hoehenachse[],
         ${JSON.stringify(teil.beschaedigungsarten)}::jsonb
       )
     `

@@ -1,7 +1,56 @@
 # Fotoassistent: Hochkantbilder korrekt skalieren + Lexikon-Seite als drei freie Achsen
 
 Datum: 10.09.2026
-Status: freigegeben (per `/grill-me` geklärt), zur Umsetzung an `/senior-dev`
+Status: freigegeben (per `/grill-me` geklärt), umgesetzt — mit Nachtrag (siehe unten)
+
+## Nachtrag (10.09.2026, nach erster Umsetzung): Teil-Restriktion für die KI
+
+Nach dem ersten Ausrollen wandte der Nutzer ein: ohne jede Teil-Restriktion
+weiss die KI nicht, welche Achsen für ein bestimmtes Teil überhaupt Sinn
+ergeben (z. B. eine Höhenachse für einen Kotflügel) — das erhöht wieder die
+Halluzinationsrate, die die ganze Verlässlichkeits-Runde eigentlich senken
+sollte. Das widerspricht der ursprünglichen Entscheidung „Mach die Funktion
+für alle Teile" (keine Teil-Restriktion), die deshalb an dieser einen Stelle
+zurückgenommen wird — der Rest des Teil-B-Designs oben bleibt unverändert.
+
+Geklärt per Nachfrage:
+
+- **Die Restriktion gilt ausschliesslich für die KI**, nicht für das
+  Klickmenü. Das Klickmenü zeigt weiterhin immer alle drei Achsen für jedes
+  Teil — ein Mensch klickt nur an, was er wirklich sieht, eine
+  Teil-Restriktion hat für die manuelle Bedienung keinen Sinn.
+- **Konfiguration je Achse einzeln**, wie früher bei „Seiten": in der
+  Verwaltungsseite drei Kästchen-Gruppen je Teil (gültige Längs-, Quer-,
+  Höhenwerte). Leer gelassen heisst „diese Achse gibt die KI für dieses
+  Teil nie vor", nicht „jeder Wert ist erlaubt" — bewusst die strengere
+  Lesart, passend zum Ziel, Halluzination zu senken.
+
+Umsetzung: `FotoTeil` bekommt drei neue Felder (`gueltigeLaengsachsen`,
+`gueltigeQuerachsen`, `gueltigeHoehenachsen`), gespiegelt in der Datenbank
+über drei neue Spalten mit je eigenem Postgres-Enum (`foto_teil_laengsachse`
+usw.) — eine zweite Migration, zusätzlich zur bereits gemergten aus Teil B.
+Eine neue reine Funktion `achsenPassenZumTeil(teile, treffer)` in
+`lexikon.ts` prüft eine gesetzte (nicht-`null`) Achse gegen die für das Teil
+hinterlegte Liste; `zusammensetzen()`/`klausel()` rufen sie bewusst nicht
+auf (das würde auch das Klickmenü einschränken) — nur `bildunterschrift()`
+in `assistent.ts` filtert die KI-Treffer damit, vor dem Aufruf von
+`zusammensetzen()`. Eine per Achse ungültige KI-Vorgabe lässt den gesamten
+Treffer entfallen (kein Vorschlag), konsistent mit der bestehenden Regel
+„lieber kein KI-Vorschlag als einer, der vom Hausstil abweicht". Der
+Auftragstext nennt der KI zusätzlich je Teil die „Gültige Achsen"-Zeile, und
+der Systemtext verweist explizit darauf — die serverseitige Prüfung ist
+somit die zweite Verteidigungslinie hinter einer bereits engeren
+Aufgabenstellung, nicht die einzige.
+
+Die Klickmenü-Komponente (`Klickmenue` in `foto-assistent.tsx`) und
+`achsenPassenZumTeil` bleiben bewusst getrennt — die Funktion wird von dort
+nie aufgerufen.
+
+Zusätzlich, im selben Nachtrag, unabhängig von der Restriktion angefordert:
+die drei Abschnitte des Klickmenüs (Teil, Richtung, Beschädigungsart)
+bekommen sichtbare Überschriften (`.klickmenue-abschnitt-titel`), weil das
+Menü mit drei Achsen-Reihen plus Teil- und Begriffs-Reihe ohne optische
+Gliederung unübersichtlich wurde.
 
 ## Teil A — Hochkantbilder werden falsch skaliert
 

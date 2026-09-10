@@ -2,7 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { verlangeRecht } from '@/rechte/zugriff'
-import type { Beschaedigungsart } from './lexikon'
+import {
+  istHoehenachse,
+  istLaengsachse,
+  istQuerachse,
+  type Beschaedigungsart,
+  type Hoehenachse,
+  type Laengsachse,
+  type Querachse,
+} from './lexikon'
 import { loescheTeil, nameVergeben, speichereTeil } from './lexikon-ablage'
 import type { Aktionsergebnis } from '@/melden/typen'
 
@@ -17,13 +25,19 @@ import type { Aktionsergebnis } from '@/melden/typen'
 export interface FotoTeilEingabe {
   name: string
   erkennungsmerkmal: string
+  gueltigeLaengsachsen: string[]
+  gueltigeQuerachsen: string[]
+  gueltigeHoehenachsen: string[]
   beschaedigungsarten: { begriff: string; hinweis: string }[]
 }
 
-/** Säubert die Eingabe aus dem Formular — Leerzeichen, leere Zeilen. */
+/** Säubert die Eingabe aus dem Formular — Leerzeichen, leere Zeilen, unbekannte Achsenwerte. */
 function geputzt(eingabe: FotoTeilEingabe): {
   name: string
   erkennungsmerkmal: string | null
+  gueltigeLaengsachsen: Laengsachse[]
+  gueltigeQuerachsen: Querachse[]
+  gueltigeHoehenachsen: Hoehenachse[]
   beschaedigungsarten: Beschaedigungsart[]
 } {
   const erkennungsmerkmal = eingabe.erkennungsmerkmal.trim()
@@ -32,6 +46,9 @@ function geputzt(eingabe: FotoTeilEingabe): {
     // Leer heisst „kein Merkmal hinterlegt" — dafür steht `null`, kein
     // leerer String in der Spalte.
     erkennungsmerkmal: erkennungsmerkmal.length > 0 ? erkennungsmerkmal : null,
+    gueltigeLaengsachsen: eingabe.gueltigeLaengsachsen.filter(istLaengsachse),
+    gueltigeQuerachsen: eingabe.gueltigeQuerachsen.filter(istQuerachse),
+    gueltigeHoehenachsen: eingabe.gueltigeHoehenachsen.filter(istHoehenachse),
     beschaedigungsarten: eingabe.beschaedigungsarten
       .map((b) => ({ begriff: b.begriff.trim(), hinweis: b.hinweis.trim() }))
       .filter((b) => b.begriff.length > 0),

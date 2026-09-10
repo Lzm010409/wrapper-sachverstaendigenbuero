@@ -47,6 +47,14 @@ export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfo
 /** Die Stufe eines Protokolleintrags. */
 export const protokollstufeEnum = pgEnum('protokollstufe', ['fehler', 'warnung', 'info'])
 
+/**
+ * Für ein Fotolexikon-Teil gültige Achsenwerte — ausschliesslich zur
+ * Einschränkung der KI (`src/fotos/assistent.ts`), siehe `fotoTeil` unten.
+ */
+export const fotoTeilLaengsachseEnum = pgEnum('foto_teil_laengsachse', ['vorne', 'hinten'])
+export const fotoTeilQuerachseEnum = pgEnum('foto_teil_querachse', ['links', 'rechts'])
+export const fotoTeilHoehenachseEnum = pgEnum('foto_teil_hoehenachse', ['oben', 'unten', 'mittig'])
+
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -519,11 +527,14 @@ export const fotoAnalyse = pgTable(
  * vom Teil gesucht oder angezeigt — eine eigene Tabelle dafür wäre ein Join,
  * den niemand braucht, für eine Handvoll Einträge je Teil.
  *
- * **Keine Teil-Restriktion für Achsen.** Anders als früher (eine Spalte
- * `seiten` je Teil) erlaubt jedes Teil jede Kombination aus Längs-, Quer-
- * und Höhenachse — die Achsen sind reine Laufzeitdaten eines einzelnen
- * Treffers (`Rohtreffer` in `src/fotos/lexikon.ts`), keine Eigenschaft des
- * Teils selbst, deshalb keine Spalte dafür.
+ * **Die drei `gueltige*achsen`-Spalten schränken nur die KI ein, nicht das
+ * Klickmenü.** Ein Mensch klickt nur an, was er wirklich sieht — das
+ * Klickmenü in der Fotobearbeitung zeigt deshalb immer alle drei Achsen für
+ * jedes Teil, unabhängig von diesen Spalten. Die KI dagegen soll für ein
+ * Teil, an dem z. B. nur eine Querachse Sinn ergibt (ein Kotflügel hat
+ * links/rechts, aber keine sinnvolle Höhenachse), gar nicht erst die
+ * Möglichkeit haben, eine unpassende Achse zu erfinden — leer heisst „diese
+ * Achse gibt die KI für dieses Teil nie vor", nicht „jeder Wert ist erlaubt".
  *
  * **Warum das den Fotoassistenten überhaupt bindet.** Ohne dieses Lexikon
  * formuliert das Sprachmodell frei — mit ihm liefert es nur noch Teil,
@@ -539,6 +550,18 @@ export const fotoTeil = pgTable(
     name: text().notNull(),
     /** Wie sich dieses Teil optisch von Nachbarteilen abgrenzt — frei für den Auftragstext. */
     erkennungsmerkmal: text(),
+    gueltigeLaengsachsen: fotoTeilLaengsachseEnum()
+      .array()
+      .notNull()
+      .default(sql`'{}'::foto_teil_laengsachse[]`),
+    gueltigeQuerachsen: fotoTeilQuerachseEnum()
+      .array()
+      .notNull()
+      .default(sql`'{}'::foto_teil_querachse[]`),
+    gueltigeHoehenachsen: fotoTeilHoehenachseEnum()
+      .array()
+      .notNull()
+      .default(sql`'{}'::foto_teil_hoehenachse[]`),
     /**
      * `[{ begriff: string, hinweis: string }]` — geprüft beim Lesen mit Zod,
      * siehe `src/fotos/lexikon-ablage.ts`.

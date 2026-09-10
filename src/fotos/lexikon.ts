@@ -15,9 +15,15 @@
  *
  * **Drei unabhängige Achsen statt einer Seite.** Längsachse (vorne/hinten),
  * Querachse (links/rechts) und Höhenachse (oben/unten/mittig) lassen sich
- * beliebig kombinieren ("vorne links oben") oder ganz weglassen — anders als
- * früher gilt das für jedes Teil gleich, es gibt keine Teil-Restriktion
- * mehr, welche Achsen für ein bestimmtes Teil überhaupt zulässig wären.
+ * beliebig kombinieren ("vorne links oben") oder ganz weglassen.
+ *
+ * **Die `gueltige*achsen`-Felder schränken nur die KI ein, nicht das
+ * Klickmenü.** Ein Mensch klickt nur an, was er wirklich sieht — deshalb
+ * zeigt das Klickmenü immer alle drei Achsen für jedes Teil, ungeachtet
+ * dieser Felder (`zusammensetzen`/`klausel` unten prüfen sie bewusst nicht).
+ * Nur `assistent.ts` liest sie, um der KI von vornherein nur die für ein
+ * Teil sinnvollen Achsenwerte vorzugeben und einen Treffer mit einer nicht
+ * gelisteten Achse zu verwerfen — siehe `achsenPassenZumTeil`.
  *
  * **Keine `server-only`-Markierung.** Die Verwaltungsseite und der
  * Fotoassistent im Browser brauchen diese Typen und die Komposition; die
@@ -60,6 +66,14 @@ export interface FotoTeil {
   name: string
   /** Wie sich das Teil optisch von Nachbarteilen abgrenzt (z. B. Kotflügel vs. Tür). */
   erkennungsmerkmal: string | null
+  /**
+   * Für dieses Teil gültige Achsenwerte — ausschliesslich zur Einschränkung
+   * der KI, siehe Kopfkommentar. Leer heisst „diese Achse gibt die KI für
+   * dieses Teil nie vor", nicht „jeder Wert ist erlaubt".
+   */
+  gueltigeLaengsachsen: Laengsachse[]
+  gueltigeQuerachsen: Querachse[]
+  gueltigeHoehenachsen: Hoehenachse[]
   beschaedigungsarten: Beschaedigungsart[]
 }
 
@@ -113,6 +127,25 @@ export function zusammensetzen(
 ): string | null {
   const klauseln = treffer.map((t) => klausel(teile, t)).filter((k): k is string => k !== null)
   return klauseln.length > 0 ? klauseln.join(', ') : null
+}
+
+/**
+ * Ob die gesetzten Achsen eines Treffers zu den für dieses Teil hinterlegten
+ * gültigen Werten passen — ausschliesslich zur Einschränkung der KI
+ * (`bildunterschrift` in `assistent.ts`), nicht für das Klickmenü: eine
+ * Teil-Restriktion der KI-Vorgabe hat für die manuelle Bedienung keinen
+ * Sinn, ein Mensch klickt nur an, was er wirklich sieht. Eine nicht
+ * gesetzte Achse (`null`) passt immer, unabhängig von der Konfiguration —
+ * nur ein tatsächlich gewählter Wert wird geprüft. Ein unbekanntes Teil
+ * gilt hier als „passt" — das erledigt `klausel()` bereits selbst.
+ */
+export function achsenPassenZumTeil(teile: readonly FotoTeil[], treffer: Rohtreffer): boolean {
+  const teil = teile.find((t) => t.name === treffer.teil)
+  if (!teil) return true
+  if (treffer.laengs && !teil.gueltigeLaengsachsen.includes(treffer.laengs)) return false
+  if (treffer.quer && !teil.gueltigeQuerachsen.includes(treffer.quer)) return false
+  if (treffer.hoehe && !teil.gueltigeHoehenachsen.includes(treffer.hoehe)) return false
+  return true
 }
 
 /**

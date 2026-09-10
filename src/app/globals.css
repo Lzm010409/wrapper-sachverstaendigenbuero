@@ -3442,15 +3442,31 @@ body {
 }
 
 /*
-  Klickmenü im Prüfmodus: Teil/Seite/Schadensart per Klick statt Tippen
-  (`Klickmenue` in `foto-assistent.tsx`). Optik an `.foto-filterknopf`
-  angelehnt, aber eigene Klassen — das Klickmenü hat mit der Fotofilterung
-  nichts zu tun, nur dieselbe Pillenform.
+  Klickmenü im Prüfmodus und in der normalen Fotobearbeitung: Teil/Richtung/
+  Schadensart per Klick statt Tippen (`Klickmenue` in `foto-assistent.tsx`).
+  Optik an `.foto-filterknopf` angelehnt, aber eigene Klassen — das
+  Klickmenü hat mit der Fotofilterung nichts zu tun, nur dieselbe Pillenform.
 */
 .klickmenue {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+/*
+  Ein Abschnitt (Teil / Richtung / Beschädigungsart) fasst eine Überschrift
+  und ihre Reihe(n) sichtbar zusammen — ohne das war bei drei Achsen-Reihen
+  plus Teil- und Begriffs-Reihe nicht zu erkennen, wo eine Gruppe endet.
+*/
+.klickmenue-abschnitt {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+}
+
+.klickmenue-abschnitt-titel {
+  font-size: 11px;
+  color: var(--ink-soft);
 }
 
 .klickmenue-reihe { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -30,6 +30,9 @@ const KOTFLUEGEL: FotoTeil = {
   id: 't1',
   name: 'Kotflügel',
   erkennungsmerkmal: null,
+  gueltigeLaengsachsen: ['vorne', 'hinten'],
+  gueltigeQuerachsen: ['links', 'rechts'],
+  gueltigeHoehenachsen: ['oben', 'unten', 'mittig'],
   beschaedigungsarten: [
     { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
     { begriff: 'deformiert', hinweis: 'Blech sichtbar eingedrückt oder verformt' },
@@ -95,6 +98,22 @@ describe('auftragstext', () => {
   it('zeigt keine leere Erkennungsmerkmal-Zeile ohne das Feld', () => {
     const text = auftragstext(FAHRZEUG, [], [KOTFLUEGEL])
     expect(text).not.toContain('Erkennungsmerkmal')
+  })
+
+  it('nennt die gültigen Achsen je Teil', () => {
+    const text = auftragstext(FAHRZEUG, [], [KOTFLUEGEL])
+    expect(text).toContain('Gültige Achsen — Längs: vorne/hinten, Quer: links/rechts, Höhe: oben/unten/mittig')
+  })
+
+  it('nennt "keine" für eine Achse ohne hinterlegte Werte', () => {
+    const ohneAchsen: FotoTeil = {
+      ...KOTFLUEGEL,
+      gueltigeLaengsachsen: [],
+      gueltigeQuerachsen: [],
+      gueltigeHoehenachsen: [],
+    }
+    const text = auftragstext(FAHRZEUG, [], [ohneAchsen])
+    expect(text).toContain('Gültige Achsen — Längs: keine, Quer: keine, Höhe: keine')
   })
 })
 
@@ -321,6 +340,9 @@ describe('beschriftePaket', () => {
       id: 't2',
       name: 'Tür',
       erkennungsmerkmal: null,
+      gueltigeLaengsachsen: [],
+      gueltigeQuerachsen: ['links', 'rechts'],
+      gueltigeHoehenachsen: [],
       beschaedigungsarten: [{ begriff: 'verkratzt', hinweis: 'nur oberflächlicher Kratzer' }],
     }
     ruf.mockResolvedValue(
@@ -384,6 +406,66 @@ describe('beschriftePaket', () => {
     )
 
     expect(await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])).toEqual([])
+  })
+
+  it('verwirft den Vorschlag, wenn eine Achse für dieses Teil nicht als gültig hinterlegt ist', async () => {
+    // Die Tür hat laut Lexikon keine gültige Höhenachse — ein Treffer mit
+    // gesetzter Höhe ist damit ungültig, ganz unabhängig davon, ob "oben"
+    // als Wort für sich genommen aus dem Werkzeug stammen könnte. Das
+    // Klickmenü kennt diese Einschränkung nicht, siehe `lexikon.test.ts`.
+    const TUER: FotoTeil = {
+      id: 't2',
+      name: 'Tür',
+      erkennungsmerkmal: null,
+      gueltigeLaengsachsen: [],
+      gueltigeQuerachsen: ['links', 'rechts'],
+      gueltigeHoehenachsen: [],
+      beschaedigungsarten: [{ begriff: 'verkratzt', hinweis: 'nur oberflächlicher Kratzer' }],
+    }
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          treffer: [
+            { teil: 'Tür', laengs: 'keine', quer: 'links', hoehe: 'oben', beschaedigungsart: 'verkratzt' },
+          ],
+          sicherheit: 90,
+        },
+      ]),
+    )
+
+    expect(await beschriftePaket(FAHRZEUG, [], [TUER], [bild('a')])).toEqual([])
+  })
+
+  it('übernimmt einen Treffer, dessen gesetzte Achsen alle zu den gültigen Werten des Teils gehören', async () => {
+    const TUER: FotoTeil = {
+      id: 't2',
+      name: 'Tür',
+      erkennungsmerkmal: null,
+      gueltigeLaengsachsen: [],
+      gueltigeQuerachsen: ['links', 'rechts'],
+      gueltigeHoehenachsen: [],
+      beschaedigungsarten: [{ begriff: 'verkratzt', hinweis: 'nur oberflächlicher Kratzer' }],
+    }
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          treffer: [
+            { teil: 'Tür', laengs: 'keine', quer: 'links', hoehe: 'keine', beschaedigungsart: 'verkratzt' },
+          ],
+          sicherheit: 90,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [TUER], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Tür links verkratzt')
   })
 
   it('verwirft den Vorschlag, wenn die Antwort gar kein treffer-Feld enthält und ein Lexikon existiert', async () => {

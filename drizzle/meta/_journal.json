@@ -141,6 +141,13 @@
       "when": 1789034112675,
       "tag": "0019_flashy_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789035434212,
+      "tag": "0020_striped_boomerang",
+      "breakpoints": true
     }
   ]
 }

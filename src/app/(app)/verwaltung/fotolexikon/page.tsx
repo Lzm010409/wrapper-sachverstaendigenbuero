@@ -48,10 +48,12 @@ export default async function Fotolexikon() {
       <div className="hinweis" style={{ marginBottom: 16 }}>
         <span className="hinweis-titel">Wie das wirkt</span>
         Erkennt die KI eines dieser Teile, wählt sie Beschädigungsart nur noch aus der hier
-        hinterlegten Liste — der Satz wird daraus zusammengesetzt, nicht formuliert. Längs-,
-        Quer- und Höhenachse (z. B. „vorne links oben") werden dabei frei je Treffer gewählt,
-        im Klickmenü der Fotobearbeitung oder von der KI — nicht hier je Teil festgelegt. Ein
-        hier nicht gelistetes Teil bleibt wie bisher freier Text.
+        hinterlegten Liste — der Satz wird daraus zusammengesetzt, nicht formuliert. Für Längs-,
+        Quer- und Höhenachse lässt sich je Teil eingrenzen, welche Werte die KI überhaupt
+        vorschlagen darf — nicht angekreuzte Achsen verwirft sie automatisch, das verringert
+        Fehlzuordnungen. Im Klickmenü der Fotobearbeitung bleiben dagegen immer alle Achsen
+        wählbar, unabhängig von dieser Einschränkung — ein Mensch klickt nur an, was er wirklich
+        sieht. Ein hier nicht gelistetes Teil bleibt wie bisher freier Text.
       </div>
 
       <div className="liste">

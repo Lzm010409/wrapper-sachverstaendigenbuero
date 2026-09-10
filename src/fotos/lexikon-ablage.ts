@@ -4,7 +4,16 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { fotoTeil } from '@/db/schema'
 import { protokolliereWarnung } from '@/protokoll'
-import type { Beschaedigungsart, FotoTeil } from './lexikon'
+import {
+  istHoehenachse,
+  istLaengsachse,
+  istQuerachse,
+  type Beschaedigungsart,
+  type FotoTeil,
+  type Hoehenachse,
+  type Laengsachse,
+  type Querachse,
+} from './lexikon'
 
 /**
  * Die Datenschicht des Fotolexikons.
@@ -22,6 +31,9 @@ export interface FotoTeilEingabe {
   name: string
   /** Wie sich das Teil optisch von Nachbarteilen abgrenzt. Optional. */
   erkennungsmerkmal: string | null
+  gueltigeLaengsachsen: Laengsachse[]
+  gueltigeQuerachsen: Querachse[]
+  gueltigeHoehenachsen: Hoehenachse[]
   beschaedigungsarten: Beschaedigungsart[]
 }
 
@@ -48,6 +60,12 @@ export async function ladeLexikon(): Promise<FotoTeil[]> {
       id: z.id,
       name: z.name,
       erkennungsmerkmal: z.erkennungsmerkmal,
+      // Enum-Werte aus Postgres — schon durch die jeweilige Spalten-Enum
+      // begrenzt, eine erneute Prüfung wäre nur eine Wiederholung derselben
+      // Garantie. `filter` dient hier nur der TypeScript-Verengung.
+      gueltigeLaengsachsen: z.gueltigeLaengsachsen.filter(istLaengsachse),
+      gueltigeQuerachsen: z.gueltigeQuerachsen.filter(istQuerachse),
+      gueltigeHoehenachsen: z.gueltigeHoehenachsen.filter(istHoehenachse),
       beschaedigungsarten,
     }
   })

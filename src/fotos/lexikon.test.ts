@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  achsenPassenZumTeil,
   istHoehenachse,
   istLaengsachse,
   istQuerachse,
@@ -13,6 +14,9 @@ const KOTFLUEGEL: FotoTeil = {
   id: 't1',
   name: 'Kotflügel',
   erkennungsmerkmal: null,
+  gueltigeLaengsachsen: [],
+  gueltigeQuerachsen: ['links', 'rechts'],
+  gueltigeHoehenachsen: [],
   beschaedigungsarten: [
     { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
     { begriff: 'deformiert', hinweis: 'Blech sichtbar eingedrückt oder verformt' },
@@ -23,6 +27,9 @@ const HECKVERKLEIDUNG: FotoTeil = {
   id: 't2',
   name: 'Heckverkleidung',
   erkennungsmerkmal: null,
+  gueltigeLaengsachsen: ['vorne', 'hinten'],
+  gueltigeQuerachsen: [],
+  gueltigeHoehenachsen: ['oben', 'unten', 'mittig'],
   beschaedigungsarten: [{ begriff: 'plastisch verformt', hinweis: 'Kunststoff eingedrückt' }],
 }
 
@@ -110,6 +117,42 @@ describe('zusammensetzen', () => {
         treffer('Dachhimmel', 'zerkratzt'),
       ]),
     ).toBe('Kotflügel links deformiert')
+  })
+})
+
+describe('achsenPassenZumTeil', () => {
+  it('gibt true, wenn keine Achse gesetzt ist, unabhängig von der Konfiguration', () => {
+    expect(achsenPassenZumTeil(TEILE, treffer('Kotflügel', 'deformiert'))).toBe(true)
+  })
+
+  it('gibt true, wenn eine gesetzte Achse zu den hinterlegten gültigen Werten gehört', () => {
+    expect(
+      achsenPassenZumTeil(TEILE, treffer('Kotflügel', 'deformiert', { quer: 'links' })),
+    ).toBe(true)
+  })
+
+  it('gibt false, wenn eine gesetzte Achse nicht zu den hinterlegten gültigen Werten gehört', () => {
+    // Kotflügel hat keine gültige Längsachse hinterlegt.
+    expect(
+      achsenPassenZumTeil(TEILE, treffer('Kotflügel', 'deformiert', { laengs: 'vorne' })),
+    ).toBe(false)
+  })
+
+  it('prüft jede Achse unabhängig — eine gültige Achse rettet keine ungültige', () => {
+    expect(
+      achsenPassenZumTeil(
+        TEILE,
+        treffer('Heckverkleidung', 'plastisch verformt', { hoehe: 'oben', quer: 'links' }),
+      ),
+      // Höhe ist für die Heckverkleidung gültig, Quer nicht — die Kombination
+      // muss trotzdem als Ganzes verworfen werden.
+    ).toBe(false)
+  })
+
+  it('gibt true für ein unbekanntes Teil — das erledigt klausel() bereits selbst', () => {
+    expect(
+      achsenPassenZumTeil(TEILE, treffer('Dachhimmel', 'deformiert', { laengs: 'vorne' })),
+    ).toBe(true)
   })
 })
 

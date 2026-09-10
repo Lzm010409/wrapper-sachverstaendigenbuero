@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { KATEGORIESCHLUESSEL, kategoriename, type Kategorie } from './kategorien'
 import { verwendungFuer, type Fotovorschlag } from './vorschlag'
 import {
+  achsenPassenZumTeil,
   HOEHENACHSEN,
   istHoehenachse,
   istLaengsachse,
@@ -305,7 +306,12 @@ Grundsätze:
   sie nicht erkennbar oder für den Schaden nicht sinnvoll ist — ein Kratzer
   über die gesamte Breite eines Stossfängers hat z. B. keine sinnvolle
   Querachse. Alle drei dürfen gleichzeitig gesetzt sein ("vorne links
-  oben"), keine ist eine Voraussetzung für eine andere.
+  oben"), keine ist eine Voraussetzung für eine andere. Massgeblich ist
+  aber immer die "Gültige Achsen"-Zeile beim jeweiligen Teil im Auftrag:
+  steht dort für eine Achse "keine", trägst du für DIESES Teil auch "keine"
+  ein — unabhängig davon, was im Bild erkennbar wäre. Die Liste je Teil
+  kann sich unterscheiden, ein Wert, der bei einem Teil gültig ist, ist es
+  nicht automatisch bei einem anderen.
 - Sobald ein Treffer eingetragen ist, wird beschreibung verworfen und der
   Satz stattdessen aus dem Lexikon zusammengesetzt. Formuliere für ein
   gelistetes Teil deshalb NIE selbst in beschreibung — weder statt eines
@@ -376,9 +382,12 @@ export function auftragstext(
     zeilen.push(
       '',
       'Teile-Lexikon (siehe Systemtext — teil/beschaedigungsart nur hieraus wählen, ' +
-        'laengs/quer/hoehe frei je Treffer):',
+        'laengs/quer/hoehe nur aus den je Teil genannten gültigen Achsen):',
       ...teile.flatMap((teil) => [
         `- ${teil.name}:`,
+        `  Gültige Achsen — Längs: ${achsenListe(teil.gueltigeLaengsachsen)}, ` +
+          `Quer: ${achsenListe(teil.gueltigeQuerachsen)}, ` +
+          `Höhe: ${achsenListe(teil.gueltigeHoehenachsen)}`,
         ...(teil.erkennungsmerkmal ? [`  Erkennungsmerkmal: ${teil.erkennungsmerkmal}`] : []),
         ...teil.beschaedigungsarten.map((b) => `  · "${b.begriff}" — ${b.hinweis}`),
       ]),
@@ -400,6 +409,11 @@ export function auftragstext(
 function kurz(text: string | null, hoechstens = 600): string {
   const geputzt = (text ?? '').replace(/\s+/g, ' ').trim()
   return geputzt.length > hoechstens ? `${geputzt.slice(0, hoechstens)}…` : geputzt
+}
+
+/** "links/rechts" oder "keine", wenn für diese Achse nichts hinterlegt ist. */
+function achsenListe(werte: readonly string[]): string {
+  return werte.length > 0 ? werte.join('/') : 'keine'
 }
 
 /**
@@ -447,14 +461,21 @@ function bildunterschrift(
 
   if (vorschlag.kategorie === 'schaden' && teile.length > 0) {
     // `.slice(0, 1)` erzwingt serverseitig, was der Auftragstext nur bitten
-    // kann: nie mehr als ein Treffer je Foto.
-    const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
-      teil: t.teil,
-      laengs: istLaengsachse(t.laengs) ? t.laengs : null,
-      quer: istQuerachse(t.quer) ? t.quer : null,
-      hoehe: istHoehenachse(t.hoehe) ? t.hoehe : null,
-      begriff: t.beschaedigungsart,
-    }))
+    // kann: nie mehr als ein Treffer je Foto. `achsenPassenZumTeil` verwirft
+    // zusätzlich einen Treffer, dessen Achse für dieses Teil laut Lexikon
+    // gar nicht hinterlegt ist — dieselbe Strenge wie bei Teil und
+    // Beschädigungsart, nur für die drei Achsen. Das Klickmenü der manuellen
+    // Bedienung durchläuft diese Prüfung nie, siehe `achsenPassenZumTeil`.
+    const rohtreffer: Rohtreffer[] = vorschlag.treffer
+      .slice(0, 1)
+      .map((t) => ({
+        teil: t.teil,
+        laengs: istLaengsachse(t.laengs) ? t.laengs : null,
+        quer: istQuerachse(t.quer) ? t.quer : null,
+        hoehe: istHoehenachse(t.hoehe) ? t.hoehe : null,
+        begriff: t.beschaedigungsart,
+      }))
+      .filter((r) => achsenPassenZumTeil(teile, r))
     const zusammengesetzt = zusammensetzen(teile, rohtreffer)
     if (!zusammengesetzt) return null
     return zusammengesetzt.trim().replace(/[.;:,\s]+$/, '').slice(0, 120)

@@ -532,10 +532,16 @@ function Vorschlagsformular({
  * sieht, die Ein-Treffer-Grenze der KI gilt hier nicht.
  *
  * Nach der Teil-Wahl erscheinen alle drei Achsen-Reihen (Längs, Quer,
- * Höhe) gleichzeitig, nicht nacheinander — anders als früher gibt es keine
- * Teil-Restriktion mehr, die eine Reihe von einer anderen abhängig machen
- * würde. Jede Achse ist für sich optional (`AchsenReihe`, unten): ein
- * erneuter Klick auf den bereits aktiven Wert wählt ihn wieder ab.
+ * Höhe) gleichzeitig, nicht nacheinander — im Klickmenü gibt es (anders als
+ * bei der KI, siehe `assistent.ts`) keine Teil-Restriktion, die eine Reihe
+ * von einer anderen abhängig machen würde. Jede Achse ist für sich optional
+ * (`AchsenReihe`, unten): ein erneuter Klick auf den bereits aktiven Wert
+ * wählt ihn wieder ab.
+ *
+ * Drei Überschriften (Teil, Richtung, Beschädigungsart) gliedern die
+ * Abschnitte sichtbar — ohne sie war bei drei Achsen-Reihen plus Teil- und
+ * Begriffs-Reihe auf den ersten Blick nicht zu erkennen, wo eine Gruppe
+ * endet und die nächste beginnt.
  *
  * **Exportiert**, weil sowohl der Prüfmodus (`Vorschlagsformular` hier)
  * als auch die normale Fotobearbeitung (`Beschriftung` in
@@ -574,38 +580,47 @@ export function Klickmenue({
 
   return (
     <div className="klickmenue">
-      <div className="klickmenue-reihe" role="group" aria-label="Teil wählen">
-        {teile.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`label-chip ${teil?.id === t.id ? 'aktiv' : ''}`}
-            aria-pressed={teil?.id === t.id}
-            onClick={() => waehleTeil(t)}
-          >
-            {t.name}
-          </button>
-        ))}
+      <div className="klickmenue-abschnitt">
+        <span className="klickmenue-abschnitt-titel">Teil</span>
+        <div className="klickmenue-reihe" role="group" aria-label="Teil wählen">
+          {teile.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`label-chip ${teil?.id === t.id ? 'aktiv' : ''}`}
+              aria-pressed={teil?.id === t.id}
+              onClick={() => waehleTeil(t)}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       {teil ? (
         <>
-          <AchsenReihe label="Längsachse wählen" werte={LAENGSACHSEN} wert={laengs} setzeWert={setzeLaengs} />
-          <AchsenReihe label="Querachse wählen" werte={QUERACHSEN} wert={quer} setzeWert={setzeQuer} />
-          <AchsenReihe label="Höhenachse wählen" werte={HOEHENACHSEN} wert={hoehe} setzeWert={setzeHoehe} />
+          <div className="klickmenue-abschnitt">
+            <span className="klickmenue-abschnitt-titel">Richtung</span>
+            <AchsenReihe label="Längsachse wählen" werte={LAENGSACHSEN} wert={laengs} setzeWert={setzeLaengs} />
+            <AchsenReihe label="Querachse wählen" werte={QUERACHSEN} wert={quer} setzeWert={setzeQuer} />
+            <AchsenReihe label="Höhenachse wählen" werte={HOEHENACHSEN} wert={hoehe} setzeWert={setzeHoehe} />
+          </div>
 
-          <div className="klickmenue-reihe" role="group" aria-label="Schadensart wählen">
-            {teil.beschaedigungsarten.map((b) => (
-              <button
-                key={b.begriff}
-                type="button"
-                className="label-chip"
-                title={b.hinweis}
-                onClick={() => schliesseAb(b.begriff)}
-              >
-                {b.begriff}
-              </button>
-            ))}
+          <div className="klickmenue-abschnitt">
+            <span className="klickmenue-abschnitt-titel">Beschädigungsart</span>
+            <div className="klickmenue-reihe" role="group" aria-label="Schadensart wählen">
+              {teil.beschaedigungsarten.map((b) => (
+                <button
+                  key={b.begriff}
+                  type="button"
+                  className="label-chip"
+                  title={b.hinweis}
+                  onClick={() => schliesseAb(b.begriff)}
+                >
+                  {b.begriff}
+                </button>
+              ))}
+            </div>
           </div>
         </>
       ) : null}
