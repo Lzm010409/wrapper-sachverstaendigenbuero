@@ -72,11 +72,29 @@ export function holeClient(): Anthropic {
  * **Wann es wirkt.** Anthropic legt einen Eintrag erst ab einer Mindestlänge
  * des Präfixes an: 512 Token bei Opus 5, 1024 bei Sonnet 5, 4096 bei
  * Haiku 4.5. Darunter passiert nichts — ohne Fehler, ohne Hinweis, nur
- * `cache_creation_input_tokens: 0`. Werkzeug und Systemanweisung der
- * Extraktion (~1700 Token) und der WBW-Prüfung (~950 Token) liegen unter der
- * Haiku-Schwelle; dort ist der Haltepunkt heute folgenlos und greift von
- * selbst, sobald ein Prompt wächst oder die Aufrufstelle das Modell wechselt.
- * Was tatsächlich ankommt, steht im Protokoll — siehe `protokolliereVerbrauch`.
+ * `cache_creation_input_tokens: 0`. Nach Werkzeug plus Systemanweisung
+ * geschätzt:
+ *
+ * | Aufrufstelle              | Modell   | Präfix | Schwelle | greift        |
+ * |---------------------------|----------|--------|----------|---------------|
+ * | `stellungnahme/komposition` | Sonnet 5 | ~1700  | 1024     | ja            |
+ * | `fotos/assistent`         | Haiku 4.5 | ~2300 | 4096     | noch nicht    |
+ * | `pruefbericht/extraktion`  | Haiku 4.5 | ~1700 | 4096     | noch nicht    |
+ * | `wbw/pruefung`            | Haiku 4.5 | ~950   | 4096     | noch nicht    |
+ *
+ * Bei den drei Haiku-Stellen ist der Haltepunkt heute also folgenlos. Er
+ * greift von selbst, sobald ein Prompt wächst oder die Aufrufstelle das
+ * Modell wechselt — beim Fotoassistenten am ehesten, weil dessen
+ * Werkzeugdefinition mit dem Fotolexikon mitwächst. Was tatsächlich ankommt,
+ * steht im Protokoll — siehe `protokolliereVerbrauch`.
+ *
+ * **Voraussetzung ist ein Byte für Byte gleicher Präfix.** Alle vier
+ * Systemanweisungen sind fest verdrahtet, ohne Einsetzung pro Anfrage; der
+ * Hausstil der Komposition wird einmal geladen und im Modul gehalten; das
+ * Fotolexikon kommt sortiert aus der Datenbank (`orderBy(asc(name))`), damit
+ * die Werkzeugdefinition zwischen zwei Anfragen dieselbe bleibt. Wer hier
+ * etwas Veränderliches einsetzt — Datum, Fall-ID, unsortierte Liste —, macht
+ * das Zwischenspeichern wirkungslos, ohne dass etwas fehlschlägt.
  *
  * Die Lebensdauer beträgt fünf Minuten und wird von jedem Zugriff erneuert.
  * Das passt zu der Art, wie hier gearbeitet wird: ein Vorgang in einem Zug.
