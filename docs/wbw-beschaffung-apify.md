@@ -172,8 +172,11 @@ nie am Portal.**
 *„Gesucht: SHARAN 7-Sitzer 2.0TDI"* mit `adType: "WANTED"`, 11.000 € und
 20.000 km. Ein Wunschpreis eines Käufers, kein Angebot. Ungefiltert wäre er
 als Vergleichsfahrzeug in den Median gegangen. Der Actor führt dafür einen
-Schalter: `adType` muss auf `OFFERED` stehen, und im URL-Weg heisst dasselbe
-`anzeige:angebote`. Das ist **Pflicht**, kein Feinschliff.
+Schalter — und der ist selbst schon die nächste Falle: das **Eingabefeld**
+`adType` nimmt `angebote`, das **Ausgabefeld** desselben Namens meldet
+`OFFERED`. Wer den gelieferten Wert zurückschreibt, filtert nichts. Genau der
+Fehler, der bei AutoScout24 `van` hiess. Gesetzt wird `angebote`, und das ist
+**Pflicht**, kein Feinschliff.
 
 **Kleinanzeigen liefert nur den heutigen Tag.** Über alle drei Probeläufe
 hinweg tragen **31 von 31** Datensätzen dasselbe Einstelldatum — den Tag des
@@ -248,7 +251,7 @@ Was gesetzt wird — und was ausdrücklich **nicht**:
 | Leistung | — | `powerMin`/`Max` | `autos.power_i` (**in PS**) |
 | Unfall | — | `damageStatus: EXCLUDE` | `autos.schaden_s: nein` |
 | Ausschluss | — | `excludeKeywords` (Export, Bastler) | `whatExclude` |
-| Angebote | — | — | **`adType: OFFERED`** (sonst Gesuche) |
+| Angebote | — | — | **`adType: angebote`** (sonst Gesuche) |
 | Details | `includeDetails: true` | `includeDetails: true` | `includeDetails: true` |
 | **Bauart** | **nie** | **nie** | **nie** (kostet einen echten Sharan) |
 
