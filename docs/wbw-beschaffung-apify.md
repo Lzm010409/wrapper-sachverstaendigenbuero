@@ -487,6 +487,52 @@ Aufrufen wären das 4,50 $. Er wird ein Gesamtdeckel für den Lauf, und die
 kostenpflichtige Stufe bleibt zusätzlich ein bewusster Haken in der
 Oberfläche.
 
+### 5. Reihenfolge, Deckel und der Rückfall-Hinweis — umgesetzt
+
+**Apify steht jetzt bei allen drei Portalen vorn**, die kostenlosen Stufen
+bleiben als Rückfall darunter. Der Grund ist schmal und benennbar: nur für
+Apify ist gemessen, dass Umkreis, Laufleistung und Baujahr am Portal wirken
+und ein tragfähiger Korb herauskommt.
+
+**Der Deckel gilt jetzt für den Lauf.** `maxTotalChargeUsd` ist bei Apify ein
+Deckel **je Aufruf**. Er stand auf 0,50 $, und ein Lauf ruft drei Portale in
+bis zu drei Zyklen auf — neun Aufrufe, also bis zu **4,50 $**, ohne dass
+irgendwo eine Grenze gerissen wäre. Jeder einzelne Aufruf hätte sich an seinen
+Deckel gehalten.
+
+`wbw-plugin/budget.js` führt deshalb ein Hauptbuch im Ordner des Vorgangs. Es
+liegt als Datei dort, weil die Portale als eigene Kindprozesse laufen — eine
+Zahl im Speicher überlebt das nicht. Reserviert wird **pessimistisch**: der
+volle Betrag vor dem Aufruf, der ungenutzte Teil danach zurück. Ein Prozess,
+der abstürzt, hat damit zu viel abgebucht und nicht zu wenig.
+
+| | Wert | Wirkung |
+| --- | --- | --- |
+| `maxTotalChargeUsd` je Aufruf | 0,20 $ | harte Grenze, von Apify durchgesetzt |
+| Hauptbuch je Lauf | 1,00 $ | weiche Grenze, aus der Preisliste gerechnet |
+
+**Die Schätzung ist eine Schätzung.** Was ein Lauf wirklich kostet, steht auf
+der Abrechnung. Das Hauptbuch rechnet aus Grundpreis plus Preis je Datensatz —
+die Zahlen stehen je Stufe in `providers.json` und stammen aus den
+Probeläufen. Deshalb bleibt der Deckel je Aufruf zusätzlich bestehen.
+
+**Ein Rückfall ist nie still.** Er steht im Protokoll des Laufs und in der
+Benachrichtigung. Erkannt wird er am Beschaffungsprotokoll selbst:
+`versuche[0]` ist immer die erste Stufe, auch wenn sie übersprungen wurde —
+steht dort eine andere als die, die getragen hat, war es ein Rückfall. Das
+kommt ohne einen zweiten Blick in `providers.json` aus, und damit können die
+beiden nicht auseinanderlaufen.
+
+**Zwei Arten von Rückfall, und nur eine ist eine Warnung.** Weil Apify jetzt
+vorn steht und hinter dem Kosten-Haken liegt, würde ohne diese Unterscheidung
+**jeder** Lauf ohne Haken eine Warnung erzeugen — eine, die nach der dritten
+niemand mehr liest.
+
+| Grund | Meldung |
+| --- | --- |
+| Kosten-Haken nicht gesetzt | Hinweis: „die kostenpflichtige Stufe war für diesen Lauf nicht freigegeben" |
+| Apify gescheitert (HTTP, Zeitüberschreitung, Budget) | **Warnung**: „der Korb kann anders zustande gekommen sein als geplant" |
+
 ## Was offen bleibt
 
 - ~~Trägt Kleinanzeigen einen Korb?~~ **Ja, mit Tiefe 80:** 17 und 18
@@ -520,4 +566,4 @@ Oberfläche.
 | 2 | Feldkarte + `mappe()` gegen die echten Datensätze | ✅ 30 Tests, Vertrag hält |
 | 3 | Filter je Portal setzen, Gesuche nachfiltern, Selbstprüfung | Testfall: Subjekt → erwartetes Eingabeobjekt |
 | 4 | Bauartfilter im Plugin auf die neuen Werte, weich | ✅ 25 Tests, Citan-Regressionsfall |
-| 5 | Umhängen auf L0, Gesamtdeckel, Rückfall-Hinweis | ein echter Lauf im Cockpit |
+| 5 | Apify nach vorn, Gesamtdeckel, Rückfall-Hinweis | ✅ 20 Tests — offen: ein echter Lauf im Cockpit |

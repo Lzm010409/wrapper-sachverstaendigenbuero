@@ -16,6 +16,7 @@
  */
 const { holeJson, zahl, ez, ausstattung, leeresFahrzeug, fehlendeZugangsdaten } = require("./gemeinsam.js");
 const { mappeMitKarte } = require("./feldkarte.js");
+const { reserviere, erstatte, schaetzeKosten } = require("../budget.js");
 
 const BASIS = "https://api.apify.com/v2";
 
@@ -118,9 +119,32 @@ async function holen(eingaben, opts = {}) {
   const input = inputKey ? eingaben[inputKey] : eingaben;
   if (!input) throw new Error(`L3 Apify: Eingabeblock "${inputKey}" fehlt in search-inputs.json`);
 
+  /*
+    Zwei Deckel, und beide werden gebraucht.
+
+    `maxTotalChargeUsd` gilt bei Apify **je Aufruf** — bei drei Portalen in bis
+    zu drei Zyklen sind das neun Aufrufe. Der alte Wert 0,50 $ je Aufruf ergab
+    also bis zu 4,50 $, ohne dass irgendwo eine Grenze gerissen wäre.
+
+    Das Hauptbuch in `budget.js` deckelt den ganzen Lauf. Reserviert wird
+    pessimistisch: der volle Betrag vor dem Aufruf, der ungenutzte Teil danach
+    zurück. Fehlt das Hauptbuch, bleibt es beim Deckel je Aufruf — dann
+    verhält sich alles wie bisher.
+  */
+  const wunsch = opts.maxTotalChargeUsd ?? 0.5;
+  const deckel = reserviere(opts.budgetDatei, wunsch, `${opts.quelle || actor}`);
+  if (opts.budgetDatei && deckel <= 0) {
+    const e = new Error(
+      `L3 Apify: Der Gesamtdeckel des Laufs ist erschöpft (${opts.budgetDatei}). ` +
+      "Kein weiterer kostenpflichtiger Aufruf."
+    );
+    e.code = "BUDGET_ERSCHOEPFT";
+    throw e;
+  }
+
   const url = `${BASIS}/acts/${encodeURIComponent(actor.replace("/", "~"))}/run-sync-get-dataset-items`
     + `?token=${encodeURIComponent(token())}`
-    + `&maxTotalChargeUsd=${encodeURIComponent(String(opts.maxTotalChargeUsd ?? 0.5))}`;
+    + `&maxTotalChargeUsd=${encodeURIComponent(String(deckel))}`;
   const t0 = Date.now();
   const r = await holeJson(url, {
     method: "POST",
@@ -128,8 +152,15 @@ async function holen(eingaben, opts = {}) {
     body: JSON.stringify(input),
     timeoutMs: opts.timeoutMs ?? 600000,
   });
-  if (r.status < 200 || r.status >= 300) throw new Error(`L3 Apify: HTTP ${r.status} für Actor ${actor}`);
+  if (r.status < 200 || r.status >= 300) {
+    // Auch ein gescheiterter Aufruf kann den Grundpreis gekostet haben —
+    // erstattet wird deshalb nur, was darüber hinaus reserviert war.
+    erstatte(opts.budgetDatei, Math.max(0, deckel - schaetzeKosten(0, opts)), `${opts.quelle || actor} (HTTP ${r.status})`);
+    throw new Error(`L3 Apify: HTTP ${r.status} für Actor ${actor}`);
+  }
   const roh = Array.isArray(r.daten) ? r.daten : [];
+  const geschaetzt = schaetzeKosten(roh.length, opts);
+  erstatte(opts.budgetDatei, Math.max(0, deckel - geschaetzt), `${opts.quelle || actor}`);
   const warnungen = [];
   const quelle = opts.quelle || "apify";
 
@@ -142,7 +173,8 @@ async function holen(eingaben, opts = {}) {
     items,
     protokoll: {
       abrufe: [{ url: `${BASIS}/acts/${actor}/run-sync-get-dataset-items`, status: r.status, ms: Date.now() - t0, zeitpunkt: new Date().toISOString() }],
-      actor, maxTotalChargeUsd: opts.maxTotalChargeUsd ?? 0.5, rohTreffer: roh.length, gesuche, warnungen,
+      actor, maxTotalChargeUsd: deckel, geschaetzteKostenUsd: geschaetzt,
+      rohTreffer: roh.length, gesuche, warnungen,
       kostenpflichtig: true,
     },
     roh,

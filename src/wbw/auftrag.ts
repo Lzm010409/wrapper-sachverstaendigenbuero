@@ -3,7 +3,13 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { wbwLauf } from '@/db/schema'
 import { waehleSuchmodell } from './modell'
-import { ermittleModelle, fuehreLaufAus, type Schritt, type WbwEingabe } from './lauf'
+import {
+  ermittleModelle,
+  fuehreLaufAus,
+  rueckfallHinweis,
+  type Schritt,
+  type WbwEingabe,
+} from './lauf'
 import { notiere } from '@/melden/ablage'
 import { leseErgebnis } from './ergebnis'
 import { fehlendeLaufangaben, type LaufEingaben } from './lauf-eingaben'
@@ -237,15 +243,22 @@ async function fuehreAus(
     // ohne diese Meldung endete er lautlos.
     const gelesen = leseErgebnis(ergebnis.ergebnis)
     const korb = gelesen?.wert.anzahl ?? 0
+    /*
+      Ein Rückfall auf eine andere Beschaffungsstufe gehört in die Meldung,
+      nicht nur ins Protokoll. Wer den Lauf angestossen hat, sieht sonst nur
+      die Korbzahl — und die sieht bei einem Rückfall genauso aus wie sonst.
+      Ein stiller Rückfall ist derselbe Fehler wie die stille PDF-Stufe.
+    */
+    const hinweis = rueckfallHinweis(ergebnis.rueckfaelle)
     await notiere({
       benutzerId,
-      art: korb > 0 ? 'erfolg' : 'warnung',
+      art: korb > 0 && !hinweis?.warnung ? 'erfolg' : 'warnung',
       titel: 'Vergleichsfahrzeuge gefunden',
       text:
-        korb > 0
+        (korb > 0
           ? `${korb} Fahrzeuge im Korb, Vorschlag ${betragText(gelesen?.wert.vorschlagBrutto)}.`
           : 'Der Lauf ist durchgelaufen, aber kein Fahrzeug hat es in den Korb geschafft. ' +
-            'Die Toleranzen sind vermutlich zu eng.',
+            'Die Toleranzen sind vermutlich zu eng.') + (hinweis ? ` ${hinweis.text}` : ''),
       verweis: `/faelle/${fallId}?reiter=wbw`,
       quelle: 'wbw',
     })

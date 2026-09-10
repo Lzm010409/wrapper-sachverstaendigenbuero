@@ -11,6 +11,16 @@
       "inputKey": "mobileDe",
       "stufen": [
         {
+          "id": "L3",
+          "adapter": "apify",
+          "enabled": true,
+          "actor": "blackfalcondata/mobile-de-scraper",
+          "maxTotalChargeUsd": 0.2,
+          "kostenpflichtig": true,
+          "grundpreisUsd": 0.005,
+          "preisJeDatensatzUsd": 0.00059
+        },
+        {
           "id": "L0",
           "adapter": "mobilede",
           "enabled": false,
@@ -23,20 +33,22 @@
           "ueberPortal": "mobilede",
           "enabled": false,
           "grund": "Kein Bright-Data-Konto vorhanden. Adapter ist verdrahtet, aber nicht live verifiziert. Bei vorhandenem BRIGHTDATA_TOKEN auf true setzen und einmal gegen eine echte Antwort pruefen."
-        },
-        {
-          "id": "L3",
-          "adapter": "apify",
-          "enabled": true,
-          "actor": "blackfalcondata/mobile-de-scraper",
-          "maxTotalChargeUsd": 0.5,
-          "kostenpflichtig": true
         }
       ]
     },
     "autoscout24": {
       "inputKey": "autoScout",
       "stufen": [
+        {
+          "id": "L3",
+          "adapter": "apify",
+          "enabled": true,
+          "actor": "blackfalcondata/autoscout24-scraper",
+          "maxTotalChargeUsd": 0.2,
+          "kostenpflichtig": true,
+          "grundpreisUsd": 0.005,
+          "preisJeDatensatzUsd": 0.00049
+        },
         {
           "id": "L0",
           "adapter": "autoscout24",
@@ -50,14 +62,6 @@
           "ueberPortal": "autoscout24",
           "enabled": false,
           "grund": "Nicht noetig: L0 traegt reproduzierbar. Bleibt als Reserve verdrahtet, falls AutoScout24 spaeter blockt."
-        },
-        {
-          "id": "L3",
-          "adapter": "apify",
-          "enabled": true,
-          "actor": "blackfalcondata/autoscout24-scraper",
-          "maxTotalChargeUsd": 0.5,
-          "kostenpflichtig": true
         }
       ]
     },
@@ -65,22 +69,26 @@
       "inputKey": "kleinanzeigen",
       "stufen": [
         {
+          "id": "L3",
+          "adapter": "apify",
+          "enabled": true,
+          "actor": "blackfalcondata/kleinanzeigen-scraper",
+          "maxTotalChargeUsd": 0.2,
+          "kostenpflichtig": true,
+          "grund_actorwechsel": "Vorher fatihtahta/ebay-kleinanzeigen-scraper. Der erwartet andere Eingabeschluessel (queries/car_make/min_mileage/enrich_data/limit) als der hier gebaute Eingabeblock. Unbekannte Schluessel werden laut Schema \"sent as-is\" und filtern still nicht. Der blackfalcondata-Actor ist der, gegen den die Probelaeufe 1 bis 5 gemessen wurden - siehe docs/wbw-beschaffung-apify.md.",
+          "grundpreisUsd": 0.005,
+          "preisJeDatensatzUsd": 0.0004
+        },
+        {
           "id": "L1",
           "adapter": "kleinanzeigen",
           "enabled": true,
           "endpointEnv": "KA_API_BASE",
           "beleg": "Wird vom Cockpit selbst beantwortet: POST {KA_API_BASE}/inserate-by-url liefert success:true, GET {KA_API_BASE}/inserat/{adid} liefert Kilometerstand, Erstzulassung, Leistung, Getriebe, Kraftstoffart, Fahrzeugtyp, Anzahl Tueren - dieselben Felder und dieselbe Antwortform wie der frueher ausgelagerte Dienst (DanielWTE/ebay-kleinanzeigen-api). Kleinanzeigen liefert Trefferliste und Detailseite fertig gerendert; am 07.09.2026 ohne Browser nachgemessen. Zeitweise HTTP 403 ('IP-Bereich voruebergehend gesperrt') ist eine Frequenzbremse und kein Ausschluss: sechs Aufrufe ohne Pause ergaben 403 200 200 403 403 200, mit vier Sekunden Abstand dreimal 200. Der Abruf im Cockpit haelt deshalb Abstand und wiederholt."
-        },
-        {
-          "id": "L3",
-          "adapter": "apify",
-          "enabled": true,
-          "actor": "blackfalcondata/kleinanzeigen-scraper",
-          "maxTotalChargeUsd": 0.5,
-          "kostenpflichtig": true,
-          "grund_actorwechsel": "Vorher fatihtahta/ebay-kleinanzeigen-scraper. Der erwartet andere Eingabeschluessel (queries/car_make/min_mileage/enrich_data/limit) als der hier gebaute Eingabeblock. Unbekannte Schluessel werden laut Schema \"sent as-is\" und filtern still nicht. Der blackfalcondata-Actor ist der, gegen den die Probelaeufe 1 bis 5 gemessen wurden - siehe docs/wbw-beschaffung-apify.md."
         }
       ]
     }
-  }
+  },
+  "_reihenfolge": "Apify steht bewusst VORN. Die kostenlosen Stufen bleiben als Rueckfall darunter. Grund: die Probelaeufe 1 bis 5 (docs/wbw-beschaffung-apify.md) haben nur fuer Apify belegt, dass Umkreis, Laufleistung und Baujahr am Portal wirken und ein tragfaehiger Korb herauskommt. Greift ein Rueckfall, steht das im Beschaffungsprotokoll UND in der Benachrichtigung - ein stiller Rueckfall ist derselbe Fehler wie die stille PDF-Stufe.",
+  "_deckel": "maxTotalChargeUsd gilt je Aufruf. Ein Lauf ruft bis zu neun Mal auf (drei Portale, drei Zyklen), deshalb deckelt budget.js zusaetzlich den ganzen Lauf ueber ein Hauptbuch im Ordner des Vorgangs. Die Preise je Stufe stammen aus den Probelaeufen."
 }
