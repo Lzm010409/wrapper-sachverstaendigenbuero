@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { fotoTeil } from '@/db/schema'
 import { protokolliereWarnung } from '@/protokoll'
-import { SEITEN, type Beschaedigungsart, type FotoTeil, type Seite } from './lexikon'
+import type { Beschaedigungsart, FotoTeil } from './lexikon'
 
 /**
  * Die Datenschicht des Fotolexikons.
@@ -20,7 +20,6 @@ const beschaedigungsartSchema = z.object({ begriff: z.string(), hinweis: z.strin
 
 export interface FotoTeilEingabe {
   name: string
-  seiten: Seite[]
   /** Wie sich das Teil optisch von Nachbarteilen abgrenzt. Optional. */
   erkennungsmerkmal: string | null
   beschaedigungsarten: Beschaedigungsart[]
@@ -48,9 +47,6 @@ export async function ladeLexikon(): Promise<FotoTeil[]> {
     return {
       id: z.id,
       name: z.name,
-      // Enum-Werte aus Postgres — schon durch `fotoTeilSeiteEnum` begrenzt,
-      // eine erneute Prüfung wäre nur eine Wiederholung derselben Garantie.
-      seiten: z.seiten.filter((s): s is Seite => (SEITEN as readonly string[]).includes(s)),
       erkennungsmerkmal: z.erkennungsmerkmal,
       beschaedigungsarten,
     }

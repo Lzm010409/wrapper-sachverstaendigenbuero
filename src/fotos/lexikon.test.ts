@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { istSeite, toggleTreffer, zusammensetzen, type FotoTeil, type Rohtreffer } from './lexikon'
+import {
+  istHoehenachse,
+  istLaengsachse,
+  istQuerachse,
+  toggleTreffer,
+  zusammensetzen,
+  type FotoTeil,
+  type Rohtreffer,
+} from './lexikon'
 
 const KOTFLUEGEL: FotoTeil = {
   id: 't1',
   name: 'Kotflügel',
-  seiten: ['links', 'rechts'],
   erkennungsmerkmal: null,
   beschaedigungsarten: [
     { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
@@ -15,58 +22,72 @@ const KOTFLUEGEL: FotoTeil = {
 const HECKVERKLEIDUNG: FotoTeil = {
   id: 't2',
   name: 'Heckverkleidung',
-  seiten: [],
   erkennungsmerkmal: null,
   beschaedigungsarten: [{ begriff: 'plastisch verformt', hinweis: 'Kunststoff eingedrückt' }],
 }
 
 const TEILE = [KOTFLUEGEL, HECKVERKLEIDUNG]
 
-function treffer(teil: string, seite: Rohtreffer['seite'], begriff: string): Rohtreffer {
-  return { teil, seite, begriff }
+function treffer(
+  teil: string,
+  begriff: string,
+  achsen: Partial<Pick<Rohtreffer, 'laengs' | 'quer' | 'hoehe'>> = {},
+): Rohtreffer {
+  return { teil, laengs: null, quer: null, hoehe: null, ...achsen, begriff }
 }
 
-describe('istSeite', () => {
-  it('erkennt die vier gültigen Seiten', () => {
-    expect(istSeite('links')).toBe(true)
-    expect(istSeite('oben')).toBe(false)
+describe('istLaengsachse / istQuerachse / istHoehenachse', () => {
+  it('erkennt die gültigen Werte jeder Achse', () => {
+    expect(istLaengsachse('vorne')).toBe(true)
+    expect(istLaengsachse('links')).toBe(false)
+    expect(istQuerachse('links')).toBe(true)
+    expect(istQuerachse('oben')).toBe(false)
+    expect(istHoehenachse('mittig')).toBe(true)
+    expect(istHoehenachse('vorne')).toBe(false)
   })
 })
 
 describe('zusammensetzen', () => {
-  it('baut den Satz aus Teil, Seite und Begriff', () => {
-    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'rechts', 'deformiert')])).toBe(
+  it('baut den Satz ohne jede Achse', () => {
+    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'deformiert')])).toBe('Kotflügel deformiert')
+  })
+
+  it('baut den Satz mit nur der Querachse', () => {
+    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'deformiert', { quer: 'rechts' })])).toBe(
       'Kotflügel rechts deformiert',
     )
   })
 
-  it('lässt die Seite weg, wenn das Teil keine hat', () => {
-    expect(zusammensetzen(TEILE, [treffer('Heckverkleidung', null, 'plastisch verformt')])).toBe(
-      'Heckverkleidung plastisch verformt',
-    )
+  it('baut den Satz mit Längs- und Querachse in dieser Reihenfolge', () => {
+    expect(
+      zusammensetzen(TEILE, [
+        treffer('Kotflügel', 'deformiert', { laengs: 'vorne', quer: 'links' }),
+      ]),
+    ).toBe('Kotflügel vorne links deformiert')
   })
 
-  it('ignoriert eine mitgelieferte Seite bei einem Teil ohne Seitenbezug', () => {
-    // Die Kombination bleibt gültig — nur die Seite gehört nicht in den Satz.
-    expect(zusammensetzen(TEILE, [treffer('Heckverkleidung', 'links', 'plastisch verformt')])).toBe(
-      'Heckverkleidung plastisch verformt',
-    )
+  it('baut den Satz mit allen drei Achsen in der Reihenfolge Längs, Quer, Höhe', () => {
+    expect(
+      zusammensetzen(TEILE, [
+        treffer('Kotflügel', 'deformiert', { laengs: 'vorne', quer: 'links', hoehe: 'oben' }),
+      ]),
+    ).toBe('Kotflügel vorne links oben deformiert')
+  })
+
+  it('erlaubt jede Achsenkombination für jedes Teil — es gibt keine Teil-Restriktion mehr', () => {
+    expect(
+      zusammensetzen(TEILE, [
+        treffer('Heckverkleidung', 'plastisch verformt', { laengs: 'hinten', hoehe: 'unten' }),
+      ]),
+    ).toBe('Heckverkleidung hinten unten plastisch verformt')
   })
 
   it('gibt null, wenn das Teil nicht im Lexikon steht', () => {
-    expect(zusammensetzen(TEILE, [treffer('Dachhimmel', null, 'deformiert')])).toBeNull()
+    expect(zusammensetzen(TEILE, [treffer('Dachhimmel', 'deformiert')])).toBeNull()
   })
 
   it('gibt null, wenn die Beschädigungsart nicht zum Teil gehört', () => {
-    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'links', 'plastisch verformt')])).toBeNull()
-  })
-
-  it('gibt null, wenn die Seite für dieses Teil nicht erlaubt ist', () => {
-    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'vorne', 'deformiert')])).toBeNull()
-  })
-
-  it('gibt null, wenn eine Seite verlangt ist, aber keine mitkommt', () => {
-    expect(zusammensetzen(TEILE, [treffer('Kotflügel', null, 'deformiert')])).toBeNull()
+    expect(zusammensetzen(TEILE, [treffer('Kotflügel', 'plastisch verformt')])).toBeNull()
   })
 
   it('gibt null für ein leeres Array', () => {
@@ -76,8 +97,8 @@ describe('zusammensetzen', () => {
   it('verbindet zwei gültige Treffer mit Komma', () => {
     expect(
       zusammensetzen(TEILE, [
-        treffer('Kotflügel', 'links', 'deformiert'),
-        treffer('Heckverkleidung', null, 'plastisch verformt'),
+        treffer('Kotflügel', 'deformiert', { quer: 'links' }),
+        treffer('Heckverkleidung', 'plastisch verformt'),
       ]),
     ).toBe('Kotflügel links deformiert, Heckverkleidung plastisch verformt')
   })
@@ -85,8 +106,8 @@ describe('zusammensetzen', () => {
   it('lässt einen ungültigen Treffer stillschweigend heraus, den gültigen nicht', () => {
     expect(
       zusammensetzen(TEILE, [
-        treffer('Kotflügel', 'links', 'deformiert'),
-        treffer('Dachhimmel', null, 'zerkratzt'),
+        treffer('Kotflügel', 'deformiert', { quer: 'links' }),
+        treffer('Dachhimmel', 'zerkratzt'),
       ]),
     ).toBe('Kotflügel links deformiert')
   })
@@ -94,26 +115,32 @@ describe('zusammensetzen', () => {
 
 describe('toggleTreffer', () => {
   it('fügt einen neuen Treffer hinzu, wenn die Liste leer ist', () => {
-    const t = treffer('Kotflügel', 'links', 'deformiert')
+    const t = treffer('Kotflügel', 'deformiert', { quer: 'links' })
     expect(toggleTreffer([], t)).toEqual([t])
   })
 
   it('fügt einen zweiten, unterschiedlichen Treffer hinzu, ohne den ersten zu verlieren', () => {
-    const erster = treffer('Kotflügel', 'links', 'deformiert')
-    const zweiter = treffer('Heckverkleidung', null, 'plastisch verformt')
+    const erster = treffer('Kotflügel', 'deformiert', { quer: 'links' })
+    const zweiter = treffer('Heckverkleidung', 'plastisch verformt')
     expect(toggleTreffer([erster], zweiter)).toEqual([erster, zweiter])
   })
 
   it('entfernt einen Treffer wieder, wenn exakt derselbe erneut übergeben wird', () => {
-    const t = treffer('Kotflügel', 'links', 'deformiert')
+    const t = treffer('Kotflügel', 'deformiert', { quer: 'links' })
     expect(toggleTreffer([t], { ...t })).toEqual([])
   })
 
-  it('unterscheidet zwei Treffer mit gleichem Teil, aber unterschiedlicher Seite', () => {
-    const links = treffer('Kotflügel', 'links', 'deformiert')
-    const rechts = treffer('Kotflügel', 'rechts', 'deformiert')
+  it('unterscheidet zwei Treffer mit gleichem Teil, aber unterschiedlicher Querachse', () => {
+    const links = treffer('Kotflügel', 'deformiert', { quer: 'links' })
+    const rechts = treffer('Kotflügel', 'deformiert', { quer: 'rechts' })
     // Der zweite Klick fügt "rechts" hinzu, statt "links" zu entfernen —
     // beide sind unterschiedliche Kombinationen, keine Verwechslung.
     expect(toggleTreffer([links], rechts)).toEqual([links, rechts])
+  })
+
+  it('unterscheidet zwei Treffer mit gleicher Quer-, aber unterschiedlicher Höhenachse', () => {
+    const oben = treffer('Kotflügel', 'deformiert', { quer: 'links', hoehe: 'oben' })
+    const unten = treffer('Kotflügel', 'deformiert', { quer: 'links', hoehe: 'unten' })
+    expect(toggleTreffer([oben], unten)).toEqual([oben, unten])
   })
 })

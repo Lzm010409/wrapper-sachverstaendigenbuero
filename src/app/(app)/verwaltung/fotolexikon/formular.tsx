@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { SEITEN, type FotoTeil, type Seite } from '@/fotos/lexikon'
+import type { FotoTeil } from '@/fotos/lexikon'
 import { loescheFotoTeil, speichereFotoTeil } from '@/fotos/lexikon-aktionen'
 import { useMelder } from '@/app/teile/melder'
 import { ausErgebnis } from '@/melden/typen'
@@ -33,16 +33,11 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
   const [bearbeiten, setzeBearbeiten] = useState(!teil)
   const [name, setzeName] = useState(teil?.name ?? '')
   const [erkennungsmerkmal, setzeErkennungsmerkmal] = useState(teil?.erkennungsmerkmal ?? '')
-  const [seiten, setzeSeiten] = useState<Seite[]>(teil?.seiten ?? [])
   const [zeilen, setzeZeilen] = useState<ZeileEingabe[]>(
     teil && teil.beschaedigungsarten.length > 0 ? teil.beschaedigungsarten : [LEERE_ZEILE],
   )
   const [laeuft, starte] = useTransition()
   const { melde } = useMelder()
-
-  function schalteSeite(s: Seite, an: boolean) {
-    setzeSeiten((alt) => (an ? [...alt, s] : alt.filter((x) => x !== s)))
-  }
 
   function aendereZeile(index: number, feld: keyof ZeileEingabe, wert: string) {
     setzeZeilen((alt) => alt.map((z, i) => (i === index ? { ...z, [feld]: wert } : z)))
@@ -56,7 +51,6 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
     starte(async () => {
       const ergebnis = await speichereFotoTeil(teil?.id, {
         name,
-        seiten,
         erkennungsmerkmal,
         beschaedigungsarten: zeilen,
       })
@@ -67,7 +61,6 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
           // Neuanlage geglückt: Maske für den nächsten Eintrag leeren.
           setzeName('')
           setzeErkennungsmerkmal('')
-          setzeSeiten([])
           setzeZeilen([LEERE_ZEILE])
         } else {
           // Geänderter Eintrag: zuklappen, dieselbe Ruhe wie die übrigen Zeilen.
@@ -92,7 +85,6 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
     if (!teil) return
     setzeName(teil.name)
     setzeErkennungsmerkmal(teil.erkennungsmerkmal ?? '')
-    setzeSeiten(teil.seiten)
     setzeZeilen(teil.beschaedigungsarten.length > 0 ? teil.beschaedigungsarten : [LEERE_ZEILE])
     setzeBearbeiten(false)
   }
@@ -100,7 +92,6 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
   const kannSpeichern = name.trim().length > 0 && zeilen.some((z) => z.begriff.trim())
 
   if (teil && !bearbeiten) {
-    const seitenText = teil.seiten.length > 0 ? teil.seiten.join('/') : 'ohne Seite'
     const begriffe = teil.beschaedigungsarten.map((b) => b.begriff).join(', ') || '—'
     return (
       <div
@@ -110,7 +101,7 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <strong>{teil.name}</strong>{' '}
           <span className="unterzeile" style={{ margin: 0 }}>
-            · {seitenText} · {begriffe}
+            · {begriffe}
           </span>
         </div>
         <button type="button" className="knopf-schlicht" onClick={() => setzeBearbeiten(true)}>
@@ -144,29 +135,6 @@ export function TeilFormular({ teil }: { teil?: FotoTeil }) {
           placeholder="Wie unterscheidet sich dieses Teil optisch von Nachbarteilen? Optional, aber hilfreich bei leicht verwechselbaren Teilen."
           onChange={(e) => setzeErkennungsmerkmal(e.target.value)}
         />
-      </div>
-
-      <div className="feld" style={{ marginTop: 10 }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Seiten</span>
-        <div className="feldgruppe">
-          {SEITEN.map((s) => (
-            <label key={s} style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 400 }}>
-              <input
-                type="checkbox"
-                checked={seiten.includes(s)}
-                disabled={laeuft}
-                onChange={(e) => schalteSeite(s, e.target.checked)}
-              />{' '}
-              {s}
-            </label>
-          ))}
-        </div>
-        <p className="unterzeile" style={{ margin: 0 }}>
-          Mehrere ankreuzen, wenn beide Seiten vorkommen können — ein Eintrag „Scheinwerfer&quot;
-          mit links und rechts angekreuzt reicht für beide, kein zweiter Eintrag nötig. Keine
-          angekreuzt: das Teil bekommt im Satz keine Seite, z. B. „Heckverkleidung plastisch
-          verformt&quot;.
-        </p>
       </div>
 
       <div className="feld" style={{ marginTop: 10 }}>

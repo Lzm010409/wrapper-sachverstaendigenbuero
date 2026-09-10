@@ -13,11 +13,8 @@
  * deformiert" etwa steht dort für Blechteile durchgängig, nicht nur
  * „deformiert" — das übernimmt diese Liste, statt es zu erraten.
  */
-import type { Seite } from '../src/fotos/lexikon'
-
 export interface Vorlage {
   name: string
-  seiten: Seite[]
   erkennungsmerkmal: string
   beschaedigungsarten: { begriff: string; hinweis: string }[]
 }
@@ -25,7 +22,6 @@ export interface Vorlage {
 export const TEILE: Vorlage[] = [
   {
     name: 'Kotflügel',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal:
       'Sitzt zwischen Scheinwerfer/Frontverkleidung und der Tür, umschliesst den ' +
       'Radlauf. Anders als die Tür hat er keinen Türgriff und keine umlaufende Fuge.',
@@ -42,7 +38,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Tür',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal:
       'Trägt Türgriff und Fensterrahmen, umlaufende Fuge zu Kotflügel, Seitenwand ' +
       'und Schweller. Nicht der Kotflügel (kein Griff, keine Fuge ringsum).',
@@ -53,7 +48,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Seitenwand',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal:
       'Durchgehende Blechfläche zwischen den Radläufen, ohne eigene Tür-Fuge — bei ' +
       'Transportern oft fensterlos. Nicht die Tür (keine Fuge, kein Griff).',
@@ -64,7 +58,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Schweller',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal: 'Schmale Leiste unterhalb der Türen, zwischen Vorder- und Hinterrad.',
     beschaedigungsarten: [
       { begriff: 'kratzbeschädigt', hinweis: 'Oberflächlicher Kratzer oder Schürfspur, ohne Verformung.' },
@@ -72,7 +65,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Frontverkleidung',
-    seiten: [],
     erkennungsmerkmal:
       'Stossfänger vorne, meist über die gesamte Fahrzeugbreite, aus Kunststoff — ' +
       'anders als der lackierte Blech-Kotflügel daneben.',
@@ -87,7 +79,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Heckverkleidung',
-    seiten: [],
     erkennungsmerkmal: 'Stossfänger hinten — dieselbe Bauart wie die Frontverkleidung, nur am Heck.',
     beschaedigungsarten: [
       { begriff: 'kratzbeschädigt', hinweis: 'Oberflächlicher Kratzer im Kunststoff, ohne Verformung.' },
@@ -100,7 +91,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Heckklappe',
-    seiten: [],
     erkennungsmerkmal:
       'Grosse, nach oben klappbare Tür am Heck über dem Kennzeichen, trägt meist die ' +
       'Rückleuchten.',
@@ -111,7 +101,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Spiegel',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal: 'Aussenspiegelgehäuse aus Kunststoff, an der Tür montiert.',
     beschaedigungsarten: [
       { begriff: 'kratzbeschädigt', hinweis: 'Oberflächlicher Kratzer im Gehäuse.' },
@@ -120,7 +109,6 @@ export const TEILE: Vorlage[] = [
   },
   {
     name: 'Felge',
-    seiten: ['links', 'rechts'],
     erkennungsmerkmal: 'Metallrad unter dem Reifen, durch die Speichen sichtbar.',
     beschaedigungsarten: [
       {

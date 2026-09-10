@@ -2,7 +2,17 @@ import 'server-only'
 import { z } from 'zod'
 import { KATEGORIESCHLUESSEL, kategoriename, type Kategorie } from './kategorien'
 import { verwendungFuer, type Fotovorschlag } from './vorschlag'
-import { istSeite, SEITEN, zusammensetzen, type FotoTeil, type Rohtreffer } from './lexikon'
+import {
+  HOEHENACHSEN,
+  istHoehenachse,
+  istLaengsachse,
+  istQuerachse,
+  LAENGSACHSEN,
+  QUERACHSEN,
+  zusammensetzen,
+  type FotoTeil,
+  type Rohtreffer,
+} from './lexikon'
 import { MODELLE, rufeMitWerkzeugAuf, type InhaltsBlock } from '@/ki/client'
 import { protokolliereWarnung } from '@/protokoll'
 
@@ -28,10 +38,11 @@ import { protokolliereWarnung } from '@/protokoll'
  * siehe `bildunterschrift` weiter unten.
  *
  * **Das Teile-Lexikon (`lexikon.ts`) bindet den Wortlaut — nur bei
- * `schaden`.** Ist im Haus ein Teil hinterlegt (Seite, Beschädigungsarten
- * mit Begriff), muss das Modell für ein Schadendetail-Foto mit dem einen
- * erkannten Teil genau einen Treffer (Teil, Seite, Beschädigungsart)
- * liefern, nur aus dieser Liste — nie mehr als einen je Foto, auch wenn
+ * `schaden`.** Ist im Haus ein Teil hinterlegt (Beschädigungsarten mit
+ * Begriff, dazu die drei freien Achsen laengs/quer/hoehe), muss das Modell
+ * für ein Schadendetail-Foto mit dem einen erkannten Teil genau einen
+ * Treffer (Teil, drei Achsen, Beschädigungsart) liefern, nur aus dieser
+ * Liste — nie mehr als einen je Foto, auch wenn
  * mehrere Teile zu sehen sind: ein Foto zeigt einen Schaden, nicht eine
  * Liste. Der Satz wird serverseitig aus dem Treffer zusammengesetzt
  * (`zusammensetzen` in `lexikon.ts`), nicht vom Modell formuliert. Ein nicht
@@ -87,7 +98,9 @@ export interface Bildpaket {
 
 const trefferSchema = z.object({
   teil: z.string(),
-  seite: z.string(),
+  laengs: z.string(),
+  quer: z.string(),
+  hoehe: z.string(),
   beschaedigungsart: z.string(),
 })
 
@@ -157,11 +170,26 @@ function bauWerkzeug(teile: readonly FotoTeil[]) {
           enum: teilNamen,
           description: 'Das erkannte Fahrzeugteil, exakt aus dem Teile-Lexikon im Auftrag.',
         },
-        seite: {
+        laengs: {
           type: 'string',
-          enum: SEITEN,
+          enum: [...LAENGSACHSEN, 'keine'],
           description:
-            'Die Seite dieses Teils — nur wenn das Lexikon für dieses Teil eine Seite vorsieht.',
+            'Längsachse des Schadens: vorne, hinten, oder "keine", wenn nicht erkennbar ' +
+            'oder nicht zutreffend.',
+        },
+        quer: {
+          type: 'string',
+          enum: [...QUERACHSEN, 'keine'],
+          description:
+            'Querachse des Schadens, in Fahrtrichtung: links, rechts, oder "keine", wenn ' +
+            'nicht erkennbar oder nicht zutreffend.',
+        },
+        hoehe: {
+          type: 'string',
+          enum: [...HOEHENACHSEN, 'keine'],
+          description:
+            'Höhenachse des Schadens: oben, unten, mittig, oder "keine", wenn nicht ' +
+            'erkennbar oder nicht zutreffend.',
         },
         beschaedigungsart: {
           type: 'string',
@@ -171,7 +199,7 @@ function bauWerkzeug(teile: readonly FotoTeil[]) {
             'Begriffe.',
         },
       },
-      required: ['teil', 'seite', 'beschaedigungsart'],
+      required: ['teil', 'laengs', 'quer', 'hoehe', 'beschaedigungsart'],
     },
   }
 
@@ -240,7 +268,8 @@ Grundsätze:
   ist "Tachostand", falsch ist "Tachostand 129.558 km".
 - Benenne Bauteil und Seite, wenn beides erkennbar ist: "Heckstossfänger
   links, Kratzer über die gesamte Breite".
-- Die Seitenangabe folgt der Fahrtrichtung, nicht dem Blick des Betrachters.
+- Seiten- und Achsenangaben folgen immer der Fahrtrichtung, nicht dem Blick
+  des Betrachters.
 - Bei den vier Eckansichten (ansicht_vorne_links/rechts,
   ansicht_hinten_links/rechts) entscheidet eine einfache Regel, keine
   Vermutung: Bei einer Aufnahme von HINTEN blickst du gedanklich in
@@ -271,14 +300,21 @@ Grundsätze:
   keines der gelisteten Teile beschädigt, lass treffer leer und schreibe
   trotzdem eine knappe beschreibung (Validierung verlangt das Feld) — sie
   wird nur ignoriert, verschwende darauf also keine Mühe.
+- Ein Treffer trägt drei unabhängige Achsen: laengs (vorne/hinten), quer
+  (links/rechts) und hoehe (oben/unten/mittig). Jede bleibt "keine", wenn
+  sie nicht erkennbar oder für den Schaden nicht sinnvoll ist — ein Kratzer
+  über die gesamte Breite eines Stossfängers hat z. B. keine sinnvolle
+  Querachse. Alle drei dürfen gleichzeitig gesetzt sein ("vorne links
+  oben"), keine ist eine Voraussetzung für eine andere.
 - Sobald ein Treffer eingetragen ist, wird beschreibung verworfen und der
   Satz stattdessen aus dem Lexikon zusammengesetzt. Formuliere für ein
   gelistetes Teil deshalb NIE selbst in beschreibung — weder statt eines
   Treffers noch zusätzlich dazu. Beispiel für falsch: du schreibst
   "Kotflügel rechts leicht verbeult" in beschreibung, obwohl der Kotflügel
   im Lexikon steht und dort "deformiert" heisst. Richtig ist, stattdessen
-  {teil: "Kotflügel", seite: "rechts", beschaedigungsart: "deformiert"} in
-  treffer einzutragen — der Satz entsteht daraus von selbst.
+  {teil: "Kotflügel", laengs: "keine", quer: "rechts", hoehe: "keine",
+  beschaedigungsart: "deformiert"} in treffer einzutragen — der Satz
+  entsteht daraus von selbst.
 - Keine Bewertung des Schadens, keine Reparaturempfehlung, keine Vermutung
   über die Ursache. Das ist die Arbeit des Sachverständigen.
 - Keine Einleitung, kein "Dieses Bild zeigt", kein Punkt am Ende.
@@ -339,9 +375,10 @@ export function auftragstext(
   if (teile.length > 0) {
     zeilen.push(
       '',
-      'Teile-Lexikon (siehe Systemtext — teil/seite/beschaedigungsart nur hieraus wählen):',
+      'Teile-Lexikon (siehe Systemtext — teil/beschaedigungsart nur hieraus wählen, ' +
+        'laengs/quer/hoehe frei je Treffer):',
       ...teile.flatMap((teil) => [
-        `- ${teil.name} (Seite: ${teil.seiten.length > 0 ? teil.seiten.join('/') : 'ohne'}):`,
+        `- ${teil.name}:`,
         ...(teil.erkennungsmerkmal ? [`  Erkennungsmerkmal: ${teil.erkennungsmerkmal}`] : []),
         ...teil.beschaedigungsarten.map((b) => `  · "${b.begriff}" — ${b.hinweis}`),
       ]),
@@ -413,7 +450,9 @@ function bildunterschrift(
     // kann: nie mehr als ein Treffer je Foto.
     const rohtreffer: Rohtreffer[] = vorschlag.treffer.slice(0, 1).map((t) => ({
       teil: t.teil,
-      seite: istSeite(t.seite) ? t.seite : null,
+      laengs: istLaengsachse(t.laengs) ? t.laengs : null,
+      quer: istQuerachse(t.quer) ? t.quer : null,
+      hoehe: istHoehenachse(t.hoehe) ? t.hoehe : null,
       begriff: t.beschaedigungsart,
     }))
     const zusammengesetzt = zusammensetzen(teile, rohtreffer)

@@ -218,16 +218,13 @@ async function befuelleFotolexikon(sql) {
   for (const teil of teile) {
     if (vorhanden.has(teil.name.toLowerCase())) continue
 
-    // Seiten und Beschädigungsarten gehen als Text durch die Bindung und
-    // werden erst in der Anweisung selbst zum passenden Typ gecastet — ohne
-    // Annahmen darüber, wie `postgres` ein rohes JS-Array oder -Objekt sonst
-    // serialisieren würde.
-    const seitenListe = teil.seiten.length ? `{${teil.seiten.join(',')}}` : '{}'
+    // Beschädigungsarten gehen als Text durch die Bindung und werden erst in
+    // der Anweisung selbst zum passenden Typ gecastet — ohne Annahmen
+    // darüber, wie `postgres` ein rohes JS-Objekt sonst serialisieren würde.
     await sql`
-      insert into foto_teil (name, seiten, erkennungsmerkmal, beschaedigungsarten)
+      insert into foto_teil (name, erkennungsmerkmal, beschaedigungsarten)
       values (
         ${teil.name},
-        ${seitenListe}::foto_teil_seite[],
         ${teil.erkennungsmerkmal ?? null},
         ${JSON.stringify(teil.beschaedigungsarten)}::jsonb
       )

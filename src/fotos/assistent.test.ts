@@ -29,7 +29,6 @@ const FAHRZEUG = {
 const KOTFLUEGEL: FotoTeil = {
   id: 't1',
   name: 'Kotflügel',
-  seiten: ['links', 'rechts'],
   erkennungsmerkmal: null,
   beschaedigungsarten: [
     { begriff: 'kratzbeschädigt', hinweis: 'nur oberflächlicher Kratzer, kein Verzug' },
@@ -148,7 +147,9 @@ describe('beschriftePaket', () => {
           id: 'a',
           kategorie: 'ansicht_hinten_links',
           beschreibung: 'wird ignoriert',
-          treffer: [{ teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' }],
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'keine', quer: 'links', hoehe: 'keine', beschaedigungsart: 'deformiert' },
+          ],
           sicherheit: 75,
         },
       ]),
@@ -166,7 +167,9 @@ describe('beschriftePaket', () => {
           id: 'a',
           kategorie: 'reifen',
           beschreibung: 'Reifen vorne links mit gutem Profil',
-          treffer: [{ teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' }],
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'keine', quer: 'links', hoehe: 'keine', beschaedigungsart: 'deformiert' },
+          ],
           sicherheit: 80,
         },
       ]),
@@ -249,7 +252,9 @@ describe('beschriftePaket', () => {
           id: 'b',
           kategorie: 'schaden',
           beschreibung: 'wird ignoriert',
-          treffer: [{ teil: 'Kotflügel', seite: 'rechts', beschaedigungsart: 'deformiert' }],
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'keine', quer: 'rechts', hoehe: 'keine', beschaedigungsart: 'deformiert' },
+          ],
           sicherheit: 49,
         },
       ]),
@@ -275,7 +280,9 @@ describe('beschriftePaket', () => {
           id: 'a',
           kategorie: 'schaden',
           beschreibung: 'wird ignoriert',
-          treffer: [{ teil: 'Kotflügel', seite: 'rechts', beschaedigungsart: 'deformiert' }],
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'keine', quer: 'rechts', hoehe: 'keine', beschaedigungsart: 'deformiert' },
+          ],
           sicherheit: 90,
         },
       ]),
@@ -286,6 +293,26 @@ describe('beschriftePaket', () => {
     expect(vorschlag?.beschreibung).toBe('Kotflügel rechts deformiert')
   })
 
+  it('setzt alle drei Achsen in der Reihenfolge Längs, Quer, Höhe zusammen', async () => {
+    ruf.mockResolvedValue(
+      antwort([
+        {
+          id: 'a',
+          kategorie: 'schaden',
+          beschreibung: 'wird ignoriert',
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'vorne', quer: 'links', hoehe: 'oben', beschaedigungsart: 'deformiert' },
+          ],
+          sicherheit: 90,
+        },
+      ]),
+    )
+
+    const [vorschlag] = await beschriftePaket(FAHRZEUG, [], [KOTFLUEGEL], [bild('a')])
+
+    expect(vorschlag?.beschreibung).toBe('Kotflügel vorne links oben deformiert')
+  })
+
   it('übernimmt nur den ersten Treffer, auch wenn das Modell mehrere liefert', async () => {
     // Genau ein Teil je Foto ist die Vorgabe — hält sich das Modell trotzdem
     // nicht daran, erzwingt der Server die Grenze, statt einen Satz aus
@@ -293,7 +320,6 @@ describe('beschriftePaket', () => {
     const TUER: FotoTeil = {
       id: 't2',
       name: 'Tür',
-      seiten: ['links', 'rechts'],
       erkennungsmerkmal: null,
       beschaedigungsarten: [{ begriff: 'verkratzt', hinweis: 'nur oberflächlicher Kratzer' }],
     }
@@ -304,8 +330,8 @@ describe('beschriftePaket', () => {
           kategorie: 'schaden',
           beschreibung: 'wird ignoriert',
           treffer: [
-            { teil: 'Kotflügel', seite: 'links', beschaedigungsart: 'deformiert' },
-            { teil: 'Tür', seite: 'links', beschaedigungsart: 'verkratzt' },
+            { teil: 'Kotflügel', laengs: 'keine', quer: 'links', hoehe: 'keine', beschaedigungsart: 'deformiert' },
+            { teil: 'Tür', laengs: 'keine', quer: 'links', hoehe: 'keine', beschaedigungsart: 'verkratzt' },
           ],
           sicherheit: 85,
         },
@@ -337,17 +363,21 @@ describe('beschriftePaket', () => {
   })
 
   it('verwirft den Vorschlag, wenn sich das Modell nicht ans Lexikon gehalten hat', async () => {
-    // "vorne" gibt es für den Kotflügel im Lexikon nicht — die Kombination
-    // ist ungültig, obwohl beide Werte für sich genommen aus dem Werkzeug
-    // stammen könnten. Kein gültiger Treffer heisst jetzt: kein Vorschlag,
-    // nicht mehr der freie Text des Modells.
+    // "zerbeult" steht für den Kotflügel nicht im Lexikon — die Kombination
+    // ist ungültig, obwohl der Teilname für sich genommen aus dem Werkzeug
+    // stammen könnte. Kein gültiger Treffer heisst jetzt: kein Vorschlag,
+    // nicht mehr der freie Text des Modells. Die drei Achsen selbst
+    // schränken ein Teil nicht mehr ein — jede Kombination ist für jedes
+    // Teil zulässig, siehe `zusammensetzen` in `lexikon.ts`.
     ruf.mockResolvedValue(
       antwort([
         {
           id: 'a',
           kategorie: 'schaden',
           beschreibung: 'Kotflügel vorne beschädigt',
-          treffer: [{ teil: 'Kotflügel', seite: 'vorne', beschaedigungsart: 'deformiert' }],
+          treffer: [
+            { teil: 'Kotflügel', laengs: 'vorne', quer: 'keine', hoehe: 'keine', beschaedigungsart: 'zerbeult' },
+          ],
           sicherheit: 70,
         },
       ]),

@@ -134,6 +134,13 @@
       "when": 1788969401891,
       "tag": "0018_pretty_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789034112675,
+      "tag": "0019_flashy_scalphunter",
+      "breakpoints": true
     }
   ]
 }

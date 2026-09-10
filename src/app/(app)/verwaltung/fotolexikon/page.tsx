@@ -47,10 +47,11 @@ export default async function Fotolexikon() {
 
       <div className="hinweis" style={{ marginBottom: 16 }}>
         <span className="hinweis-titel">Wie das wirkt</span>
-        Erkennt die KI eines dieser Teile, wählt sie Seite und Beschädigungsart nur noch aus
-        der hier hinterlegten Liste — der Satz wird daraus zusammengesetzt, nicht formuliert.
-        Ein Teil ohne angekreuzte Seite bekommt keine Seite in den Satz. Ein hier nicht
-        gelistetes Teil bleibt wie bisher freier Text.
+        Erkennt die KI eines dieser Teile, wählt sie Beschädigungsart nur noch aus der hier
+        hinterlegten Liste — der Satz wird daraus zusammengesetzt, nicht formuliert. Längs-,
+        Quer- und Höhenachse (z. B. „vorne links oben") werden dabei frei je Treffer gewählt,
+        im Klickmenü der Fotobearbeitung oder von der KI — nicht hier je Teil festgelegt. Ein
+        hier nicht gelistetes Teil bleibt wie bisher freier Text.
       </div>
 
       <div className="liste">

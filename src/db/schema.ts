@@ -47,9 +47,6 @@ export const meldungsartEnum = pgEnum('meldungsart', ['fehler', 'warnung', 'erfo
 /** Die Stufe eines Protokolleintrags. */
 export const protokollstufeEnum = pgEnum('protokollstufe', ['fehler', 'warnung', 'info'])
 
-/** Die Seite eines Fahrzeugteils im Fotolexikon — siehe `fotoTeil`. */
-export const fotoTeilSeiteEnum = pgEnum('foto_teil_seite', ['links', 'rechts', 'vorne', 'hinten'])
-
 /** Woher ein Eintrag stammt — für den Prüfbericht der Migration und die Audit-Spur. */
 export const herkunftEnum = pgEnum('herkunft', [
   'migration',
@@ -513,19 +510,24 @@ export const fotoAnalyse = pgTable(
 )
 
 /**
- * Das Fotolexikon: welche Teile es gibt, welche Seiten dafür gelten und mit
- * welchem Wortlaut eine Beschädigung daran heisst.
+ * Das Fotolexikon: welche Teile es gibt und mit welchem Wortlaut eine
+ * Beschädigung daran heisst.
  *
- * **Warum eine Zeile je Teil und nicht drei Tabellen.** Die Seiten sind ein
- * festes, kleines Vokabular (`fotoTeilSeiteEnum`) — ein Array reicht. Die
- * Beschädigungsarten dagegen sind je Teil ein eigener, kurzer Wortschatz
- * (Blech "deformiert", Kunststoff "plastisch verformt") und werden nie
- * unabhängig vom Teil gesucht oder angezeigt — eine eigene Tabelle dafür wäre
- * ein Join, den niemand braucht, für eine Handvoll Einträge je Teil.
+ * **Warum eine Zeile je Teil und nicht mehrere Tabellen.** Die
+ * Beschädigungsarten sind je Teil ein eigener, kurzer Wortschatz (Blech
+ * "deformiert", Kunststoff "plastisch verformt") und werden nie unabhängig
+ * vom Teil gesucht oder angezeigt — eine eigene Tabelle dafür wäre ein Join,
+ * den niemand braucht, für eine Handvoll Einträge je Teil.
+ *
+ * **Keine Teil-Restriktion für Achsen.** Anders als früher (eine Spalte
+ * `seiten` je Teil) erlaubt jedes Teil jede Kombination aus Längs-, Quer-
+ * und Höhenachse — die Achsen sind reine Laufzeitdaten eines einzelnen
+ * Treffers (`Rohtreffer` in `src/fotos/lexikon.ts`), keine Eigenschaft des
+ * Teils selbst, deshalb keine Spalte dafür.
  *
  * **Warum das den Fotoassistenten überhaupt bindet.** Ohne dieses Lexikon
- * formuliert das Sprachmodell frei — mit ihm liefert es nur noch Teil, Seite
- * und Beschädigungsart aus dieser Liste, und der Satz wird daraus
+ * formuliert das Sprachmodell frei — mit ihm liefert es nur noch Teil,
+ * Achsen und Beschädigungsart aus dieser Liste, und der Satz wird daraus
  * zusammengesetzt (`src/fotos/lexikon.ts`). Ein Haus mit eigenem Wording
  * bekommt damit durchgehend denselben Begriff statt einer KI-Interpretation
  * je Fall.
@@ -535,7 +537,6 @@ export const fotoTeil = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     name: text().notNull(),
-    seiten: fotoTeilSeiteEnum().array().notNull().default(sql`'{}'::foto_teil_seite[]`),
     /** Wie sich dieses Teil optisch von Nachbarteilen abgrenzt — frei für den Auftragstext. */
     erkennungsmerkmal: text(),
     /**

@@ -5,7 +5,18 @@ import { useRouter } from 'next/navigation'
 import type { Foto } from '@/fotos/ansicht'
 import type { Fotoanalyse, Fotovorschlag } from '@/fotos/vorschlag'
 import { PFLICHT, kategoriename, luecken, type Kategorie } from '@/fotos/kategorien'
-import { toggleTreffer, zusammensetzen, type FotoTeil, type Rohtreffer, type Seite } from '@/fotos/lexikon'
+import {
+  HOEHENACHSEN,
+  LAENGSACHSEN,
+  QUERACHSEN,
+  toggleTreffer,
+  zusammensetzen,
+  type FotoTeil,
+  type Hoehenachse,
+  type Laengsachse,
+  type Querachse,
+  type Rohtreffer,
+} from '@/fotos/lexikon'
 import {
   frageAnalyseStandAb,
   setzeAnalyseZurueck,
@@ -514,15 +525,17 @@ function Vorschlagsformular({
 }
 
 /**
- * Schnellauswahl für ein Foto: Teil, Seite, Schadensart per Klick statt
- * Tippen — dieselbe Bindung wie beim KI-Vorschlag (`zusammensetzen` in
- * `lexikon.ts`), nur von Hand statt vom Modell geraten. Mehrere
+ * Schnellauswahl für ein Foto: Teil, drei Achsen, Schadensart per Klick
+ * statt Tippen — dieselbe Bindung wie beim KI-Vorschlag (`zusammensetzen`
+ * in `lexikon.ts`), nur von Hand statt vom Modell geraten. Mehrere
  * Kombinationen sind erlaubt: ein Mensch klickt nur an, was er wirklich
  * sieht, die Ein-Treffer-Grenze der KI gilt hier nicht.
  *
- * Sequentiell: erst ein Teil wählen, dann erscheinen nur dessen gültige
- * Seiten (ganz ausgeblendet, wenn das Teil keine hat) und Schadensarten —
- * eine ungültige Kombination ist so gar nicht erst anklickbar.
+ * Nach der Teil-Wahl erscheinen alle drei Achsen-Reihen (Längs, Quer,
+ * Höhe) gleichzeitig, nicht nacheinander — anders als früher gibt es keine
+ * Teil-Restriktion mehr, die eine Reihe von einer anderen abhängig machen
+ * würde. Jede Achse ist für sich optional (`AchsenReihe`, unten): ein
+ * erneuter Klick auf den bereits aktiven Wert wählt ihn wieder ab.
  *
  * **Exportiert**, weil sowohl der Prüfmodus (`Vorschlagsformular` hier)
  * als auch die normale Fotobearbeitung (`Beschriftung` in
@@ -538,18 +551,25 @@ export function Klickmenue({
   setzeAktiv: (naechste: Rohtreffer[]) => void
 }) {
   const [teil, setzeTeil] = useState<FotoTeil | null>(null)
-  const [seite, setzeSeite] = useState<Seite | null>(null)
+  const [laengs, setzeLaengs] = useState<Laengsachse | null>(null)
+  const [quer, setzeQuer] = useState<Querachse | null>(null)
+  const [hoehe, setzeHoehe] = useState<Hoehenachse | null>(null)
+
+  function waehleTeil(t: FotoTeil) {
+    setzeTeil(t)
+    setzeLaengs(null)
+    setzeQuer(null)
+    setzeHoehe(null)
+  }
 
   function schliesseAb(begriff: string) {
     if (!teil) return
-    const treffer: Rohtreffer = {
-      teil: teil.name,
-      seite: teil.seiten.length > 0 ? seite : null,
-      begriff,
-    }
+    const treffer: Rohtreffer = { teil: teil.name, laengs, quer, hoehe, begriff }
     setzeAktiv(toggleTreffer(aktiv, treffer))
     setzeTeil(null)
-    setzeSeite(null)
+    setzeLaengs(null)
+    setzeQuer(null)
+    setzeHoehe(null)
   }
 
   return (
@@ -561,64 +581,82 @@ export function Klickmenue({
             type="button"
             className={`label-chip ${teil?.id === t.id ? 'aktiv' : ''}`}
             aria-pressed={teil?.id === t.id}
-            onClick={() => {
-              setzeTeil(t)
-              setzeSeite(null)
-            }}
+            onClick={() => waehleTeil(t)}
           >
             {t.name}
           </button>
         ))}
       </div>
 
-      {teil && teil.seiten.length > 0 ? (
-        <div className="klickmenue-reihe" role="group" aria-label="Seite wählen">
-          {teil.seiten.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`label-chip ${seite === s ? 'aktiv' : ''}`}
-              aria-pressed={seite === s}
-              onClick={() => setzeSeite(s)}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {teil ? (
+        <>
+          <AchsenReihe label="Längsachse wählen" werte={LAENGSACHSEN} wert={laengs} setzeWert={setzeLaengs} />
+          <AchsenReihe label="Querachse wählen" werte={QUERACHSEN} wert={quer} setzeWert={setzeQuer} />
+          <AchsenReihe label="Höhenachse wählen" werte={HOEHENACHSEN} wert={hoehe} setzeWert={setzeHoehe} />
 
-      {teil && (teil.seiten.length === 0 || seite) ? (
-        <div className="klickmenue-reihe" role="group" aria-label="Schadensart wählen">
-          {teil.beschaedigungsarten.map((b) => (
-            <button
-              key={b.begriff}
-              type="button"
-              className="label-chip"
-              title={b.hinweis}
-              onClick={() => schliesseAb(b.begriff)}
-            >
-              {b.begriff}
-            </button>
-          ))}
-        </div>
+          <div className="klickmenue-reihe" role="group" aria-label="Schadensart wählen">
+            {teil.beschaedigungsarten.map((b) => (
+              <button
+                key={b.begriff}
+                type="button"
+                className="label-chip"
+                title={b.hinweis}
+                onClick={() => schliesseAb(b.begriff)}
+              >
+                {b.begriff}
+              </button>
+            ))}
+          </div>
+        </>
       ) : null}
 
       {aktiv.length > 0 ? (
         <div className="klickmenue-reihe klickmenue-aktiv" role="group" aria-label="Ausgewählte Kombinationen">
           {aktiv.map((r) => (
             <button
-              key={`${r.teil}-${r.seite}-${r.begriff}`}
+              key={`${r.teil}-${r.laengs}-${r.quer}-${r.hoehe}-${r.begriff}`}
               type="button"
               className="label-chip aktiv"
               title="Klicken zum Entfernen"
               onClick={() => setzeAktiv(toggleTreffer(aktiv, r))}
             >
               {r.teil}
-              {r.seite ? ` ${r.seite}` : ''} {r.begriff} ✕
+              {r.laengs ? ` ${r.laengs}` : ''}
+              {r.quer ? ` ${r.quer}` : ''}
+              {r.hoehe ? ` ${r.hoehe}` : ''} {r.begriff} ✕
             </button>
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/** Eine Achsen-Reihe: höchstens ein Wert aktiv, ein erneuter Klick wählt ihn wieder ab. */
+function AchsenReihe<W extends string>({
+  label,
+  werte,
+  wert,
+  setzeWert,
+}: {
+  label: string
+  werte: readonly W[]
+  wert: W | null
+  setzeWert: (w: W | null) => void
+}) {
+  return (
+    <div className="klickmenue-reihe" role="group" aria-label={label}>
+      {werte.map((w) => (
+        <button
+          key={w}
+          type="button"
+          className={`label-chip ${wert === w ? 'aktiv' : ''}`}
+          aria-pressed={wert === w}
+          onClick={() => setzeWert(wert === w ? null : w)}
+        >
+          {w}
+        </button>
+      ))}
     </div>
   )
 }
