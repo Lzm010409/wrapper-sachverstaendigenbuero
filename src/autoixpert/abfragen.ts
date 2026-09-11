@@ -187,7 +187,20 @@ function fallSortierAusdruck(feld: FallSortierfeld): SQL {
   }
 }
 
-/** Die zuletzt abgerufenen Fälle, eingeschränkt durch den Filter. */
+/**
+ * Die Fälle, eingeschränkt durch den Filter.
+ *
+ * Ohne gewählten Sortierstand (`sortierung` leer — die Sortierleiste zeigt
+ * dann „Standard") entspricht die Voreinstellung
+ * `?sortiert=aktenzeichen&richtung=absteigend`: das neuste bzw. größte
+ * Aktenzeichen steht oben. Vorher stand hier `abgerufenAm` — das Datum, an
+ * dem der Fall zuletzt aus autoiXpert geladen wurde, nicht das Datum des
+ * Falls selbst. Ein erneut abgerufener alter Fall sprang damit an die
+ * Spitze der Liste, obwohl er dort nicht hingehört.
+ *
+ * `nulls last`: Fälle ohne Aktenzeichen sollen nicht vor jedem vorhandenen
+ * stehen — absteigend stünden sie sonst (als `NULL`) an erster Stelle.
+ */
 export function ladeFaelle(
   filter?: Fallfilter,
   sortierung?: Sortierstand<FallSortierfeld>,
@@ -199,7 +212,7 @@ export function ladeFaelle(
     ? sortierung.richtung === 'absteigend'
       ? desc(fallSortierAusdruck(sortierung.feld))
       : asc(fallSortierAusdruck(sortierung.feld))
-    : desc(fall.abgerufenAm)
+    : sql`${fall.aktenzeichen} desc nulls last`
 
   return db
     .select({
