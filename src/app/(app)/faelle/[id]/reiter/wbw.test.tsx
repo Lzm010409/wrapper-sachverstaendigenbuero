@@ -104,9 +104,16 @@ describe('Recherche-Knopf', () => {
       />,
     )
     expect(html).toContain('Vergleichsfahrzeuge suchen')
+    // Alle drei Portale sind vorausgewählt und mit Anzeigenamen beschriftet —
+    // nicht mit den rohen Schlüsseln aus der Eingabedatei.
     expect(html).toContain('AutoScout24')
-    // Ein kostenpflichtiges Portal wird als solches ausgewiesen.
-    expect(html).toContain('kostenpflichtig')
+    expect(html).toContain('Kleinanzeigen')
+    expect(html).toContain('mobile.de')
+    expect(html).toContain('AutoScout24, Kleinanzeigen, mobile.de — dauert einige Minuten')
+    // Die Kostenpflichtig-Kennzeichnung ist weg: die Eskalationskette holt
+    // inzwischen bei allen drei Portalen primär über die kostenpflichtige
+    // Stufe, ein Pill nur bei mobile.de wäre irreführend.
+    expect(html).not.toContain('kostenpflichtig')
   })
 
   it('sperrt ihn, solange eine Pflichtangabe fehlt', () => {

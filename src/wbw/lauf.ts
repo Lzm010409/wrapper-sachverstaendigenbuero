@@ -18,6 +18,7 @@ import {
 import { brauchbare, pruefeInserate, type Inseratsangabe, type Pruefurteil } from './pruefung'
 import { fahrzeugKennung } from './ergebnis'
 import { protokolliereWarnung } from '@/protokoll'
+import { PORTAL_NAMEN, portalName } from './portalnamen'
 import type { Kraftstoff } from './portalvokabular'
 
 const fuehreAus = promisify(execFile)
@@ -77,6 +78,13 @@ export interface ModellProPortal {
 }
 
 export type Portal = 'autoscout24' | 'kleinanzeigen' | 'mobile.de'
+
+// Der Anzeigename je Portal wohnt in ./portalnamen, nicht hier — die eigene
+// Datei bleibt frei von `server-only`, damit belegseite.ts sie mitnutzen
+// kann, ohne selbst einen Server- oder Browserkontext zu brauchen. Hier
+// erneut exportiert, damit die bestehenden Importe aus '@/wbw/lauf' gültig
+// bleiben.
+export { PORTAL_NAMEN, portalName }
 
 export interface WbwEingabe {
   subjekt: WbwSubjekt
@@ -551,7 +559,7 @@ export function rueckfallHinweis(rueckfaelle: Rueckfall[]): {
   const jePortal = new Map<Portal, Rueckfall>()
   for (const r of rueckfaelle) if (!jePortal.has(r.portal)) jePortal.set(r.portal, r)
   const eintraege = [...jePortal.values()]
-  const teile = eintraege.map((r) => `${r.portal} über ${r.stufe}`)
+  const teile = eintraege.map((r) => `${portalName(r.portal)} über ${r.stufe}`)
   const liste =
     teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} und ${teile.at(-1)}`
 
@@ -798,7 +806,7 @@ export async function fuehreLaufAus(
 
     for (const portal of eingabe.portale) {
       const datei = `${ROHDATEI[portal].replace(/\.json$/, '')}-${stufe.name}.json`
-      const schrittname = `${stufe.beschriftung}: ${portal}`
+      const schrittname = `${stufe.beschriftung}: ${portalName(portal)}`
       const modell = modelle[portal === 'mobile.de' ? 'mobilede' : portal] ?? null
 
       halteFest({ name: schrittname, stand: 'laeuft' })
