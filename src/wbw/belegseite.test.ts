@@ -57,6 +57,10 @@ describe('Ein Fahrzeugabschnitt', () => {
     expect(html).toContain('Panoramadach')
     expect(html).toContain('Scheckheftgepflegt')
     expect(html).toContain('autoscout24.de/angebote/abc')
+    // Die Angabe „Portal" trägt den Anzeigenamen, nicht den rohen
+    // internen Schlüssel — der Beleg geht in den Gutachtenordner und muss
+    // für den Leser lesbar sein, nicht nur für die eigene Pipeline.
+    expect(html).toContain('<dd>AutoScout24</dd>')
   })
 
   it('sagt, was fehlt, statt es zu verschweigen', () => {

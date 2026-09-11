@@ -72,11 +72,11 @@ describe('rueckfallHinweis', () => {
     expect(rueckfallHinweis([])).toBeNull()
   })
 
-  it('nennt Portal und Stufe und warnt', () => {
+  it('nennt Portal und Stufe und warnt — mit Anzeigenamen, nicht dem rohen Schlüssel', () => {
     const h = rueckfallHinweis([
       { portal: 'kleinanzeigen', zyklus: 'eng', stufe: 'L1', stattdessen: 'L3', grund: 'HTTP 402', bewusst: false },
     ])
-    expect(h?.text).toMatch(/kleinanzeigen über L1/)
+    expect(h?.text).toMatch(/Kleinanzeigen über L1/)
     expect(h?.text).toMatch(/anders zustande gekommen/)
     expect(h?.warnung).toBe(true)
   })
@@ -109,14 +109,14 @@ describe('rueckfallHinweis', () => {
       { portal: 'kleinanzeigen', zyklus: 'eng', stufe: 'L1', stattdessen: 'L3', grund: null, bewusst: false },
       { portal: 'kleinanzeigen', zyklus: 'weit', stufe: 'L1', stattdessen: 'L3', grund: null, bewusst: false },
     ])
-    expect(h?.text.match(/kleinanzeigen/g)).toHaveLength(1)
+    expect(h?.text.match(/Kleinanzeigen/g)).toHaveLength(1)
   })
 
-  it('zählt mehrere Portale auf', () => {
+  it('zählt mehrere Portale mit Anzeigenamen auf', () => {
     const h = rueckfallHinweis([
       { portal: 'kleinanzeigen', zyklus: 'eng', stufe: 'L1', stattdessen: 'L3', grund: null, bewusst: false },
       { portal: 'autoscout24', zyklus: 'eng', stufe: 'L0', stattdessen: 'L3', grund: null, bewusst: false },
     ])
-    expect(h?.text).toMatch(/kleinanzeigen über L1 und autoscout24 über L0/)
+    expect(h?.text).toMatch(/Kleinanzeigen über L1 und AutoScout24 über L0/)
   })
 })

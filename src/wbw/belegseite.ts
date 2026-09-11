@@ -14,6 +14,8 @@
  * Browser und ohne Datenbank prüfbar.
  */
 
+import { portalName } from './portalnamen'
+
 export interface Belegfahrzeug {
   kennung: string
   quelle: string
@@ -111,7 +113,7 @@ export function fahrzeugabschnitt(f: Belegfahrzeug, seitenumbruch = false): stri
       ${angabe('Getriebe', f.getriebe)}
       ${angabe('Kraftstoff', f.kraftstoff)}
       ${angabe('Standort', [f.plz, f.ort].filter(Boolean).join(' ') || null)}
-      ${angabe('Portal', f.quelle)}
+      ${angabe('Portal', portalName(f.quelle))}
     </dl>
 
     ${bilder}
