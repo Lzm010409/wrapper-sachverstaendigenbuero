@@ -17,6 +17,7 @@ import { ladeVorgangsschritte } from '@/fall/vorgangsschritte'
 import { BerichtFormular } from '../../stellungnahmen/bericht-formular'
 import { Aktualisieren } from './aktualisieren'
 import { Reiterleiste, leseReiter } from './reiter/reiterleiste'
+import { AutoixpertKnopf, baueAutoixpertLink } from './reiter/autoixpert-link'
 import { FotoReiter } from './reiter/fotos'
 import { KalkulationReiter } from './reiter/kalkulation'
 import { WbwReiterMitVorschlag } from './reiter/wbw-laden'
@@ -64,6 +65,11 @@ export default async function FallSeite({
   if (!fall) notFound()
 
   const aktiv = leseReiter(reiterWunsch)
+  // Ein Reiter, ein Absprung: der Link folgt dem aktiven Reiter und zeigt
+  // immer auf die passende Stelle in autoiXpert, nicht nur auf das Gutachten
+  // allgemein. Fehlt die autoiXpert-Id oder hat „Stellungnahmen" keine
+  // Entsprechung dort, bleibt der Knopf weg statt ins Leere zu führen.
+  const autoixpertHref = baueAutoixpertLink(fall.daten?.autoixpertId, aktiv)
 
   return (
     <>
@@ -81,7 +87,10 @@ export default async function FallSeite({
             <p className="unterzeile">{fall.untertitel}</p>
           </div>
         </div>
-        <Aktualisieren fallId={fall.id} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <AutoixpertKnopf href={autoixpertHref} />
+          <Aktualisieren fallId={fall.id} />
+        </div>
       </div>
 
       <Reiterleiste
@@ -390,9 +399,6 @@ async function VorgangReiter({
       ? `https://${process.env.PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com/deal/${vorgang.deal!.dealId}`
       : null
   const sevdeskLink = vorgang.stand === 'gefunden' ? vorgang.deal!.sevdeskRechnungLink : null
-  const autoixpertLink = d.autoixpertId
-    ? `https://app.autoixpert.de/Gutachten/${encodeURIComponent(d.autoixpertId)}`
-    : null
 
   return (
     <div className="detail">
@@ -456,17 +462,6 @@ async function VorgangReiter({
               <dt>Fertigstellung</dt>
               <dd style={{ textAlign: 'left' }}>{formatiereDatum(d.fertigstellung) ?? '—'}</dd>
             </dl>
-            {autoixpertLink ? (
-              <a
-                href={autoixpertLink}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="knopf"
-                style={{ marginTop: 12 }}
-              >
-                autoiXpert öffnen ↗
-              </a>
-            ) : null}
           </div>
         </div>
       </aside>
