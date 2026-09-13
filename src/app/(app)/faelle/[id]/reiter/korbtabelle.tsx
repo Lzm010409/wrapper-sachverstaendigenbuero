@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { ladeBelegeInGutachtenordner, uebernimmKorb } from '@/wbw/aktionen'
 import { fahrzeugKennung, type Korbeintrag } from '@/wbw/ergebnis'
+import { portalName } from '@/wbw/lauf'
 import {
   AUFFAELLIGKEITEN,
   UNBEKANNTE_BAUART,
@@ -191,7 +192,7 @@ export function Korbtabelle({
             <option value="">Alle Portale</option>
             {quellen.map((q) => (
               <option key={q} value={q}>
-                {q}
+                {portalName(q)}
               </option>
             ))}
           </select>
@@ -362,7 +363,7 @@ export function Korbtabelle({
                     <span className="unterzeile"> · {Math.round(f.entfernungKm)} km</span>
                   ) : null}
                   <span className="unterzeile" style={{ display: 'block' }}>
-                    {f.quelle ?? '—'}
+                    {f.quelle ? portalName(f.quelle) : '—'}
                   </span>
                 </td>
                 <td>

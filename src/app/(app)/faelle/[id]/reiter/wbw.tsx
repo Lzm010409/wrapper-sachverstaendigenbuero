@@ -6,7 +6,7 @@ import { fehlendeAngaben, reportToWbwParams, type WbwEingaben } from '@/wbw/para
 import type { KalkulationStand } from '@/fall/kalkulation'
 import { fehlendeLaufangaben, type LaufEingaben } from '@/wbw/lauf-eingaben'
 import type { Laufstand } from '@/wbw/auftrag'
-import type { Portal } from '@/wbw/lauf'
+import { portalName, type Portal } from '@/wbw/lauf'
 import { WbwLauf } from './wbw-lauf'
 import type { WbwVorschlag } from '@/wbw/vorschlag'
 import type { Merkmal } from '@/wbw/ausstattung'
@@ -35,23 +35,28 @@ import { pruefeModellname, type Modellpruefung } from '@/wbw/aktionen'
  * steht die Abweichung da, statt sich stillschweigend für eine zu
  * entscheiden.
  */
-/** Voreinstellung: die beiden kostenlosen Portale. */
-const PORTALE: { schluessel: Portal; name: string; hinweis: string; kostenpflichtig?: boolean }[] = [
+/*
+  Alle drei stehen hier gleich da: die Eskalationskette in providers.json holt
+  bei jedem der drei Portale primär über die kostenpflichtige Apify-Stufe,
+  die kostenlosen Wege sind der Rückfall. Ein Pill, der nur mobile.de als
+  „kostenpflichtig“ auswies, hätte deshalb das Gegenteil suggeriert — dass die
+  anderen beiden es zuverlässig nicht wären.
+*/
+const PORTALE: { schluessel: Portal; name: string; hinweis: string }[] = [
   {
     schluessel: 'autoscout24',
-    name: 'AutoScout24',
+    name: portalName('autoscout24'),
     hinweis: 'kennt Motorvarianten als eigenes Modell — der belastbarste Korb',
   },
   {
     schluessel: 'kleinanzeigen',
-    name: 'Kleinanzeigen',
+    name: portalName('kleinanzeigen'),
     hinweis: 'nur Baureihen, dafür viele private Angebote',
   },
   {
     schluessel: 'mobile.de',
-    name: 'mobile.de',
-    hinweis: 'nur über einen kostenpflichtigen Dienst erreichbar (Apify)',
-    kostenpflichtig: true,
+    name: portalName('mobile.de'),
+    hinweis: 'sucht per Freitext, keine Liste der Motorvarianten',
   },
 ]
 
@@ -68,7 +73,7 @@ export function WbwReiter({
   fallId: string
   letzterLauf: Laufstand | null
 }) {
-  const [portale, setzePortale] = useState<Portal[]>(['autoscout24', 'kleinanzeigen'])
+  const [portale, setzePortale] = useState<Portal[]>(['autoscout24', 'kleinanzeigen', 'mobile.de'])
   // Der Vorschlag ist die Voreinstellung, nicht der Wert: jedes Feld bleibt
   // ein gewöhnliches Eingabefeld, das der Sachverständige überschreibt.
   const [eingaben, setzeEingaben] = useState<WbwEingaben>(() => ausVorschlag(vorschlag))
@@ -364,9 +369,6 @@ export function WbwReiter({
                     />
                     <span>
                       {p.name}
-                      {p.kostenpflichtig ? (
-                        <span className="marke-pille m-warn">kostenpflichtig</span>
-                      ) : null}
                       <span className="unterzeile" style={{ display: 'block' }}>
                         {p.hinweis}
                       </span>

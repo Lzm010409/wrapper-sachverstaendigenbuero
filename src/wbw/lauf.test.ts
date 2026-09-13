@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { korbgroesse, vereineRohtreffer } from './lauf'
+import { korbgroesse, portalName, vereineRohtreffer } from './lauf'
 
 /**
  * Der Lauf vom 08.09.2026, Fall 0826/2072TG (VW Sharan).
@@ -56,6 +56,24 @@ describe('vereineRohtreffer', () => {
     const ohne1 = { titel: 'Sharan 2.0 TDI', preis: 9990 }
     const ohne2 = { titel: 'Sharan 1.4 TSI', preis: 8500 }
     expect(vereineRohtreffer([ohne1], [ohne2])).toHaveLength(2)
+  })
+})
+
+describe('portalName', () => {
+  /*
+   * Der interne Portalschlüssel (`autoscout24`, `kleinanzeigen`, `mobile.de`)
+   * landete unformatiert in der Laufanzeige, im Fortschrittsprotokoll und im
+   * Rückfall-Hinweis — sichtbar z. B. als "autoscout24" statt "AutoScout24".
+   * `portalName` ist seither die einzige Stelle, die den Anzeigenamen kennt.
+   */
+  it('übersetzt die bekannten Portalschlüssel in ihren Anzeigenamen', () => {
+    expect(portalName('autoscout24')).toBe('AutoScout24')
+    expect(portalName('kleinanzeigen')).toBe('Kleinanzeigen')
+    expect(portalName('mobile.de')).toBe('mobile.de')
+  })
+
+  it('lässt einen unbekannten Schlüssel unverändert stehen', () => {
+    expect(portalName('irgendein-neues-portal')).toBe('irgendein-neues-portal')
   })
 })
 

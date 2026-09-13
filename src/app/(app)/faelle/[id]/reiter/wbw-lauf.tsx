@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { frageStandAb, starteRecherche } from '@/wbw/aktionen'
 import type { LaufEingaben, Laufstand } from '@/wbw/auftrag'
-import type { Portal, Schritt } from '@/wbw/lauf'
+import { portalName, type Schritt } from '@/wbw/lauf'
 import { leseErgebnis, trichterzeilen, type Korbeintrag, type Laufergebnis } from '@/wbw/ergebnis'
 import type { Pruefurteil } from '@/wbw/urteil'
 import { Korbtabelle } from './korbtabelle'
@@ -131,7 +131,7 @@ export function WbwLauf({
           </button>
           <span className="unterzeile">
             {eingaben.portale.length > 0
-              ? `${eingaben.portale.join(', ')} — dauert einige Minuten`
+              ? `${eingaben.portale.map(portalName).join(', ')} — dauert einige Minuten`
               : 'Kein Portal ausgewählt'}
           </span>
         </div>
