@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { ladeBelegeInGutachtenordner, uebernimmKorb } from '@/wbw/aktionen'
 import { fahrzeugKennung, type Korbeintrag } from '@/wbw/ergebnis'
-import { portalName } from '@/wbw/lauf'
+import { portalName } from '@/wbw/portalnamen'
 import {
   AUFFAELLIGKEITEN,
   UNBEKANNTE_BAUART,
