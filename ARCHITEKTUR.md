@@ -435,6 +435,59 @@ selbst, und jede Ablehnung geht ins Protokoll. Die Verwaltung schützt sich
 zusätzlich gegen den Griff ins eigene Knie — der letzte Administrator kann
 sich weder herabstufen noch sperren.
 
+## Eine API für Automatisierungen: ein zweiter Weg zum selben Zugang
+
+`/api/v1/stellungnahmen` und `/api/v1/bibliothek` sind der erste Schritt
+einer API für Automatisierungen wie n8n — kein zweites Rechtesystem, kein
+zweiter Zugang.
+
+**Das Token trägt dieselben Rechte wie sein Benutzer.** Kein eigenständiger
+Service-Account mit eigenen Rechten (`api_token.benutzer_id` verweist auf
+genau einen Zugang), weil die erwarteten Abnehmer intern sind und wenige —
+ein eigener Rechtesatz je Token wäre Verwaltung für einen Bedarf, der noch
+nicht da ist. Wer ein Token erzeugt, verwaltet ausschliesslich seine
+eigenen (`src/einstellungen/`); dafür braucht es kein eigenes Recht.
+
+**Gehasht wie das Sitzungscookie, mit sichtbarem Präfix.** In der
+Datenbank steht nur `sha256(token)`; der Klartext (`cockpit_…`) erscheint
+genau einmal, direkt nach dem Erzeugen, und dann nie wieder — dieselbe
+Abwägung wie beim Sitzungstoken (`src/auth/sitzung.ts`), kein `scrypt`, weil
+es kein von Menschen gewähltes Passwort ist, sondern 32 zufällige Bytes.
+Das Präfix `cockpit_` steht absichtlich im Klartext-Anfang: ein Token, das
+versehentlich in ein Protokoll oder einen Commit gerät, ist damit als
+solches erkennbar. Die Schwärzung (`schwaerzen.ts`) greift ohnehin schon
+vorher über die Regel für `Bearer <token>` im Autorisierungskopf.
+
+**Eine eigene Wache, weil eine API-Antwort anders aussieht als eine
+Weiterleitung.** `apiBenutzerOderAntwort()` (`src/app/api/wache.ts`) prüft
+den Kopf `Authorization: Bearer <token>` statt eines Sitzungscookies und
+antwortet bei Ablehnung als JSON (`{ "fehler": "…" }`), nicht als Klartext
+wie `benutzerOderAntwort()` — ein Skript erwartet JSON, auch im
+Fehlerfall. Der strukturelle Test aus `src/auth/wache.test.ts` kennt beide
+Wachen gleichrangig; eine neue `/api/v1/*`-Route ohne eine der beiden fällt
+weiterhin auf.
+
+**Das PDF entsteht mit Chromium, nicht aus dem Word-Export.** Eine
+Umwandlung der vorhandenen `.docx` (LibreOffice/`soffice`) hätte eine neue
+Abhängigkeit ins Abbild gebracht, für ein Ergebnis, das ohnehin nicht die
+Geschäftspapier-Vorlage sein muss — die API liefert den Inhalt, keinen
+Nachbau des Briefbogens. Stattdessen eine eigene, schlichte HTML-Vorlage im
+Hausstil (Serifenschrift), gedruckt mit demselben Mechanismus wie die
+WBW-Belege (`src/wbw/drucker.ts`, `src/stellungnahme/pdf.ts`) — inklusive
+derselben Riegel gegen eine leere oder unauffindbare Vorlage.
+
+**Beide Ausgabewege teilen sich die Sperre.** Der PDF-Abruf läuft durch
+dieselbe Prüfung (`pruefeDokument`) wie der bestehende Word-Export
+(`src/stellungnahme/ausgabe.ts`); eine Stellungnahme mit sperrenden
+Befunden liefert `409` mit den Befunden im Antwortkörper, statt ein PDF
+auszugeben, das der Word-Export verweigern würde.
+
+**Was hier bewusst fehlt:** ein Ablaufdatum ist wählbar (90 Tage, 1 Jahr,
+nie) und jedes Token lässt sich einzeln widerrufen, aber es gibt keine
+Ratenbegrenzung und keine Scopes je Token — für wenige, bekannte
+Automatisierungen ist das kein Sicherheitsgewinn, nur Verwaltung. Fälle und
+Bilder bleiben aussen vor, bis dafür ein tatsächlicher Bedarf steht.
+
 ## Die WBW-Suche läuft in Stufen, die KI liest den Fliesstext
 
 Eine eng gefasste Suche hat zwei Ausgänge: sie trifft, oder der Lauf war

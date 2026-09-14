@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   beleg,
@@ -329,3 +329,67 @@ export async function ladeEintrag(id: string) {
 
 export type EintragMitDetails = NonNullable<Awaited<ReturnType<typeof ladeEintrag>>>
 export type EintragListe = Awaited<ReturnType<typeof sucheEintraege>>
+
+/**
+ * Lädt eine Seite der ganzen Bibliothek — inklusive Entwürfen — mit allen
+ * Unterdatensätzen, für die API unter `/api/v1/bibliothek`.
+ *
+ * Anders als `ladeEintrag` (ein Eintrag, fünf Abfragen) holt diese Funktion
+ * die Unterdatensätze für die ganze Seite in je einer Abfrage über
+ * `inArray` — dieselbe Bündelung wie bei `ladeVerwendbareEintraege`. Bei
+ * `hoechstens` Einträgen wären fünf Abfragen je Zeile sonst ein Vielfaches
+ * an Rundreisen zur Datenbank, für nichts als denselben Filter.
+ */
+export async function ladeEintraegeMitDetails(
+  hoechstens = 50,
+  versatz = 0,
+): Promise<EintragMitDetails[]> {
+  const grund = await db
+    .select()
+    .from(eintrag)
+    .orderBy(asc(eintrag.bereich), asc(sortierSchluessel()))
+    .limit(hoechstens)
+    .offset(versatz)
+  if (grund.length === 0) return []
+
+  const ids = grund.map((g) => g.id)
+  const [varianten, ergaenzungen, platzhalter, vorbedingungen, belege] = await Promise.all([
+    db
+      .select()
+      .from(eintragVariante)
+      .where(inArray(eintragVariante.eintragId, ids))
+      .orderBy(asc(eintragVariante.reihenfolge)),
+    db
+      .select()
+      .from(eintragErgaenzung)
+      .where(inArray(eintragErgaenzung.eintragId, ids))
+      .orderBy(asc(eintragErgaenzung.reihenfolge)),
+    db
+      .select()
+      .from(eintragPlatzhalter)
+      .where(inArray(eintragPlatzhalter.eintragId, ids))
+      .orderBy(asc(eintragPlatzhalter.schluessel)),
+    db.select().from(eintragVorbedingung).where(inArray(eintragVorbedingung.eintragId, ids)),
+    db.select().from(beleg).where(inArray(beleg.eintragId, ids)),
+  ])
+
+  function gruppiere<T extends { eintragId: string }>(zeilen: T[]): Map<string, T[]> {
+    const karte = new Map<string, T[]>()
+    for (const z of zeilen) karte.set(z.eintragId, [...(karte.get(z.eintragId) ?? []), z])
+    return karte
+  }
+  const vJe = gruppiere(varianten)
+  const eJe = gruppiere(ergaenzungen)
+  const pJe = gruppiere(platzhalter)
+  const vbJe = gruppiere(vorbedingungen)
+  const bJe = gruppiere(belege)
+
+  return grund.map((e) => ({
+    ...e,
+    varianten: vJe.get(e.id) ?? [],
+    ergaenzungen: eJe.get(e.id) ?? [],
+    platzhalter: pJe.get(e.id) ?? [],
+    vorbedingungen: vbJe.get(e.id) ?? [],
+    belege: bJe.get(e.id) ?? [],
+  }))
+}

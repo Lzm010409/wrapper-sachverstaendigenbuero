@@ -148,6 +148,13 @@
       "when": 1789035434212,
       "tag": "0020_striped_boomerang",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789403434707,
+      "tag": "0021_high_rage",
+      "breakpoints": true
     }
   ]
 }

@@ -332,3 +332,28 @@ export async function ladeStellungnahme(id: string) {
 }
 
 export type GeladeneStellungnahme = NonNullable<Awaited<ReturnType<typeof ladeStellungnahme>>>
+
+/**
+ * Die schlanke Liste für `/api/v1/stellungnahmen` — ohne Filter, unabhängig
+ * vom Stand (auch Entwürfe), und ohne den vollen Text oder ein PDF: das wäre
+ * bei einer Liste zu teuer, dieselbe Abwägung wie beim Einzelabruf der
+ * autoiXpert-Gutachten. Der volle Inhalt steht im Einzelabruf.
+ */
+export async function ladeStellungnahmenApiListe(hoechstens = 50, versatz = 0) {
+  return db
+    .select({
+      id: stellungnahme.id,
+      fallId: stellungnahme.fallId,
+      fallAktenzeichen: fall.aktenzeichen,
+      betreff: stellungnahme.betreff,
+      empfaengerName: stellungnahme.empfaengerName,
+      erstelltAm: stellungnahme.erstelltAm,
+      versendetAm: stellungnahme.versendetAm,
+      auswertungsstand: stellungnahme.auswertungsstand,
+    })
+    .from(stellungnahme)
+    .leftJoin(fall, eq(stellungnahme.fallId, fall.id))
+    .orderBy(desc(stellungnahme.erstelltAm))
+    .limit(hoechstens)
+    .offset(versatz)
+}

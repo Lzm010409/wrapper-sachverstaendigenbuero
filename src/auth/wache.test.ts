@@ -34,8 +34,20 @@ const OFFEN: Record<string, string> = {
     'Aufrufer ist autoiXpert, nicht ein angemeldeter Benutzer — geprueft ueber ein Geheimnis im Header',
 }
 
-/** Die Aufrufe, die als Anmeldepruefung gelten. */
-const WACHEN = ['benutzerOderAntwort(', 'pruefeZugang(', 'verlangeAnmeldung(']
+/**
+ * Die Aufrufe, die als Anmeldepruefung gelten.
+ *
+ * `apiBenutzerOderAntwort(` gehoert seit den `/api/v1/*`-Routen dazu: sie
+ * pruefen kein Sitzungscookie, sondern ein Bearer-Token aus dem Kopf
+ * `Authorization` (`src/auth/api-token.ts`) — ein zweiter, gleichrangiger Weg,
+ * dieselbe Anmeldepflicht zu erfuellen.
+ */
+const WACHEN = [
+  'benutzerOderAntwort(',
+  'pruefeZugang(',
+  'verlangeAnmeldung(',
+  'apiBenutzerOderAntwort(',
+]
 
 /** Alle Dateien mit diesem Namen; `null` heisst: alle Dateien. */
 function dateien(ordner: string, name: string | null): string[] {
