@@ -334,10 +334,38 @@ export async function ladeStellungnahme(id: string) {
 export type GeladeneStellungnahme = NonNullable<Awaited<ReturnType<typeof ladeStellungnahme>>>
 
 /**
+ * Kürzungspositionen mehrerer Stellungnahmen auf einmal.
+ *
+ * Für die API-Liste, die sonst pro Zeile eine eigene Abfrage bräuchte —
+ * dieselbe Überlegung wie bei den Bausteinen in `ladeStellungnahme`.
+ */
+export async function ladePositionenZuStellungnahmen(
+  stellungnahmeIds: string[],
+): Promise<Map<string, (typeof position.$inferSelect)[]>> {
+  const jeStellungnahme = new Map<string, (typeof position.$inferSelect)[]>()
+  if (stellungnahmeIds.length === 0) return jeStellungnahme
+
+  const zeilen = await db
+    .select()
+    .from(position)
+    .where(inArray(position.stellungnahmeId, stellungnahmeIds))
+    .orderBy(asc(position.reihenfolge))
+
+  for (const p of zeilen) {
+    const liste = jeStellungnahme.get(p.stellungnahmeId) ?? []
+    liste.push(p)
+    jeStellungnahme.set(p.stellungnahmeId, liste)
+  }
+  return jeStellungnahme
+}
+
+/**
  * Die schlanke Liste für `/api/v1/stellungnahmen` — ohne Filter, unabhängig
  * vom Stand (auch Entwürfe), und ohne den vollen Text oder ein PDF: das wäre
  * bei einer Liste zu teuer, dieselbe Abwägung wie beim Einzelabruf der
- * autoiXpert-Gutachten. Der volle Inhalt steht im Einzelabruf.
+ * autoiXpert-Gutachten. Der volle Inhalt steht im Einzelabruf. Die
+ * Kürzungspositionen kommen dennoch mit — anders als Text oder PDF sind sie
+ * schon geladen und nicht je Zeile neu zu berechnen.
  */
 export async function ladeStellungnahmenApiListe(hoechstens = 50, versatz = 0) {
   return db

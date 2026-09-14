@@ -4,13 +4,16 @@ import { erzeugeApiAusgabe } from '@/stellungnahme/api-ausgabe'
 
 /**
  * Eine einzelne Stellungnahme per API — kompletter Klartext und gerendertes
- * PDF (Base64) in einer Antwort.
+ * PDF (Base64) in einer Antwort, dazu die Kürzungspositionen mit ihren
+ * Summen.
  *
  * Eine gesperrte Stellungnahme (sperrende Prüfungen, siehe
  * `src/stellungnahme/editor-aktionen.ts`) liefert 409: derselbe Fall, der
  * auch den bestehenden Word-Export sperrt — beide Ausgabewege folgen
  * derselben Regel. Fehlt das Schreiben ganz, liefert die Route 422; die
  * Befunde stehen im Antwortkörper, damit ein Aufrufer sieht, was zu tun ist.
+ * Die Kürzungspositionen stehen in allen drei Fällen im Antwortkörper — sie
+ * hängen nicht am Erfolg der Textausgabe.
  */
 export async function GET(
   anfrage: Request,
@@ -26,12 +29,15 @@ export async function GET(
 
   if (ergebnis === null) return apiFehlerAntwort(404, 'Diese Stellungnahme gibt es nicht.')
 
-  // Erstellungs- und Versanddatum stehen unabhängig davon fest, ob die
-  // Ausgabe selbst gelingt — sie gehören zum Datensatz, nicht zum Ergebnis.
+  // Erstellungs- und Versanddatum sowie die Kürzungspositionen stehen
+  // unabhängig davon fest, ob die Ausgabe selbst gelingt — sie gehören zum
+  // Datensatz, nicht zum Ergebnis.
   const basis = {
     erstelltAm: ergebnis.erstelltAm,
     versendetAm: ergebnis.versendetAm,
     fallAktenzeichen: ergebnis.fallAktenzeichen,
+    kuerzungspositionen: ergebnis.kuerzungspositionen,
+    kuerzungssummen: ergebnis.kuerzungssummen,
   }
 
   if (ergebnis.art === 'gesperrt') {

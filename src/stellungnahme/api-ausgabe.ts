@@ -10,6 +10,11 @@ import type { Befund } from '@/export/waechter'
 import { druckeStellungnahmePdf, type PdfBild } from './pdf'
 import { pruefeDokument } from './editor-aktionen'
 import { ladeStellungnahme } from './abfragen'
+import {
+  kuerzungspositionenApi,
+  type KuerzungspositionApi,
+  type Kuerzungssummen,
+} from './kuerzungen-api'
 
 /**
  * Die Ausgabe einer Stellungnahme für `/api/v1/stellungnahmen/{id}` — Text
@@ -24,12 +29,16 @@ import { ladeStellungnahme } from './abfragen'
 /**
  * Steht in jedem Ergebniszweig, auch wenn die Ausgabe (noch) nicht
  * gelingt: wann die Stellungnahme angelegt wurde, ist eine Auskunft über
- * den Datensatz selbst, nicht über den Erfolg der Ausgabe.
+ * den Datensatz selbst, nicht über den Erfolg der Ausgabe. Dasselbe gilt für
+ * die Kürzungspositionen — sie stehen unabhängig davon fest, ob daraus
+ * schon ein Schreiben geworden ist.
  */
 export interface ApiAusgabeBasis {
   erstelltAm: Date
   versendetAm: Date | null
   fallAktenzeichen: string | null
+  kuerzungspositionen: KuerzungspositionApi[]
+  kuerzungssummen: Kuerzungssummen
 }
 
 export type ApiAusgabeErgebnis = ApiAusgabeBasis &
@@ -54,6 +63,7 @@ export async function erzeugeApiAusgabe(stellungnahmeId: string): Promise<ApiAus
     erstelltAm: s.erstelltAm,
     versendetAm: s.versendetAm,
     fallAktenzeichen: s.fall?.aktenzeichen ?? null,
+    ...kuerzungspositionenApi(s.positionen),
   }
 
   const dokument = await leseDokument(stellungnahmeId)
