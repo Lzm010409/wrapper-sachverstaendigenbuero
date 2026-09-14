@@ -4045,6 +4045,10 @@ body {
   border-color: currentColor;
 }
 
+.bulk-undo.fehler {
+  background: var(--crit);
+}
+
 /* ---------- Suche in der Kopfleiste ---------- */
 
 /*

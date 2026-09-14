@@ -88,6 +88,8 @@ export async function bulkSetzeStatus(
       titel: eintrag.titel,
       status: eintrag.status,
       version: eintrag.version,
+      freigegebenVon: eintrag.freigegebenVon,
+      freigegebenAm: eintrag.freigegebenAm,
     })
     .from(eintrag)
     .where(inArray(eintrag.id, auswahl.ids))
@@ -131,9 +133,20 @@ export async function bulkSetzeStatus(
         .where(inArray(eintrag.id, uebrigeIds))
     }
 
-    return schreibeLauf(tx, benutzer.id, 'status', auswahl.ids, bearbeitbar, jetzt, (e) => ({
-      status: e.vorher.status,
-    }))
+    return schreibeLauf(tx, benutzer.id, 'status', auswahl.ids, bearbeitbar, jetzt, (e) => {
+      const zeile = zeilen.find((z) => z.id === e.id)!
+      return {
+        status: e.vorher.status,
+        // Nur gesichert, wenn davor tatsächlich freigegeben war — sonst
+        // stünden hier zwei „leere" Felder, die kein Rückgängig je braucht.
+        ...(e.vorher.status === 'freigegeben'
+          ? {
+              freigegebenVon: zeile.freigegebenVon,
+              freigegebenAm: zeile.freigegebenAm?.toISOString() ?? null,
+            }
+          : {}),
+      }
+    })
   })
 
   revalidatePath('/bibliothek')
@@ -370,6 +383,29 @@ export async function macheBulkLaufRueckgaengig(bulkLaufId: string): Promise<Und
     return { fehler: 'Dieser Lauf wurde bereits rückgängig gemacht.', wiederhergestellt: 0, uebersprungen: 0 }
   }
 
+  /*
+   * Dasselbe Recht wie der ursprüngliche Lauf, nicht bloss die Anmeldung.
+   *
+   * Ein Rückgängig ist keine neutrale Operation: `freigabe` rückgängig zu
+   * machen nimmt eine Freigabe zurück, und `status` rückgängig zu machen
+   * kann einen Eintrag genau dorthin zurückbringen — auf `freigegeben`. Ohne
+   * diese Prüfung könnte jeder Angemeldete, der an eine `bulkLaufId` kommt
+   * (Browserverlauf, ein geteilter Bildschirm), innerhalb der dreissig
+   * Sekunden eine Freigabe erteilen oder zurücknehmen, für die ihm
+   * `bibliothek.freigeben` fehlt — genau die Grenze, die `setzeStatus` und
+   * `gebeFrei` für den Einzelfall ziehen.
+   */
+  const beruehrtFreigabe =
+    lauf.operation === 'freigabe' ||
+    Object.values(lauf.vorherZustand).some((v) => v.status === 'freigegeben')
+  if (beruehrtFreigabe && !(await darf('bibliothek.freigeben'))) {
+    return {
+      fehler: 'Diesen Lauf rückgängig zu machen darf nur, wer die Rolle „Freigeber" oder „Administrator" hat.',
+      wiederhergestellt: 0,
+      uebersprungen: 0,
+    }
+  }
+
   const jetzt = new Date()
   if (!laufNochRueckgaengigMachbar(lauf.erstelltAm, jetzt)) {
     return {
@@ -406,25 +442,52 @@ export async function macheBulkLaufRueckgaengig(bulkLaufId: string): Promise<Und
     }
   }
 
-  await db.transaction(async (tx) => {
-    for (const id of wiederherstellbar) {
-      const vorher = lauf.vorherZustand[id]!
-      await tx
-        .update(eintrag)
-        .set({
-          ...(vorher.status ? { status: vorher.status as EintragStatus } : {}),
-          ...(vorher.bereich ? { bereich: vorher.bereich as Bereich } : {}),
-          ...(vorher.nummer ? { nummer: vorher.nummer } : {}),
-          // Eine zurückgenommene Freigabe verliert wieder ihre Spur — genau
-          // das Gegenstück zur Freigabe selbst.
-          ...(lauf.operation === 'freigabe' ? { freigegebenVon: null, freigegebenAm: null } : {}),
-          version: vorher.version,
-          geaendertAm: jetzt,
-        })
-        .where(eq(eintrag.id, id))
+  try {
+    await db.transaction(async (tx) => {
+      for (const id of wiederherstellbar) {
+        const vorher = lauf.vorherZustand[id]!
+        await tx
+          .update(eintrag)
+          .set({
+            ...(vorher.status ? { status: vorher.status as EintragStatus } : {}),
+            ...(vorher.bereich ? { bereich: vorher.bereich as Bereich } : {}),
+            ...(vorher.nummer ? { nummer: vorher.nummer } : {}),
+            // Eine zurückgenommene Freigabe verliert wieder ihre Spur — genau
+            // das Gegenstück zur Freigabe selbst. Kam die Freigabe dagegen
+            // durch dieses Rückgängig zurück (Statuswechsel weg von
+            // „freigegeben" wird aufgehoben), lebt ihre Spur wieder auf,
+            // statt für immer leer zu bleiben.
+            ...(lauf.operation === 'freigabe'
+              ? { freigegebenVon: null, freigegebenAm: null }
+              : vorher.status === 'freigegeben'
+                ? {
+                    freigegebenVon: vorher.freigegebenVon ?? null,
+                    freigegebenAm: vorher.freigegebenAm ? new Date(vorher.freigegebenAm) : null,
+                  }
+                : {}),
+            version: vorher.version,
+            geaendertAm: jetzt,
+          })
+          .where(eq(eintrag.id, id))
+      }
+      await tx.update(bulkLauf).set({ rueckgaengigGemachtAm: jetzt }).where(eq(bulkLauf.id, bulkLaufId))
+    })
+  } catch (ausnahme) {
+    // Nur bei `bereich`-Läufen möglich: die alte (Bereich, Nummer) wurde
+    // seitdem von einem dritten Eintrag belegt (neu angelegt oder dorthin
+    // verschoben). Dieselbe Ausweichantwort wie bei der Vergabe selbst,
+    // statt einer rohen Datenbankmeldung.
+    if (istDublette(ausnahme)) {
+      return {
+        fehler:
+          'Beim Zurücksetzen kam eine Gliederungsnummer inzwischen anderswo in Gebrauch. ' +
+          'Bitte einzeln in der Bibliothek prüfen.',
+        wiederhergestellt: 0,
+        uebersprungen,
+      }
     }
-    await tx.update(bulkLauf).set({ rueckgaengigGemachtAm: jetzt }).where(eq(bulkLauf.id, bulkLaufId))
-  })
+    throw ausnahme
+  }
 
   revalidatePath('/bibliothek')
   return {

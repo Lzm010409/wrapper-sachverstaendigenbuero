@@ -52,6 +52,7 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
   const [ergebnis, setzeErgebnis] = useState<BulkErgebnis | null>(null)
   const [exportFehler, setzeExportFehler] = useState<string | null>(null)
   const [undo, setzeUndo] = useState<{ bulkLaufId: string; text: string } | null>(null)
+  const [undoErgebnis, setzeUndoErgebnis] = useState<{ text: string; fehler: boolean } | null>(null)
 
   function schalte(e: { id: string; nummer: string; titel: string }) {
     setzeGewaehlt((vorher) => {
@@ -129,14 +130,16 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
   function macheRueckgaengig() {
     if (!undo) return
     const bulkLaufId = undo.bulkLaufId
+    setzeUndo(null)
     starte(async () => {
       const antwort = await macheBulkLaufRueckgaengig(bulkLaufId)
-      setzeUndo(null)
-      setzeErgebnis(
-        antwort.fehler
-          ? { fehler: antwort.fehler, bearbeitet: [], uebersprungen: [] }
-          : { bearbeitet: [], uebersprungen: [] },
-      )
+      // Eigener Zustand statt `ergebnis`: die Aktionsleiste (in der
+      // `ergebnis` sonst steht) ist meist schon verschwunden, weil die
+      // rückgängig gemachten Einträge nicht mehr ausgewählt sind. Die
+      // Undo-Einblendung bleibt deshalb stehen und zeigt an, was der Server
+      // tatsächlich getan hat — nicht nur, dass irgendetwas geschah.
+      setzeUndoErgebnis({ text: antwort.fehler ?? antwort.hinweis ?? '', fehler: Boolean(antwort.fehler) })
+      setTimeout(() => setzeUndoErgebnis(null), 8000)
     })
   }
 
@@ -339,6 +342,13 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
           <button type="button" disabled={laeuft} onClick={macheRueckgaengig}>
             Rückgängig
           </button>
+        </div>
+      ) : undoErgebnis ? (
+        <div
+          className={`bulk-undo${undoErgebnis.fehler ? ' fehler' : ''}`}
+          role={undoErgebnis.fehler ? 'alert' : 'status'}
+        >
+          <span>{undoErgebnis.text}</span>
         </div>
       ) : null}
     </>

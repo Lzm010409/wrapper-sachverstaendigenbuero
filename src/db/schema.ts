@@ -463,12 +463,28 @@ export const bulkLauf = pgTable(
     operation: bulkOperationEnum().notNull(),
     /** Die ursprünglich ausgewählten Einträge — auch die, die übersprungen wurden. */
     eintragIds: jsonb().$type<string[]>().notNull(),
-    /** Nur die tatsächlich geänderten Einträge, mit ihrem Stand davor. */
+    /**
+     * Nur die tatsächlich geänderten Einträge, mit ihrem Stand davor.
+     *
+     * `freigegebenVon`/`freigegebenAm` stehen nur, wenn `status` hier
+     * `freigegeben` ist — ein Statuswechsel weg davon löscht diese beiden
+     * Felder (siehe `bulk-aktionen.ts`), und ohne sie hier zu sichern, käme
+     * ein Rückgängig zwar auf den Status „freigegeben" zurück, aber ohne
+     * jede Spur, wer freigegeben hatte.
+     */
     vorherZustand: jsonb()
       .$type<
         Record<
           string,
-          { status?: string; bereich?: string; nummer?: string; version: number; geaendertAm: string }
+          {
+            status?: string
+            bereich?: string
+            nummer?: string
+            freigegebenVon?: string | null
+            freigegebenAm?: string | null
+            version: number
+            geaendertAm: string
+          }
         >
       >()
       .notNull(),
