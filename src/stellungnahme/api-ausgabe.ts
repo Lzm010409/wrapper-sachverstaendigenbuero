@@ -21,10 +21,23 @@ import { ladeStellungnahme } from './abfragen'
  * Exportpfade mit unterschiedlichen Regeln.
  */
 
-export type ApiAusgabeErgebnis =
-  | { art: 'fertig'; klartext: string; pdfBase64: string; pdfName: string; befunde: Befund[] }
-  | { art: 'gesperrt'; fehler: string; befunde: Befund[] }
-  | { art: 'kein-dokument'; fehler: string }
+/**
+ * Steht in jedem Ergebniszweig, auch wenn die Ausgabe (noch) nicht
+ * gelingt: wann die Stellungnahme angelegt wurde, ist eine Auskunft über
+ * den Datensatz selbst, nicht über den Erfolg der Ausgabe.
+ */
+export interface ApiAusgabeBasis {
+  erstelltAm: Date
+  versendetAm: Date | null
+  fallAktenzeichen: string | null
+}
+
+export type ApiAusgabeErgebnis = ApiAusgabeBasis &
+  (
+    | { art: 'fertig'; klartext: string; pdfBase64: string; pdfName: string; befunde: Befund[] }
+    | { art: 'gesperrt'; fehler: string; befunde: Befund[] }
+    | { art: 'kein-dokument'; fehler: string }
+  )
 
 function falldatenName(daten: unknown): string | null {
   const geprueft = gutachtenSchema.safeParse(daten)
@@ -37,15 +50,26 @@ export async function erzeugeApiAusgabe(stellungnahmeId: string): Promise<ApiAus
   const s = await ladeStellungnahme(stellungnahmeId)
   if (!s) return null
 
+  const basis: ApiAusgabeBasis = {
+    erstelltAm: s.erstelltAm,
+    versendetAm: s.versendetAm,
+    fallAktenzeichen: s.fall?.aktenzeichen ?? null,
+  }
+
   const dokument = await leseDokument(stellungnahmeId)
   if (!dokument) {
-    return { art: 'kein-dokument', fehler: 'Zu dieser Stellungnahme gibt es noch kein Schreiben.' }
+    return {
+      ...basis,
+      art: 'kein-dokument',
+      fehler: 'Zu dieser Stellungnahme gibt es noch kein Schreiben.',
+    }
   }
 
   const pruefung = await pruefeDokument(stellungnahmeId, dokument)
   if (pruefung.gesperrt) {
     const anzahl = pruefung.zusammenfassung.sperrt
     return {
+      ...basis,
       art: 'gesperrt',
       fehler:
         `${anzahl} Prüfung${anzahl === 1 ? '' : 'en'} sperr${anzahl === 1 ? 't' : 'en'} ` +
@@ -57,6 +81,7 @@ export async function erzeugeApiAusgabe(stellungnahmeId: string): Promise<ApiAus
   const struktur = leseStruktur(dokument)
   if (struktur.abschnitte.length === 0) {
     return {
+      ...basis,
       art: 'kein-dokument',
       fehler: 'Kein Abschnitt trägt Text — es gäbe nichts auszugeben.',
     }
@@ -92,6 +117,7 @@ export async function erzeugeApiAusgabe(stellungnahmeId: string): Promise<ApiAus
   const pdf = await druckeStellungnahmePdf(kopf, absaetze, bilder)
 
   return {
+    ...basis,
     art: 'fertig',
     klartext: alsKlartext(absaetze),
     pdfBase64: pdf.toString('base64'),

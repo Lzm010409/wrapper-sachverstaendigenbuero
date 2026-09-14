@@ -25,13 +25,23 @@ export async function GET(
   const ergebnis = await erzeugeApiAusgabe(id)
 
   if (ergebnis === null) return apiFehlerAntwort(404, 'Diese Stellungnahme gibt es nicht.')
-  if (ergebnis.art === 'gesperrt') {
-    return apiFehlerAntwort(409, ergebnis.fehler, { befunde: ergebnis.befunde })
+
+  // Erstellungs- und Versanddatum stehen unabhängig davon fest, ob die
+  // Ausgabe selbst gelingt — sie gehören zum Datensatz, nicht zum Ergebnis.
+  const basis = {
+    erstelltAm: ergebnis.erstelltAm,
+    versendetAm: ergebnis.versendetAm,
+    fallAktenzeichen: ergebnis.fallAktenzeichen,
   }
-  if (ergebnis.art === 'kein-dokument') return apiFehlerAntwort(422, ergebnis.fehler)
+
+  if (ergebnis.art === 'gesperrt') {
+    return apiFehlerAntwort(409, ergebnis.fehler, { ...basis, befunde: ergebnis.befunde })
+  }
+  if (ergebnis.art === 'kein-dokument') return apiFehlerAntwort(422, ergebnis.fehler, basis)
 
   return apiJsonAntwort({
     id,
+    ...basis,
     klartext: ergebnis.klartext,
     pdfBase64: ergebnis.pdfBase64,
     pdfName: ergebnis.pdfName,

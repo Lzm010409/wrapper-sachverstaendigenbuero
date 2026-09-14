@@ -19,6 +19,7 @@ vi.mock('@/app/api/wache', async () => {
 const { GET } = await import('./route')
 
 const GUELTIGE_ID = 'a1b2c3d4-e5f6-4789-a123-0123456789ab'
+const ERSTELLT_AM = new Date('2026-09-01T09:00:00Z')
 
 function anfrage(id = GUELTIGE_ID): Request {
   return new Request(`https://cockpit.example/api/v1/stellungnahmen/${id}`, {
@@ -41,9 +42,12 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     expect((await antwort.json()).fehler).toMatch(/gibt es nicht/)
   })
 
-  it('antwortet 409 und liefert die Befunde, wenn sperrende Prüfungen die Ausgabe verhindern', async () => {
+  it('antwortet 409, liefert aber Erstellungsdatum und Befunde, wenn sperrende Prüfungen die Ausgabe verhindern', async () => {
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'gesperrt',
+      erstelltAm: ERSTELLT_AM,
+      versendetAm: null,
+      fallAktenzeichen: '0926/2081TG',
       fehler: '1 Prüfung sperrt die Ausgabe.',
       befunde: [
         {
@@ -60,20 +64,30 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     const rumpf = await antwort.json()
     expect(rumpf.fehler).toMatch(/sperrt/)
     expect(rumpf.befunde).toHaveLength(1)
+    expect(rumpf.erstelltAm).toBe(ERSTELLT_AM.toISOString())
+    expect(rumpf.fallAktenzeichen).toBe('0926/2081TG')
   })
 
   it('antwortet 422, wenn es noch kein Schreiben zu dieser Stellungnahme gibt', async () => {
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'kein-dokument',
+      erstelltAm: ERSTELLT_AM,
+      versendetAm: null,
+      fallAktenzeichen: null,
       fehler: 'Zu dieser Stellungnahme gibt es noch kein Schreiben.',
     })
     const antwort = await GET(anfrage(), { params: Promise.resolve({ id: GUELTIGE_ID }) })
     expect(antwort.status).toBe(422)
+    expect((await antwort.json()).erstelltAm).toBe(ERSTELLT_AM.toISOString())
   })
 
-  it('liefert Klartext und PDF in einer Antwort', async () => {
+  it('liefert Erstellungsdatum, Klartext und PDF in einer Antwort', async () => {
+    const versendetAm = new Date('2026-09-05T12:00:00Z')
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'fertig',
+      erstelltAm: ERSTELLT_AM,
+      versendetAm,
+      fallAktenzeichen: '0926/2081TG',
       klartext: 'Sehr geehrte Damen und Herren,\n\n…',
       pdfBase64: 'JVBERi0=',
       pdfName: 'Stellungnahme_Muster_2026-09-08.pdf',
@@ -87,6 +101,9 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     expect(rumpf.klartext).toContain('Sehr geehrte Damen und Herren')
     expect(rumpf.pdfBase64).toBe('JVBERi0=')
     expect(rumpf.pdfName).toBe('Stellungnahme_Muster_2026-09-08.pdf')
+    expect(rumpf.erstelltAm).toBe(ERSTELLT_AM.toISOString())
+    expect(rumpf.versendetAm).toBe(versendetAm.toISOString())
+    expect(rumpf.fallAktenzeichen).toBe('0926/2081TG')
   })
 
   it('gibt die Ablehnung der Wache unverändert weiter, wenn kein Token gültig ist', async () => {
