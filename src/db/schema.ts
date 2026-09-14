@@ -65,6 +65,9 @@ export const herkunftEnum = pgEnum('herkunft', [
 
 export const rolleEnum = pgEnum('rolle', ['ersteller', 'freigeber', 'admin'])
 
+/** Welche Bulk-Aktion einen Lauf über mehrere Bibliothekseinträge ausgelöst hat. */
+export const bulkOperationEnum = pgEnum('bulk_operation', ['status', 'freigabe', 'bereich'])
+
 /** Woher der Wert eines Platzhalters kommt. */
 export const platzhalterQuelleEnum = pgEnum('platzhalter_quelle', [
   'autoixpert',
@@ -422,6 +425,57 @@ export const beleg = pgTable(
     verifiziertVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
   },
   (t) => [index('beleg_eintrag_idx').on(t.eintragId)],
+)
+
+/**
+ * Ein Bulk-Lauf über mehrere Bibliothekseinträge — Statuswechsel, Freigabe
+ * oder Bereichswechsel in einem Handgriff.
+ *
+ * **Warum eine eigene Tabelle und kein Protokolleintrag.** Ein Protokoll
+ * (`ereignis`) sagt, was passiert ist — hier steht zusätzlich, was **davor**
+ * war. Ohne den Vorher-Zustand liesse sich ein Bulk-Lauf, der 40 Einträge auf
+ * einmal verändert, nicht mehr rückgängig machen.
+ *
+ * **`vorherZustand` trägt zweierlei je Eintrag.** Erstens, was die Operation
+ * geändert hat und ein Rückgängig zurückschreiben muss — bei `status` und
+ * `freigabe` den Status, bei `bereich` Bereich und Nummer (ein
+ * Bereichswechsel vergibt eine neue Gliederungsnummer im Zielbereich, siehe
+ * `bulk-aktionen.ts`) —, dazu die alte `version`. Zweitens `geaendertAm`,
+ * aber **nicht** der Stand davor, sondern der Zeitstempel, den dieser Lauf
+ * selbst beim Schreiben gesetzt hat: die Rückgängig-Prüfung vergleicht ihn
+ * mit dem aktuellen `geaendertAm` des Eintrags. Stimmen sie nicht mehr
+ * überein, hat eine andere Aktion den Eintrag seitdem angefasst — dann wird
+ * dieser eine Eintrag beim Rückgängigmachen übersprungen, statt eine fremde
+ * Änderung zu überschreiben.
+ *
+ * **Warum das Zeitfenster nicht in der Datenbank steht.** Dreissig Sekunden
+ * sind eine Auskunft der Oberfläche (der Undo-Hinweis), keine Eigenschaft des
+ * Laufs — geprüft wird serverseitig anhand von `erstelltAm`.
+ *
+ * Ein Export wird hier nicht protokolliert: er verändert keinen Eintrag und
+ * hat nichts, das rückgängig zu machen wäre.
+ */
+export const bulkLauf = pgTable(
+  'bulk_lauf',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    benutzerId: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    operation: bulkOperationEnum().notNull(),
+    /** Die ursprünglich ausgewählten Einträge — auch die, die übersprungen wurden. */
+    eintragIds: jsonb().$type<string[]>().notNull(),
+    /** Nur die tatsächlich geänderten Einträge, mit ihrem Stand davor. */
+    vorherZustand: jsonb()
+      .$type<
+        Record<
+          string,
+          { status?: string; bereich?: string; nummer?: string; version: number; geaendertAm: string }
+        >
+      >()
+      .notNull(),
+    rueckgaengigGemachtAm: timestamp({ withTimezone: true }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('bulk_lauf_benutzer_idx').on(t.benutzerId)],
 )
 
 /* ------------------------------------------------------------------ *
