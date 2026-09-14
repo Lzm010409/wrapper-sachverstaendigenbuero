@@ -21,6 +21,20 @@ const { GET } = await import('./route')
 const GUELTIGE_ID = 'a1b2c3d4-e5f6-4789-a123-0123456789ab'
 const ERSTELLT_AM = new Date('2026-09-01T09:00:00Z')
 
+const KUERZUNGSPOSITIONEN = [
+  {
+    id: 'pos1',
+    bezeichnung: 'Lackierlohn',
+    seite: 3,
+    betragGutachten: 150.56,
+    betragGekuerzt: 100,
+    differenz: 50.56,
+    begruendungVersicherer: 'UPE-Aufschlag nicht üblich',
+    behandlung: 'bestritten',
+  },
+]
+const KUERZUNGSSUMMEN = { summeGutachten: 150.56, summeGekuerzt: 100, summeDifferenz: 50.56 }
+
 function anfrage(id = GUELTIGE_ID): Request {
   return new Request(`https://cockpit.example/api/v1/stellungnahmen/${id}`, {
     headers: { authorization: 'Bearer cockpit_irrelevant' },
@@ -42,12 +56,14 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     expect((await antwort.json()).fehler).toMatch(/gibt es nicht/)
   })
 
-  it('antwortet 409, liefert aber Erstellungsdatum und Befunde, wenn sperrende Prüfungen die Ausgabe verhindern', async () => {
+  it('antwortet 409, liefert aber Erstellungsdatum, Kürzungspositionen und Befunde, wenn sperrende Prüfungen die Ausgabe verhindern', async () => {
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'gesperrt',
       erstelltAm: ERSTELLT_AM,
       versendetAm: null,
       fallAktenzeichen: '0926/2081TG',
+      kuerzungspositionen: KUERZUNGSPOSITIONEN,
+      kuerzungssummen: KUERZUNGSSUMMEN,
       fehler: '1 Prüfung sperrt die Ausgabe.',
       befunde: [
         {
@@ -66,28 +82,37 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     expect(rumpf.befunde).toHaveLength(1)
     expect(rumpf.erstelltAm).toBe(ERSTELLT_AM.toISOString())
     expect(rumpf.fallAktenzeichen).toBe('0926/2081TG')
+    expect(rumpf.kuerzungspositionen).toEqual(KUERZUNGSPOSITIONEN)
+    expect(rumpf.kuerzungssummen).toEqual(KUERZUNGSSUMMEN)
   })
 
-  it('antwortet 422, wenn es noch kein Schreiben zu dieser Stellungnahme gibt', async () => {
+  it('antwortet 422, liefert aber Kürzungspositionen, wenn es noch kein Schreiben zu dieser Stellungnahme gibt', async () => {
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'kein-dokument',
       erstelltAm: ERSTELLT_AM,
       versendetAm: null,
       fallAktenzeichen: null,
+      kuerzungspositionen: KUERZUNGSPOSITIONEN,
+      kuerzungssummen: KUERZUNGSSUMMEN,
       fehler: 'Zu dieser Stellungnahme gibt es noch kein Schreiben.',
     })
     const antwort = await GET(anfrage(), { params: Promise.resolve({ id: GUELTIGE_ID }) })
     expect(antwort.status).toBe(422)
-    expect((await antwort.json()).erstelltAm).toBe(ERSTELLT_AM.toISOString())
+    const rumpf = await antwort.json()
+    expect(rumpf.erstelltAm).toBe(ERSTELLT_AM.toISOString())
+    expect(rumpf.kuerzungspositionen).toEqual(KUERZUNGSPOSITIONEN)
+    expect(rumpf.kuerzungssummen).toEqual(KUERZUNGSSUMMEN)
   })
 
-  it('liefert Erstellungsdatum, Klartext und PDF in einer Antwort', async () => {
+  it('liefert Erstellungsdatum, Klartext, PDF sowie Kürzungspositionen und -summen in einer Antwort', async () => {
     const versendetAm = new Date('2026-09-05T12:00:00Z')
     erzeugeApiAusgabe.mockResolvedValueOnce({
       art: 'fertig',
       erstelltAm: ERSTELLT_AM,
       versendetAm,
       fallAktenzeichen: '0926/2081TG',
+      kuerzungspositionen: KUERZUNGSPOSITIONEN,
+      kuerzungssummen: KUERZUNGSSUMMEN,
       klartext: 'Sehr geehrte Damen und Herren,\n\n…',
       pdfBase64: 'JVBERi0=',
       pdfName: 'Stellungnahme_Muster_2026-09-08.pdf',
@@ -104,6 +129,8 @@ describe('GET /api/v1/stellungnahmen/[id]', () => {
     expect(rumpf.erstelltAm).toBe(ERSTELLT_AM.toISOString())
     expect(rumpf.versendetAm).toBe(versendetAm.toISOString())
     expect(rumpf.fallAktenzeichen).toBe('0926/2081TG')
+    expect(rumpf.kuerzungspositionen).toEqual(KUERZUNGSPOSITIONEN)
+    expect(rumpf.kuerzungssummen).toEqual(KUERZUNGSSUMMEN)
   })
 
   it('gibt die Ablehnung der Wache unverändert weiter, wenn kein Token gültig ist', async () => {
