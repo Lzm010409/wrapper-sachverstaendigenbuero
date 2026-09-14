@@ -204,6 +204,48 @@ export const sitzung = pgTable(
   ],
 )
 
+/**
+ * Ein persönliches API-Token für den Zugriff auf `/api/v1/*`.
+ *
+ * Dasselbe Hashing-Muster wie bei `sitzung`: gespeichert wird nur der
+ * SHA-256-Hash, das Klartext-Token zeigt die Oberfläche genau einmal, direkt
+ * nach dem Erzeugen.
+ *
+ * Ein Token trägt dieselben Rechte wie sein Benutzer — es ist kein
+ * eigenständiger Zugang, sondern ein zweiter Weg, denselben Zugang zu
+ * benutzen. Deshalb verwaltet jeder Benutzer nur seine eigenen Tokens
+ * (`benutzerId` in jeder Abfrage), ohne dass dafür ein eigenes Recht nötig
+ * wäre.
+ */
+export const apiToken = pgTable(
+  'api_token',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    benutzerId: uuid()
+      .notNull()
+      .references(() => benutzer.id, { onDelete: 'cascade' }),
+    /** Frei gewählter Name, z. B. "n8n Sync" — zur Wiedererkennung in der Liste. */
+    name: text().notNull(),
+    tokenHash: text().notNull(),
+    /**
+     * Die ersten Zeichen des Klartext-Tokens, unverschlüsselt. Damit lässt
+     * sich ein Token in der Liste wiedererkennen, ohne dass dafür der Hash
+     * verglichen werden müsste — und ohne dass das vollständige Token ein
+     * zweites Mal irgendwo stehen müsste.
+     */
+    praefix: text().notNull(),
+    /** `null` heisst: läuft nie ab. */
+    laeuftAbAm: timestamp({ withTimezone: true }),
+    widerrufenAm: timestamp({ withTimezone: true }),
+    letzteVerwendungAm: timestamp({ withTimezone: true }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('api_token_hash_idx').on(t.tokenHash),
+    index('api_token_benutzer_idx').on(t.benutzerId),
+  ],
+)
+
 /* ------------------------------------------------------------------ *
  * Argumentbibliothek — bildet das bestehende Markdown-Format ab
  * (Kürzungsgrund → Typische Begründung → Gegenargument → Hinweise
@@ -1036,3 +1078,4 @@ export type Gemeldetes = typeof meldung.$inferSelect
 export type Ereignis = typeof ereignis.$inferSelect
 export type BenutzerRecht = typeof benutzerRecht.$inferSelect
 export type FotoTeilZeile = typeof fotoTeil.$inferSelect
+export type ApiToken = typeof apiToken.$inferSelect

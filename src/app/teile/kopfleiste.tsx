@@ -20,6 +20,7 @@ const BEREICHE: { pfad: string; name: string }[] = [
   { pfad: '/stellungnahmen', name: 'Stellungnahmen' },
   { pfad: '/bibliothek', name: 'Argumentbibliothek' },
   { pfad: '/bilder', name: 'Bildbibliothek' },
+  { pfad: '/einstellungen', name: 'Einstellungen' },
   { pfad: '/verwaltung', name: 'Verwaltung' },
 ]
 

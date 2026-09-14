@@ -39,6 +39,12 @@ const PUNKTE = [
     name: 'Bildbibliothek',
     pfadDaten: 'M3 5h14v10H3V5zm0 8 3.5-3.5 3 3L13 9l4 4M12.5 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
   },
+  {
+    pfad: '/einstellungen',
+    name: 'Einstellungen',
+    pfadDaten:
+      'M10 4v2m0 8v2m6-6h-2M6 10H4m9.66-4.24-1.42 1.42M8.76 12.82l-1.42 1.42m8.32 0-1.42-1.42M6.34 5.76 7.76 7.18M13 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  },
 ]
 
 /**
