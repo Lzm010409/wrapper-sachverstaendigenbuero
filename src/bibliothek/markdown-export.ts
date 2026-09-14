@@ -50,7 +50,14 @@ export function formatiereNummer(nummer: string): string {
   return nummer.includes('.') ? nummer : `${nummer}.`
 }
 
-function formatiereEintrag(e: ExportEintrag, ebene: 2 | 3): string {
+/**
+ * Formatiert einen einzelnen Eintrag als Markdown-Abschnitt.
+ *
+ * Exportiert für den Bulk-Export (`bulk-aktionen.ts`): dort bekommt jeder
+ * ausgewählte Eintrag seine eigene Datei, auf Ebene 2 — dieselbe Formatierung
+ * wie in einer vollständigen Referenzdatei, nur ohne deren Rahmen.
+ */
+export function formatiereEintrag(e: ExportEintrag, ebene: 2 | 3): string {
   const h = '#'.repeat(ebene)
   const teile: string[] = [`${h} ${formatiereNummer(e.nummer)} ${e.titel}`.trim()]
 
