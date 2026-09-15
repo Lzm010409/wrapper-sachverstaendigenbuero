@@ -84,11 +84,22 @@ export default async function StellungnahmeSeite({
 
         <div className="seiten-kopf">
           <div>
-            <h1>{s.betreff ?? 'Neue Stellungnahme'}</h1>
+            <h1>
+              {s.betreff ?? 'Neue Stellungnahme'}
+              {s.modus === 'import' ? (
+                <span className="marke-pille m-entwurf" style={{ marginLeft: 10, verticalAlign: 'middle' }}>
+                  Importiert
+                </span>
+              ) : null}
+            </h1>
             <p className="unterzeile">
-              {s.pruefberichtDateiname
-                ? `Prüfbericht „${s.pruefberichtDateiname}"`
-                : 'Prüfbericht in Arbeit'}
+              {s.modus === 'import'
+                ? s.pruefberichtDateiname
+                  ? `Stellungnahme „${s.pruefberichtDateiname}"`
+                  : 'Stellungnahme in Arbeit'
+                : s.pruefberichtDateiname
+                  ? `Prüfbericht „${s.pruefberichtDateiname}"`
+                  : 'Prüfbericht in Arbeit'}
             </p>
           </div>
         </div>
@@ -151,7 +162,14 @@ export default async function StellungnahmeSeite({
             {extraktion?.aktenzeichen ?? 'ohne Aktenzeichen'}
           </span>
         )}
-        <h1 title={s.betreff ?? undefined}>{s.betreff ?? 'Stellungnahme'}</h1>
+        <h1 title={s.betreff ?? undefined}>
+          {s.betreff ?? 'Stellungnahme'}
+          {s.modus === 'import' ? (
+            <span className="marke-pille m-entwurf" style={{ marginLeft: 8 }} title="Aus einer hochgeladenen Stellungnahme übernommen, nicht aus einem Prüfbericht ausgewertet">
+              Importiert
+            </span>
+          ) : null}
+        </h1>
         <span className="brief-kennzahlen">
           {[
             extraktion?.pruefdienstleister,

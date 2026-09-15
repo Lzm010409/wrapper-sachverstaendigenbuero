@@ -3507,6 +3507,16 @@ body {
   font-weight: 600;
 }
 
+/* Reihe aus `.label-chip`-Knöpfen, z.B. der Umschalter zwischen Prüfbericht
+   und bestehender Stellungnahme im Upload-Formular. Gleicher Aufbau wie
+   `.klickmenue-reihe`, aber eigene Klasse: die beiden Stellen haben
+   inhaltlich nichts miteinander zu tun, nur dasselbe Reihenlayout. */
+.label-chip-reihe {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* ------------------------------------------------------------------ *
  * Doppelte Kontakte
  *

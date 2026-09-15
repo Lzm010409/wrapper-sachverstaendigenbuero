@@ -352,7 +352,7 @@ async function StellungnahmenReiter({ fall }: { fall: FallAnsicht }) {
       ) : null}
 
       <div className="karte" style={{ marginBottom: 16 }}>
-        <h2>Prüfbericht auswerten</h2>
+        <h2>Stellungnahme anlegen</h2>
         <p className="unterzeile" style={{ marginTop: 0 }}>
           Der Fall steht fest — das Schreiben wird ihm zugeordnet.
         </p>
