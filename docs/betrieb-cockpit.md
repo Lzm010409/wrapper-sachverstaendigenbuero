@@ -147,7 +147,7 @@ nichts gesetzt werden:
 | Variable | Wirkung |
 | --- | --- |
 | `AUTOIXPERT_NUR_OFFENE=false` | hebt die Beschränkung auf offene Gutachten auf |
-| `AUTOIXPERT_FRUEHESTENS` | frühestes Anlagedatum, Standard `2026-05-01T00:00:00.000Z` |
+| `AUTOIXPERT_FRUEHESTENS` | frühestes Anlagedatum, Standard `2026-02-01T00:00:00.000Z` |
 | `AUTOIXPERT_SCHREIBEN=erlaubt` | erlaubt schreibende Zugriffe — **bewusst setzen, nicht dauerhaft** |
 
 **Kleinanzeigen-Beschaffung** — hier muss **nichts** gesetzt werden. Ohne

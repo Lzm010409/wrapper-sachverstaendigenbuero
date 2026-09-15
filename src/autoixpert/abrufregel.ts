@@ -4,8 +4,9 @@
  * Zwei Gruende, warum diese Regel im Code steht und nicht nur im Aufruf:
  *
  * 1. **Auftrag des Betreibers.** Fuer den laufenden Ausbau duerfen nur offene
- *    Gutachten ab Mai 2026 gelesen werden, und es darf nichts geschrieben oder
- *    geloescht werden. Eine Regel, an die man sich erinnern muss, ist keine.
+ *    Gutachten ab Februar 2026 gelesen werden, und es darf nichts geschrieben
+ *    oder geloescht werden. Eine Regel, an die man sich erinnern muss, ist
+ *    keine.
  *
  * 2. **Kosten.** Lesezugriffe werden je Gutachten einmalig abgerechnet. Jeder
  *    Abruf, der ueber die freigegebene Menge hinausgeht, kostet Geld - auch ein
@@ -27,7 +28,7 @@ export interface Abrufregel {
 export const abrufregel: Abrufregel = {
   nurOffene: process.env.AUTOIXPERT_NUR_OFFENE !== "false",
   fruehestensErstellt:
-    process.env.AUTOIXPERT_FRUEHESTENS ?? "2026-05-01T00:00:00.000Z",
+    process.env.AUTOIXPERT_FRUEHESTENS ?? "2026-02-01T00:00:00.000Z",
   schreibenErlaubt: process.env.AUTOIXPERT_SCHREIBEN === "erlaubt",
 };
 

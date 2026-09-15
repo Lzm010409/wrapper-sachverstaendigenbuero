@@ -97,7 +97,7 @@ ist keine.
 | Regel | Voreinstellung | Lösen über |
 | --- | --- | --- |
 | nur offene Gutachten (Listenfilter) | an | `AUTOIXPERT_NUR_OFFENE=false` |
-| frühestens angelegt am | `2026-05-01` | `AUTOIXPERT_FRUEHESTENS` |
+| frühestens angelegt am | `2026-02-01` | `AUTOIXPERT_FRUEHESTENS` |
 | schreibende Zugriffe | gesperrt | `AUTOIXPERT_SCHREIBEN=erlaubt` |
 
 Die Listenabfrage setzt die Filter **hinter** den übergebenen Filter, sie sind
