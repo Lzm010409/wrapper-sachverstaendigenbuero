@@ -63,6 +63,7 @@ import { Schnellauswahl } from './schnellauswahl'
 import { leseEreignisse } from '@/app/teile/strom'
 import type { Ausgabeereignis } from '@/stellungnahme/ausgabe'
 import {
+  aktualisierePosition,
   entfernePosition,
   formuliereAbschnitt,
   pruefeDokument,
@@ -704,6 +705,26 @@ export function Schreibtisch({
     })
   }
 
+  /**
+   * Bezeichnung und Beträge einer Position von Hand berichtigen.
+   *
+   * Bewusst kein `starte(...)`: die Blase wartet auf das Ergebnis, um das
+   * Formular bei Erfolg selbst zu schliessen und bei einem Fehler offen zu
+   * lassen und die Meldung zu zeigen — das braucht den Rückgabewert, nicht
+   * nur eine schwebende Übergangsanzeige.
+   */
+  const aktualisiere = async (
+    positionId: string,
+    felder: { bezeichnung: string; betragGutachten: string; betragGekuerzt: string },
+  ) => {
+    const e = await aktualisierePosition(positionId, felder)
+    // Die Gesamtsumme oben in der Kopfzeile ist aus den Positionen live
+    // berechnet (`page.tsx`) — ohne ein Neuladen bliebe sie auf dem alten
+    // Stand, während die Blase schon den neuen Betrag zeigt.
+    if (!e.fehler) router.refresh()
+    return e
+  }
+
   const inBibliothek = (positionId: string) =>
     starte(async () => {
       if (!editor) return
@@ -1205,6 +1226,7 @@ export function Schreibtisch({
                 aufHerausnehmen={() => herausnehmen(p.id)}
                 aufAufnehmen={() => aufnehmen(p.id, benenne(p))}
                 aufEntfernen={() => entfernen(p.id, benenne(p))}
+                aufAktualisieren={(felder) => aktualisiere(p.id, felder)}
                 aufFundstelle={springeZu}
                 aufInBibliothek={() => inBibliothek(p.id)}
                 aufBildEinfuegen={(gut) => setzeBibliotheksbild(gut)}

@@ -117,6 +117,7 @@ export function Blase({
   aufHerausnehmen,
   aufAufnehmen,
   aufEntfernen,
+  aufAktualisieren,
   aufFundstelle,
   aufInBibliothek,
   aufBildEinfuegen,
@@ -146,11 +147,18 @@ export function Blase({
   aufHerausnehmen: () => void
   aufAufnehmen: () => void
   aufEntfernen: () => void
+  /** Bezeichnung und Beträge von Hand berichtigen — siehe `PositionBearbeiten`. */
+  aufAktualisieren: (felder: {
+    bezeichnung: string
+    betragGutachten: string
+    betragGekuerzt: string
+  }) => Promise<{ fehler?: string }>
   aufFundstelle: (befund: Befund) => void
   aufInBibliothek: () => void
   aufBildEinfuegen: (gut: Bildziehgut) => void
 }) {
   const [offenerKandidat, setzeOffenenKandidaten] = useState<string | null>(null)
+  const [bearbeitungOffen, setzeBearbeitungOffen] = useState(false)
   const [entwurf, setzeEntwurf] = useState('')
   const [eigenerText, setzeEigenenText] = useState('')
   const [begriff, setzeBegriff] = useState('')
@@ -263,7 +271,39 @@ export function Blase({
         <span className="blase-betrag">
           {position.differenz ? `−${euro(position.differenz)}` : ''}
         </span>
+        <button
+          type="button"
+          className="blase-kopf-knopf"
+          title="Bezeichnung und Beträge dieser Position berichtigen"
+          aria-label="Position bearbeiten"
+          aria-pressed={bearbeitungOffen}
+          onClick={() => setzeBearbeitungOffen((o) => !o)}
+        >
+          ✎
+        </button>
+        <button
+          type="button"
+          className="blase-kopf-knopf gefahr"
+          title="Diese Position ganz entfernen — aus dem Brief, aus dieser Leiste und aus dem Fall"
+          aria-label="Position löschen"
+          onClick={aufEntfernen}
+        >
+          🗑
+        </button>
       </div>
+
+      {bearbeitungOffen ? (
+        <PositionBearbeiten
+          position={position}
+          laeuft={laeuft}
+          aufSpeichern={async (felder) => {
+            const e = await aufAktualisieren(felder)
+            if (!e.fehler) setzeBearbeitungOffen(false)
+            return e
+          }}
+          aufAbbrechen={() => setzeBearbeitungOffen(false)}
+        />
+      ) : null}
 
       {/*
         Weicht die Überschrift im Brief vom Namen im Prüfbericht ab, steht
@@ -691,6 +731,103 @@ export function Blase({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * Das Formular hinter dem Bearbeiten-Knopf einer Position.
+ *
+ * Anders als die Vorschlagsfelder daneben ist das kein Baustein, der in den
+ * Brief eingefügt wird — es berichtigt die drei Grundangaben der Position
+ * selbst (Bezeichnung, Gutachten-Betrag, gekürzter Betrag). Deshalb ein
+ * eigenes, einfaches Formular ohne Vorschlags-Matching, nur an der Optik von
+ * `.blase-entwurf` und `.blase-knoepfe` orientiert.
+ */
+function PositionBearbeiten({
+  position,
+  laeuft,
+  aufSpeichern,
+  aufAbbrechen,
+}: {
+  position: PositionAnzeige
+  laeuft: boolean
+  aufSpeichern: (felder: {
+    bezeichnung: string
+    betragGutachten: string
+    betragGekuerzt: string
+  }) => Promise<{ fehler?: string }>
+  aufAbbrechen: () => void
+}) {
+  const [bezeichnung, setzeBezeichnung] = useState(position.bezeichnung)
+  const [betragGutachten, setzeBetragGutachten] = useState(position.betragGutachten ?? '')
+  const [betragGekuerzt, setzeBetragGekuerzt] = useState(position.betragGekuerzt ?? '')
+  const [speichert, setzeSpeichert] = useState(false)
+  const [fehler, setzeFehler] = useState<string | null>(null)
+
+  const speichern = async () => {
+    setzeSpeichert(true)
+    setzeFehler(null)
+    const e = await aufSpeichern({ bezeichnung, betragGutachten, betragGekuerzt })
+    setzeSpeichert(false)
+    if (e.fehler) setzeFehler(e.fehler)
+  }
+
+  return (
+    <div className="blase-entwurf" style={{ marginBottom: 10 }}>
+      <div className="feld">
+        <label htmlFor={`bez-${position.id}`}>Bezeichnung</label>
+        <input
+          id={`bez-${position.id}`}
+          value={bezeichnung}
+          onChange={(e) => setzeBezeichnung(e.target.value)}
+          disabled={speichert || laeuft}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div className="feld" style={{ flex: 1 }}>
+          <label htmlFor={`bg-${position.id}`}>Gutachten-Betrag</label>
+          <input
+            id={`bg-${position.id}`}
+            inputMode="decimal"
+            placeholder="z.B. 150.50"
+            value={betragGutachten}
+            onChange={(e) => setzeBetragGutachten(e.target.value)}
+            disabled={speichert || laeuft}
+          />
+        </div>
+        <div className="feld" style={{ flex: 1 }}>
+          <label htmlFor={`bk-${position.id}`}>Gekürzter Betrag</label>
+          <input
+            id={`bk-${position.id}`}
+            inputMode="decimal"
+            placeholder="z.B. 100"
+            value={betragGekuerzt}
+            onChange={(e) => setzeBetragGekuerzt(e.target.value)}
+            disabled={speichert || laeuft}
+          />
+        </div>
+      </div>
+
+      {fehler ? (
+        <p className="hinweis fehler" role="alert" style={{ margin: '8px 0 0' }}>
+          {fehler}
+        </p>
+      ) : null}
+
+      <div className="blase-knoepfe">
+        <button
+          type="button"
+          className="haupt"
+          disabled={speichert || laeuft || !bezeichnung.trim()}
+          onClick={() => void speichern()}
+        >
+          {speichert ? <Kreisel text="Speichert" /> : 'Speichern'}
+        </button>
+        <button type="button" disabled={speichert} onClick={aufAbbrechen}>
+          Abbrechen
+        </button>
+      </div>
     </div>
   )
 }

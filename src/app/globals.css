@@ -2025,6 +2025,34 @@ code {
   white-space: nowrap;
 }
 
+/* Bearbeiten- und Löschen-Knopf im Kopf einer offenen Blase — klein und
+   randlos, damit sie neben Nummer, Titel und Betrag nicht mit den
+   eigentlichen Handlungen am Fuss der Blase konkurrieren. */
+.blase-kopf-knopf {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.blase-kopf-knopf:hover,
+.blase-kopf-knopf:focus-visible,
+.blase-kopf-knopf[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.blase-kopf-knopf.gefahr:hover,
+.blase-kopf-knopf.gefahr:focus-visible {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
 .blase-zitat {
   font-family: var(--serif);
   font-style: italic;
