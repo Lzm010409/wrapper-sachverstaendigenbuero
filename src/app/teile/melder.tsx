@@ -232,6 +232,30 @@ export function Einblendkarte({
     return () => clearTimeout(uhr)
   }, [dauer, einblendung.id, schliesse])
 
+  /*
+   * Eine `ref`, kein `useState`: zwischen zwei schnell aufeinanderfolgenden
+   * Klicks (Doppelklick, doppeltes Antippen) liegt oft kein abgeschlossener
+   * Rerender — ein Zustand, der erst beim nächsten Rendern gilt, käme zu
+   * spät. `ausgefuehrt.current` gilt dagegen sofort für den allernächsten
+   * Klick. Ohne diese Sperre riefe ein Doppelklick `ausfuehren()` zweimal
+   * auf, bevor `schliesse()` die Karte entfernt hat — bei der Bulk-Undo etwa
+   * zwei parallele Rückgängig-Läufe für denselben Vorgang.
+   */
+  const ausgefuehrt = useRef(false)
+
+  function klickeAktion() {
+    if (ausgefuehrt.current || !einblendung.aktion) return
+    ausgefuehrt.current = true
+    try {
+      einblendung.aktion.ausfuehren()
+    } finally {
+      // Auch wenn `ausfuehren` wirft: eine Einblendung, deren Knopf schon
+      // betätigt wurde, soll nicht bis zum Ablauf ihrer Verweildauer stehen
+      // bleiben, als hätte niemand reagiert.
+      schliesse(einblendung.id)
+    }
+  }
+
   return (
     <div className={`einblendung e-${einblendung.art}`} role={rolleZu(einblendung.art)}>
       <span className="einblendung-punkt" aria-hidden="true" />
@@ -240,14 +264,7 @@ export function Einblendkarte({
         <span>{einblendung.text}</span>
       </div>
       {einblendung.aktion ? (
-        <button
-          type="button"
-          className="einblendung-aktion"
-          onClick={() => {
-            einblendung.aktion!.ausfuehren()
-            schliesse(einblendung.id)
-          }}
-        >
+        <button type="button" className="einblendung-aktion" onClick={klickeAktion}>
           {einblendung.aktion.text}
         </button>
       ) : null}

@@ -443,7 +443,26 @@ export async function macheBulkLaufRueckgaengig(bulkLaufId: string): Promise<Und
   }
 
   try {
-    await db.transaction(async (tx) => {
+    const abgebrochen = await db.transaction(async (tx) => {
+      /*
+       * Beansprucht den Lauf, bevor irgendetwas zurückgesetzt wird —
+       * atomar, mit `WHERE rueckgaengig_gemacht_am IS NULL` als Bedingung
+       * des UPDATE selbst, nicht als vorherige, separate Prüfung. Die
+       * Prüfung ganz oben (`lauf.rueckgaengigGemachtAm`) liest ausserhalb
+       * jeder Transaktion und schliesst zwei fast gleichzeitige Aufrufe
+       * (Doppelklick, zwei Tabs) nicht aus: beide läsen „noch nicht
+       * rückgängig", und ohne diese Bedingung setzte jeder seine eigene
+       * Kopie der Einträge zurück. Postgres sperrt die Zeile beim ersten
+       * UPDATE; der zweite Aufruf trifft danach auf `rueckgaengig_gemacht_am
+       * IS NOT NULL`, ändert nichts und bricht hier ab.
+       */
+      const beansprucht = await tx
+        .update(bulkLauf)
+        .set({ rueckgaengigGemachtAm: jetzt })
+        .where(and(eq(bulkLauf.id, bulkLaufId), isNull(bulkLauf.rueckgaengigGemachtAm)))
+        .returning({ id: bulkLauf.id })
+      if (beansprucht.length === 0) return true
+
       for (const id of wiederherstellbar) {
         const vorher = lauf.vorherZustand[id]!
         await tx
@@ -470,8 +489,15 @@ export async function macheBulkLaufRueckgaengig(bulkLaufId: string): Promise<Und
           })
           .where(eq(eintrag.id, id))
       }
-      await tx.update(bulkLauf).set({ rueckgaengigGemachtAm: jetzt }).where(eq(bulkLauf.id, bulkLaufId))
+      return false
     })
+    if (abgebrochen) {
+      return {
+        fehler: 'Dieser Lauf wurde inzwischen an anderer Stelle rückgängig gemacht.',
+        wiederhergestellt: 0,
+        uebersprungen: 0,
+      }
+    }
   } catch (ausnahme) {
     // Nur bei `bereich`-Läufen möglich: die alte (Bereich, Nummer) wurde
     // seitdem von einem dritten Eintrag belegt (neu angelegt oder dorthin
