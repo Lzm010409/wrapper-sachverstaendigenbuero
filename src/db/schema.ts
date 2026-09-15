@@ -117,7 +117,14 @@ export const bausteinHerkunftEnum = pgEnum('baustein_herkunft', [
 
 export const bausteinTypEnum = pgEnum('baustein_typ', ['bibliothek', 'eigener_text'])
 
-export const modusEnum = pgEnum('modus', ['standard', 'schnell', 'individuell'])
+/**
+ * `import` markiert eine Stellungnahme, die nicht aus einem Prüfbericht
+ * ausgewertet, sondern als bereits fertig verfasstes Schreiben hochgeladen
+ * und per KI in dieselbe Struktur überführt wurde (siehe
+ * `src/stellungnahme/import.ts`). Die Oberfläche zeigt dafür ein kleines
+ * Label „Importiert" — mehr hängt an diesem Wert nicht.
+ */
+export const modusEnum = pgEnum('modus', ['standard', 'schnell', 'individuell', 'import'])
 
 /* ------------------------------------------------------------------ *
  * Benutzer und Sitzungen
@@ -884,6 +891,13 @@ export const stellungnahme = pgTable(
     extraktion: jsonb(),
     /** Befunde der Sonderfall-Prüfliste B.1-B.8 (Konzept F4). */
     sonderfaelle: jsonb(),
+    /**
+     * Bei `modus = 'import'` steht hier stattdessen der Dateiname der
+     * hochgeladenen, bereits fertigen Stellungnahme — nicht eines
+     * Prüfberichts. Beide durchlaufen denselben Hintergrundlauf (PDF lesen,
+     * per KI auslesen, Zeile schreiben) und brauchen deshalb keine eigene
+     * Spalte; `modus` unterscheidet, welcher der beiden es war.
+     */
     pruefberichtDateiname: text(),
     pruefberichtSeiten: integer(),
 
@@ -940,7 +954,8 @@ export const stellungnahme = pgTable(
     auswertungsfehler: text(),
     auswertungAktualisiertAm: timestamp({ withTimezone: true }),
     /*
-      Der Prüfbericht selbst, als Base64.
+      Der Prüfbericht selbst, als Base64 — bei `modus = 'import'` stattdessen
+      die hochgeladene, bereits fertige Stellungnahme.
 
       Die Verarbeitung läuft nach der Antwort weiter — die hochgeladene
       Datei ist dann längst fort. Sie muss also irgendwo liegen, und die
