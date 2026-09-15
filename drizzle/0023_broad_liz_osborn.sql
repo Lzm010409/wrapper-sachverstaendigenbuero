@@ -1,0 +1,1 @@
+ALTER TYPE "public"."modus" ADD VALUE 'import';

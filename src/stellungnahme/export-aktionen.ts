@@ -7,6 +7,7 @@ import { bild, stellungnahme } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { verlangeRecht } from '@/rechte/zugriff'
 import { verarbeiteImHintergrund } from './auswertung'
+import { verarbeiteImportImHintergrund } from './import'
 
 /**
  * Die kurzen Wege rund um die Ausgabe.
@@ -217,22 +218,33 @@ export async function holeAuswertungsstand(
 /**
  * Stösst die Auswertung erneut an.
  *
- * Möglich, weil der Prüfbericht bei der Stellungnahme liegt — ein neuer
- * Anlauf kostet nichts als Zeit. Gebraucht wird er in zwei Fällen: die
+ * Möglich, weil die hochgeladene Datei bei der Stellungnahme liegt — ein
+ * neuer Anlauf kostet nichts als Zeit. Gebraucht wird er in zwei Fällen: die
  * Verarbeitung ist gescheitert, oder der Behälter ist mitten im Lauf neu
  * gestartet und die Zeile steht seither ohne Regung auf „läuft".
+ *
+ * Diese Aktion bedient beide Hintergrundläufe — die Auswertung eines
+ * Prüfberichts und den Import einer bereits verfassten Stellungnahme
+ * (`modus = 'import'`). `auswertungslauf.tsx` zeigt für beide denselben
+ * Fortschrittsbalken und kennt den Unterschied nicht; er wird hier anhand
+ * des Modus entschieden.
  */
 export async function starteAuswertungNeu(stellungnahmeId: string): Promise<ExportErgebnis> {
   await verlangeBenutzer()
 
   const [zeile] = await db
-    .select({ daten: stellungnahme.pruefberichtDaten })
+    .select({ daten: stellungnahme.pruefberichtDaten, modus: stellungnahme.modus })
     .from(stellungnahme)
     .where(eq(stellungnahme.id, stellungnahmeId))
     .limit(1)
 
   if (!zeile?.daten) {
-    return { fehler: 'Zu dieser Stellungnahme liegt kein Prüfbericht mehr vor.' }
+    return {
+      fehler:
+        zeile?.modus === 'import'
+          ? 'Zu dieser Stellungnahme liegt keine hochgeladene Datei mehr vor.'
+          : 'Zu dieser Stellungnahme liegt kein Prüfbericht mehr vor.',
+    }
   }
 
   await db
@@ -246,7 +258,11 @@ export async function starteAuswertungNeu(stellungnahmeId: string): Promise<Expo
     })
     .where(eq(stellungnahme.id, stellungnahmeId))
 
-  void verarbeiteImHintergrund(stellungnahmeId)
+  if (zeile.modus === 'import') {
+    void verarbeiteImportImHintergrund(stellungnahmeId)
+  } else {
+    void verarbeiteImHintergrund(stellungnahmeId)
+  }
 
   revalidatePath(`/stellungnahmen/${stellungnahmeId}`)
   return { hinweis: 'Die Auswertung läuft erneut.' }

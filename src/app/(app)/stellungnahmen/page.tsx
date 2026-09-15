@@ -172,7 +172,7 @@ export default async function StellungnahmenSeite({
           <p style={{ margin: 0 }}>
             {gefiltert
               ? 'Keine Stellungnahme passt zu diesem Filter. Nimm eine Einschränkung heraus.'
-              : 'Lade einen Prüfbericht hoch — die Kürzungspositionen werden daraus ausgelesen.'}
+              : 'Lade einen Prüfbericht oder eine bereits verfasste Stellungnahme hoch — die Positionen werden daraus ausgelesen.'}
           </p>
         </div>
       ) : (
@@ -192,7 +192,19 @@ export default async function StellungnahmenSeite({
                   {s.fallAktenzeichen ?? '—'}
                 </span>
                 <span>
-                  <span className="zeile-titel">{beschriftung(s.betreff)}</span>
+                  <span className="zeile-titel">
+                    {beschriftung(s.betreff)}
+                    {/* Sagt auf einen Blick, dass hier nichts aus einem
+                        Prüfbericht ausgewertet, sondern ein fertiges
+                        Schreiben übernommen wurde — die Positionen sind
+                        also aus dem eigenen Text gelesen, nicht aus einer
+                        Prüfkalkulation. */}
+                    {s.modus === 'import' ? (
+                      <span className="marke-pille m-entwurf" style={{ marginLeft: 8 }}>
+                        Importiert
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="zeile-meta">
                     <span>
                       {s.positionen} {s.positionen === 1 ? 'Position' : 'Positionen'}

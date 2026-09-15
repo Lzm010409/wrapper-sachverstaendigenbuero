@@ -16,6 +16,7 @@ import { abschnitteVollstaendig, istDokument, type Elementknoten } from '@/dokum
 import { formulierePosition } from './komposition'
 import { ladeStellungnahme } from './abfragen'
 import { istDublette, sperreBereichZurNummernvergabe } from '@/bibliothek/sperre'
+import { pruefePositionsfelder, type PositionsfelderEingabe } from './positions-validierung'
 
 /* ------------------------------------------------------------------ *
  * Speichern
@@ -242,6 +243,56 @@ export async function setzeBehandlung(
   if (geschlossen) return { fehler: geschlossen }
 
   await db.update(position).set({ behandlung }).where(eq(position.id, positionId))
+  return {}
+}
+
+/* ------------------------------------------------------------------ *
+ * Eine Position von Hand berichtigen
+ * ------------------------------------------------------------------ */
+
+/**
+ * Berichtigt Bezeichnung und Beträge einer Kürzungsposition von Hand.
+ *
+ * Anders als bei einer aus dem Prüfbericht ausgelesenen Position lässt sich
+ * so eine falsch gelesene Zahl oder ein missverständlicher Bauteilname
+ * geradebiegen, ohne die Position zu löschen und neu anzulegen — der Text
+ * im Brief und die Herkunftsspur der Bausteine bleiben dabei unberührt, nur
+ * die drei Grundangaben ändern sich. `differenz` wird dabei serverseitig
+ * neu berechnet, nie vom Formular übernommen: sie ist immer die Ableitung
+ * der beiden Beträge, nie eine eigene Eingabe.
+ *
+ * Anders als beim Löschen gibt es hier keine Sperre nach Versand — ein
+ * versandtes Schreiben ist als Text geschlossen (siehe `VERSENDET` oben),
+ * aber die Kürzungsliste darunter bleibt eine Arbeitsnotiz, die sich auch
+ * danach noch berichtigen lässt.
+ */
+export async function aktualisierePosition(
+  positionId: string,
+  eingabe: PositionsfelderEingabe,
+): Promise<{ fehler?: string }> {
+  await verlangeBenutzer()
+
+  const geprueft = pruefePositionsfelder(eingabe)
+  if ('fehler' in geprueft) return geprueft
+
+  const { bezeichnung, betragGutachten, betragGekuerzt } = geprueft.werte
+  const differenzWert =
+    betragGutachten !== null && betragGekuerzt !== null
+      ? Math.round((betragGutachten - betragGekuerzt) * 100) / 100
+      : null
+
+  const geaendert = await db
+    .update(position)
+    .set({
+      bezeichnung,
+      betragGutachten: betragGutachten?.toString() ?? null,
+      betragGekuerzt: betragGekuerzt?.toString() ?? null,
+      differenz: differenzWert?.toString() ?? null,
+    })
+    .where(eq(position.id, positionId))
+    .returning({ id: position.id })
+
+  if (geaendert.length === 0) return { fehler: 'Diese Position gibt es nicht mehr.' }
   return {}
 }
 
