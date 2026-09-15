@@ -84,6 +84,19 @@ const VERWEILDAUER: Record<Meldungsart, number | null> = {
   fehler: null,
 }
 
+/**
+ * Mindestverweildauer einer Einblendung mit Aktions-Knopf.
+ *
+ * Sechs Sekunden reichen zum Lesen, nicht zum Entscheiden und Klicken. Der
+ * erste Anwendungsfall ist das Undo-Fenster der Bulk-Bearbeitung (dreissig
+ * Sekunden) — absichtlich nicht daran gekoppelt, sonst hinge eine
+ * anwendungsweite Komponente an einem einzelnen Fachmodul. Wessen Aktion
+ * ein längeres oder kürzeres Fenster braucht, kann das später hier oder am
+ * Aufrufer anpassen; bis dahin ist Dreissig ein vernünftiger Standard für
+ * „Zeit zum Klicken, bevor es zu spät wäre".
+ */
+const AKTIONS_VERWEILDAUER_MS = 30000
+
 const ABFRAGE_MS = 20000
 
 export function Melder({ children }: { children: React.ReactNode }) {
@@ -194,14 +207,24 @@ function Einblendstapel({
   )
 }
 
-function Einblendkarte({
+/** Exportiert nur für `melder.test.tsx` — sonst eine reine Detailkomponente dieser Datei. */
+export function Einblendkarte({
   einblendung,
   schliesse,
 }: {
   einblendung: Einblendung
   schliesse: (id: string) => void
 }) {
-  const dauer = VERWEILDAUER[einblendung.art]
+  // Eine Einblendung, die bis zum Wegklicken steht (`null`), bleibt das auch
+  // mit einem Aktions-Knopf — Fehler und Warnungen sollen nicht verschwinden,
+  // nur weil sie zusätzlich etwas anzubieten haben. Bei den anderen beiden
+  // Arten hebt eine Aktion die Verweildauer mindestens auf das Aktionsfenster
+  // an, sonst wäre der Knopf oft schon fort, bevor jemand hinsieht.
+  const basisDauer = VERWEILDAUER[einblendung.art]
+  const dauer =
+    einblendung.aktion && basisDauer !== null
+      ? Math.max(basisDauer, AKTIONS_VERWEILDAUER_MS)
+      : basisDauer
 
   useEffect(() => {
     if (dauer === null) return
@@ -216,6 +239,18 @@ function Einblendkarte({
         {einblendung.titel ? <strong>{einblendung.titel}</strong> : null}
         <span>{einblendung.text}</span>
       </div>
+      {einblendung.aktion ? (
+        <button
+          type="button"
+          className="einblendung-aktion"
+          onClick={() => {
+            einblendung.aktion!.ausfuehren()
+            schliesse(einblendung.id)
+          }}
+        >
+          {einblendung.aktion.text}
+        </button>
+      ) : null}
       <button
         type="button"
         className="einblendung-schliessen"

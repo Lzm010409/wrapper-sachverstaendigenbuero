@@ -24,6 +24,13 @@ export interface Meldung {
   text: string
   /** Optionale Überschrift für die Einblendung, z. B. „Recherche fertig". */
   titel?: string
+  /**
+   * Ein Knopf in der Einblendung selbst, z. B. „Rückgängig". Der seltene
+   * Fall: die meisten Meldungen sind eine Auskunft, keine Gelegenheit zum
+   * Handeln. Wo doch, bekommt die Einblendung dafür automatisch mehr Zeit —
+   * siehe `AKTIONS_VERWEILDAUER_MS` in `melder.tsx`.
+   */
+  aktion?: { text: string; ausfuehren: () => void }
 }
 
 /**

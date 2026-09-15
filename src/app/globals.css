@@ -2966,6 +2966,21 @@ body {
 
 .einblendung-schliessen:hover { color: var(--ink); }
 
+.einblendung-aktion {
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-top: 1px;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.einblendung-aktion:hover { color: var(--accent-stark); text-decoration: underline; }
+
 @keyframes einblendung-herein {
   from { opacity: 0; transform: translateX(12px); }
   to { opacity: 1; transform: none; }
@@ -4052,39 +4067,12 @@ body {
   font-size: 13px;
 }
 
-.bulk-ergebnis ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  font-size: 13px;
-}
+/* Rückmeldungen zu einer Bulk-Aktion (Ergebnis, Undo) laufen über das
+   anwendungsweite Meldewesen (`melder.tsx`), nicht über eigene Klassen hier
+   — siehe `Meldung.aktion` für den Rückgängig-Knopf in der Einblendung. */
 
-/* Die Undo-Einblendung nach einer Bulk-Aktion — bewusst eigenständig statt
-   über den Melder (`melder.tsx`): der Melder kennt keine Einblendung mit
-   Aktionsknopf, und diese Erweiterung wäre für einen einzigen Anwendungsfall
-   zu viel Eingriff in eine Komponente, die für die ganze Anwendung gilt. */
-.bulk-undo {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--ink);
-  color: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--schatten);
-}
-
-.bulk-undo button {
-  color: inherit;
-  border-color: currentColor;
-}
-
-.bulk-undo.fehler {
-  background: var(--crit);
+.bulk-seiten-auswahl {
+  margin-bottom: 10px;
 }
 
 /* ---------- Suche in der Kopfleiste ---------- */

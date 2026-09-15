@@ -13,6 +13,8 @@ import {
 import { BEREICHE, type Bereich } from '@/bibliothek/eingabe'
 import type { EintragListe } from '@/bibliothek/abfragen'
 import { Kreisel } from '@/app/teile/anzeigen'
+import { useMelder } from '@/app/teile/melder'
+import { erfolg, fehler, type Meldung } from '@/melden/typen'
 import { StatusPille } from './status-pille'
 
 /**
@@ -29,6 +31,12 @@ import { StatusPille } from './status-pille'
  * über mehrere Seiten hinweg entstand und die vorige Seite nicht mehr im
  * Zugriff ist. Dieselbe Überlegung wie bei `korbtabelle.tsx`: „Der Filter
  * ändert die Auswahl nicht" — hier gilt das auch für die Seitenwahl.
+ *
+ * **Rückmeldungen laufen über das anwendungsweite Meldewesen
+ * (`useMelder()`/`melde()`)**, nicht über eigene Einblendungen — dieselbe
+ * Stelle, an der auch `korbtabelle.tsx` sein Ergebnis zeigt. Das Undo nach
+ * einer Bulk-Aktion hängt dafür als Aktions-Knopf an der Erfolgsmeldung
+ * selbst (`Meldung.aktion`, siehe `melder.tsx`).
  */
 
 type Kandidat = { nummer: string; titel: string }
@@ -44,15 +52,47 @@ interface Eigenschaften {
   darfFreigeben: boolean
 }
 
+/** Höchstens so viele übersprungene Einträge werden in der Meldung namentlich genannt. */
+const UEBERSPRUNGEN_NENNEN = 3
+
+/**
+ * Baut aus dem Ergebnis einer Bulk-Aktion die Meldung fürs Meldewesen —
+ * inklusive des Rückgängig-Knopfs, sofern die Aktion etwas geändert hat.
+ */
+function baueErgebnisMeldung(
+  antwort: BulkErgebnis,
+  rueckgaengigMachen: (bulkLaufId: string) => void,
+): Meldung {
+  if (antwort.fehler) return fehler(antwort.fehler)
+
+  const teile = [
+    `${antwort.bearbeitet.length} Eintrag${antwort.bearbeitet.length === 1 ? '' : 'e'} geändert.`,
+  ]
+  if (antwort.uebersprungen.length > 0) {
+    const genannt = antwort.uebersprungen
+      .slice(0, UEBERSPRUNGEN_NENNEN)
+      .map((u) => `${u.nummer} — ${u.titel} (${u.grund})`)
+    const rest = antwort.uebersprungen.length - genannt.length
+    teile.push(
+      `${antwort.uebersprungen.length} übersprungen: ${genannt.join('; ')}` +
+        (rest > 0 ? ` und ${rest} weitere.` : '.'),
+    )
+  }
+
+  const meldung = erfolg(teile.join(' '))
+  if (antwort.bulkLaufId) {
+    const bulkLaufId = antwort.bulkLaufId
+    meldung.aktion = { text: 'Rückgängig', ausfuehren: () => rueckgaengigMachen(bulkLaufId) }
+  }
+  return meldung
+}
+
 export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eigenschaften) {
+  const { melde } = useMelder()
   const [gewaehlt, setzeGewaehlt] = useState<Map<string, Kandidat>>(new Map())
   const [vorhaben, setzeVorhaben] = useState<Vorhaben | null>(null)
   const [zielBereich, setzeZielBereich] = useState<Bereich>('kalkulation')
   const [laeuft, starte] = useTransition()
-  const [ergebnis, setzeErgebnis] = useState<BulkErgebnis | null>(null)
-  const [exportFehler, setzeExportFehler] = useState<string | null>(null)
-  const [undo, setzeUndo] = useState<{ bulkLaufId: string; text: string } | null>(null)
-  const [undoErgebnis, setzeUndoErgebnis] = useState<{ text: string; fehler: boolean } | null>(null)
 
   function schalte(e: { id: string; nummer: string; titel: string }) {
     setzeGewaehlt((vorher) => {
@@ -63,17 +103,38 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
     })
   }
 
+  /**
+   * Wirkt nur auf die Einträge dieser (server-seitig paginierten) Seite.
+   * Eine Auswahl auf anderen Seiten bleibt unangetastet — dieselbe Regel wie
+   * beim einzelnen Haken.
+   */
+  function schalteSeite(an: boolean) {
+    setzeGewaehlt((vorher) => {
+      const naechste = new Map(vorher)
+      for (const e of eintraege) {
+        if (an) naechste.set(e.id, { nummer: e.nummer, titel: e.titel })
+        else naechste.delete(e.id)
+      }
+      return naechste
+    })
+  }
+
   function hebeAuswahlAuf() {
     setzeGewaehlt(new Map())
     setzeVorhaben(null)
-    setzeErgebnis(null)
+  }
+
+  function rueckgaengigMachen(bulkLaufId: string) {
+    starte(async () => {
+      const antwort = await macheBulkLaufRueckgaengig(bulkLaufId)
+      melde(antwort.fehler ? fehler(antwort.fehler) : erfolg(antwort.hinweis ?? 'Rückgängig gemacht.'))
+    })
   }
 
   function fuehreAus() {
     if (!vorhaben) return
     const ids = [...gewaehlt.keys()]
     starte(async () => {
-      setzeUndo(null)
       const antwort =
         vorhaben.art === 'status'
           ? await bulkSetzeStatus(ids, vorhaben.ziel)
@@ -81,8 +142,8 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
             ? await bulkGebeFrei(ids)
             : await bulkSetzeBereich(ids, vorhaben.ziel)
 
-      setzeErgebnis(antwort)
       setzeVorhaben(null)
+      melde(baueErgebnisMeldung(antwort, rueckgaengigMachen))
 
       // Erfolgreich bearbeitete Einträge fallen aus der Auswahl — was
       // übersprungen wurde, bleibt gewählt, damit es sich sofort erneut
@@ -94,24 +155,15 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
           return naechste
         })
       }
-
-      if (antwort.bulkLaufId) {
-        setzeUndo({
-          bulkLaufId: antwort.bulkLaufId,
-          text: `${antwort.bearbeitet.length} Eintrag${antwort.bearbeitet.length === 1 ? '' : 'e'} geändert.`,
-        })
-        setTimeout(() => setzeUndo(null), 30_000)
-      }
     })
   }
 
   function exportiere() {
     const ids = [...gewaehlt.keys()]
     starte(async () => {
-      setzeExportFehler(null)
       const antwort = await bulkExportiere(ids)
       if (antwort.fehler || !antwort.datenBase64) {
-        setzeExportFehler(antwort.fehler ?? 'Der Export ist fehlgeschlagen.')
+        melde(fehler(antwort.fehler ?? 'Der Export ist fehlgeschlagen.'))
         return
       }
       const bytes = Uint8Array.from(atob(antwort.datenBase64), (z) => z.charCodeAt(0))
@@ -127,21 +179,7 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
     })
   }
 
-  function macheRueckgaengig() {
-    if (!undo) return
-    const bulkLaufId = undo.bulkLaufId
-    setzeUndo(null)
-    starte(async () => {
-      const antwort = await macheBulkLaufRueckgaengig(bulkLaufId)
-      // Eigener Zustand statt `ergebnis`: die Aktionsleiste (in der
-      // `ergebnis` sonst steht) ist meist schon verschwunden, weil die
-      // rückgängig gemachten Einträge nicht mehr ausgewählt sind. Die
-      // Undo-Einblendung bleibt deshalb stehen und zeigt an, was der Server
-      // tatsächlich getan hat — nicht nur, dass irgendetwas geschah.
-      setzeUndoErgebnis({ text: antwort.fehler ?? antwort.hinweis ?? '', fehler: Boolean(antwort.fehler) })
-      setTimeout(() => setzeUndoErgebnis(null), 8000)
-    })
-  }
+  const alleAufSeiteGewaehlt = eintraege.length > 0 && eintraege.every((e) => gewaehlt.has(e.id))
 
   return (
     <>
@@ -150,64 +188,77 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
           <p style={{ margin: 0 }}>Kein Eintrag passt zu dieser Suche.</p>
         </div>
       ) : (
-        <div className="liste">
-          {eintraege.map((e) => {
-            const text = e.gegenargument || e.vorgehen
-            const istGewaehlt = gewaehlt.has(e.id)
-            return (
-              <div
-                key={e.id}
-                className={`zeile-mit-auswahl${istGewaehlt ? ' gewaehlt' : ''}`}
-              >
-                <span className="auswahlkasten">
-                  <input
-                    type="checkbox"
-                    checked={istGewaehlt}
-                    onChange={() => schalte(e)}
-                    aria-label={`„${e.titel}" auswählen`}
-                  />
-                </span>
-                <Link href={`/bibliothek/${e.id}`} className="zeile">
-                  <span className="zeile-nummer">{e.nummer}</span>
-                  <span>
-                    <span className="zeile-titel">{e.titel}</span>
-                    <span className="zeile-meta">
-                      <span>{bereichsnamen[e.bereich]}</span>
-                      <span>{e.abschnitt}</span>
-                      {e.haeufigkeitText ? <span>· {e.haeufigkeitText}</span> : null}
-                    </span>
-                    {text ? <span className="zeile-auszug">{auszug(text)}</span> : null}
+        <>
+          <label className="korb-schalter bulk-seiten-auswahl">
+            <input
+              type="checkbox"
+              checked={alleAufSeiteGewaehlt}
+              onChange={(ev) => schalteSeite(ev.target.checked)}
+            />
+            {alleAufSeiteGewaehlt
+              ? 'Auswahl auf dieser Seite aufheben'
+              : `Alle ${eintraege.length} auf dieser Seite auswählen`}
+          </label>
+
+          <div className="liste">
+            {eintraege.map((e) => {
+              const text = e.gegenargument || e.vorgehen
+              const istGewaehlt = gewaehlt.has(e.id)
+              return (
+                <div key={e.id} className={`zeile-mit-auswahl${istGewaehlt ? ' gewaehlt' : ''}`}>
+                  <span className="auswahlkasten">
+                    <input
+                      type="checkbox"
+                      checked={istGewaehlt}
+                      onChange={() => schalte(e)}
+                      aria-label={`„${e.titel}" auswählen`}
+                    />
                   </span>
-                  <span className="zeile-rechts">
-                    <StatusPille status={e.status} />
-                    <span className="marker-liste">
-                      {!e.gegenargument && e.vorgehen ? (
-                        <span className="marke-pille m-akzent" title="Handlungsanweisung statt fertigem Text">
-                          Vorgehen
-                        </span>
-                      ) : null}
-                      {e.platzhalterOffen > 0 ? (
-                        <span className="marke-pille m-entwurf" title="Einzusetzende Werte und Arbeitsaufträge">
-                          {e.platzhalterOffen} Platzh.
-                        </span>
-                      ) : null}
-                      {e.vorbedingungen > 0 ? (
-                        <span className="marke-pille m-warn" title="Vorbedingungen prüfen">
-                          ⚠ {e.vorbedingungen}
-                        </span>
-                      ) : null}
-                      {e.belegeUnverifiziert > 0 ? (
-                        <span className="marke-pille m-warn" title="Fundstellen noch nicht bestätigt — sperrt die Freigabe">
-                          {e.belegeUnverifiziert} Beleg{e.belegeUnverifiziert === 1 ? '' : 'e'}
-                        </span>
-                      ) : null}
+                  <Link href={`/bibliothek/${e.id}`} className="zeile">
+                    <span className="zeile-nummer">{e.nummer}</span>
+                    <span>
+                      <span className="zeile-titel">{e.titel}</span>
+                      <span className="zeile-meta">
+                        <span>{bereichsnamen[e.bereich]}</span>
+                        <span>{e.abschnitt}</span>
+                        {e.haeufigkeitText ? <span>· {e.haeufigkeitText}</span> : null}
+                      </span>
+                      {text ? <span className="zeile-auszug">{auszug(text)}</span> : null}
                     </span>
-                  </span>
-                </Link>
-              </div>
-            )
-          })}
-        </div>
+                    <span className="zeile-rechts">
+                      <StatusPille status={e.status} />
+                      <span className="marker-liste">
+                        {!e.gegenargument && e.vorgehen ? (
+                          <span className="marke-pille m-akzent" title="Handlungsanweisung statt fertigem Text">
+                            Vorgehen
+                          </span>
+                        ) : null}
+                        {e.platzhalterOffen > 0 ? (
+                          <span className="marke-pille m-entwurf" title="Einzusetzende Werte und Arbeitsaufträge">
+                            {e.platzhalterOffen} Platzh.
+                          </span>
+                        ) : null}
+                        {e.vorbedingungen > 0 ? (
+                          <span className="marke-pille m-warn" title="Vorbedingungen prüfen">
+                            ⚠ {e.vorbedingungen}
+                          </span>
+                        ) : null}
+                        {e.belegeUnverifiziert > 0 ? (
+                          <span
+                            className="marke-pille m-warn"
+                            title="Fundstellen noch nicht bestätigt — sperrt die Freigabe"
+                          >
+                            {e.belegeUnverifiziert} Beleg{e.belegeUnverifiziert === 1 ? '' : 'e'}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {gewaehlt.size > 0 ? (
@@ -302,53 +353,6 @@ export function BibliothekListe({ eintraege, bereichsnamen, darfFreigeben }: Eig
               </div>
             </div>
           ) : null}
-
-          {exportFehler ? (
-            <div className="hinweis fehler bulk-ergebnis" role="alert">
-              {exportFehler}
-            </div>
-          ) : null}
-
-          {ergebnis ? (
-            <div className={`hinweis bulk-ergebnis ${ergebnis.fehler ? 'fehler' : 'erfolg'}`} role={ergebnis.fehler ? 'alert' : 'status'}>
-              {ergebnis.fehler ? (
-                ergebnis.fehler
-              ) : (
-                <>
-                  {ergebnis.bearbeitet.length} Eintrag{ergebnis.bearbeitet.length === 1 ? '' : 'e'} geändert.
-                  {ergebnis.uebersprungen.length > 0 ? (
-                    <>
-                      {' '}
-                      {ergebnis.uebersprungen.length} übersprungen:
-                      <ul>
-                        {ergebnis.uebersprungen.map((u) => (
-                          <li key={u.id}>
-                            {u.nummer} — {u.titel}: {u.grund}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {undo ? (
-        <div className="bulk-undo" role="status">
-          <span>{undo.text}</span>
-          <button type="button" disabled={laeuft} onClick={macheRueckgaengig}>
-            Rückgängig
-          </button>
-        </div>
-      ) : undoErgebnis ? (
-        <div
-          className={`bulk-undo${undoErgebnis.fehler ? ' fehler' : ''}`}
-          role={undoErgebnis.fehler ? 'alert' : 'status'}
-        >
-          <span>{undoErgebnis.text}</span>
         </div>
       ) : null}
     </>
