@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { behandlungEnum } from '@/db/schema'
 import { kuerzungspositionenApi } from './kuerzungen-api'
 
 function position(werte: {
@@ -9,8 +10,17 @@ function position(werte: {
   betragGekuerzt?: string | null
   differenz?: string | null
   begruendungVersicherer?: string | null
-  behandlung?: string
-}) {
+  behandlung?: (typeof behandlungEnum.enumValues)[number]
+}): {
+  id: string
+  bezeichnung: string
+  seite: number | null
+  betragGutachten: string | null
+  betragGekuerzt: string | null
+  differenz: string | null
+  begruendungVersicherer: string | null
+  behandlung: (typeof behandlungEnum.enumValues)[number]
+} {
   return {
     seite: null,
     betragGutachten: null,
