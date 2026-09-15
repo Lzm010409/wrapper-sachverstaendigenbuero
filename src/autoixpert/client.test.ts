@@ -72,6 +72,77 @@ describe('holeGutachten', () => {
   })
 })
 
+describe('holeDokumente', () => {
+  it('listet die Dokumente eines Gutachtens', async () => {
+    const { hole, aufrufe } = stelleFetch(() => ({
+      koerper: {
+        documents: [
+          { id: 'd1', report_id: 'r1', type: 'report', title: 'Gutachten.pdf' },
+          { id: 'd2', report_id: 'r1', type: 'dat_damage_calculation', title: 'DAT-Kalkulation.pdf' },
+        ],
+      },
+    }))
+    const client = new AutoixpertClient({ token: 't', basisUrl: BASIS, hole, regel: OHNE_EINSCHRAENKUNG })
+
+    const dokumente = await client.holeDokumente('r1')
+
+    expect(dokumente).toHaveLength(2)
+    expect(dokumente[1]!.type).toBe('dat_damage_calculation')
+    expect(aufrufe[0]!.pathname).toBe('/externalApi/v1/reports/r1/documents')
+  })
+
+  it('beanstandet eine Antwort ohne documents-Liste', async () => {
+    const { hole } = stelleFetch(() => ({ koerper: { unfug: true } }))
+    const client = new AutoixpertClient({ token: 't', basisUrl: BASIS, hole, regel: OHNE_EINSCHRAENKUNG })
+
+    await expect(client.holeDokumente('r1')).rejects.toThrow(/unerwartete Form/)
+  })
+})
+
+describe('holeDokumentDatei', () => {
+  /** Baut ein `fetch`, das eine binäre Antwort liefert — anders als `stelleFetch`. */
+  function stelleBinaerFetch(
+    antworten: (url: URL) => { status?: number; koerper?: BodyInit },
+  ): { hole: typeof fetch; aufrufe: URL[] } {
+    const aufrufe: URL[] = []
+    const hole = vi.fn(async (eingabe: string | URL | Request) => {
+      const url = new URL(String(eingabe))
+      aufrufe.push(url)
+      const { status = 200, koerper = new Uint8Array([1, 2, 3]) } = antworten(url)
+      return new Response(koerper, { status })
+    }) as unknown as typeof fetch
+    return { hole, aufrufe }
+  }
+
+  it('lädt die Datei als Puffer und setzt den format-Parameter', async () => {
+    const { hole, aufrufe } = stelleBinaerFetch(() => ({ koerper: new Uint8Array([0x25, 0x50, 0x44, 0x46]) }))
+    const client = new AutoixpertClient({ token: 't', basisUrl: BASIS, hole, regel: OHNE_EINSCHRAENKUNG })
+
+    const puffer = await client.holeDokumentDatei('r1', 'dat_damage_calculation')
+
+    expect(puffer).toBeInstanceOf(Buffer)
+    expect([...puffer]).toEqual([0x25, 0x50, 0x44, 0x46])
+    expect(aufrufe[0]!.pathname).toBe(
+      '/externalApi/v1/reports/r1/documents/dat_damage_calculation/download',
+    )
+    expect(aufrufe[0]!.searchParams.get('format')).toBe('pdf')
+  })
+
+  it('meldet ein fehlendes Dokument als 404, nicht als allgemeinen Fehler', async () => {
+    const { hole } = stelleBinaerFetch(() => ({ status: 404, koerper: 'nicht da' }))
+    const client = new AutoixpertClient({ token: 't', basisUrl: BASIS, hole, regel: OHNE_EINSCHRAENKUNG })
+
+    await expect(client.holeDokumentDatei('r1', 'dat_damage_calculation')).rejects.toThrow(/nicht gefunden/)
+  })
+
+  it('meldet einen sonstigen Fehlerstatus mit HTTP-Code', async () => {
+    const { hole } = stelleBinaerFetch(() => ({ status: 500, koerper: 'kaputt' }))
+    const client = new AutoixpertClient({ token: 't', basisUrl: BASIS, hole, regel: OHNE_EINSCHRAENKUNG })
+
+    await expect(client.holeDokumentDatei('r1', 'report')).rejects.toThrow(/HTTP 500/)
+  })
+})
+
 describe('loeseAuf', () => {
   it('nimmt zuerst den direkten Pfadzugriff', async () => {
     const { hole, aufrufe } = stelleFetch(() => ({ koerper: { report: BEISPIEL_GUTACHTEN } }))

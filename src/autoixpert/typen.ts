@@ -162,3 +162,27 @@ export const fotolisteSchema = z.object({ photos: z.array(fotoSchema) })
 
 /** In welcher Grösse ein Foto geholt wird. */
 export type Fotoformat = 'thumbnail' | 'rendered' | 'original'
+
+/**
+ * Metadaten eines mit einem Gutachten verknüpften Dokuments — Gutachten
+ * selbst, DAT-Schadenskalkulation, Rechnung, Anschreiben und mehr.
+ *
+ * `.loose()` wie überall: die Dokumentation listet weit über zwanzig
+ * Dokument-Typen, von denen diese Anwendung nur zwei kennt
+ * (`dat_damage_calculation`, `report`). Unbekannte Typen sollen den Abruf
+ * der Liste nicht scheitern lassen.
+ */
+export const dokumentSchema = z
+  .object({
+    id: z.string(),
+    report_id: z.string().nullish(),
+    type: z.string(),
+    title: z.string().nullish(),
+    download_url: z.string().nullish(),
+  })
+  .loose()
+
+export type Dokument = z.infer<typeof dokumentSchema>
+
+/** Antwort von `GET /reports/{report_id}/documents`. */
+export const dokumentlisteAntwortSchema = z.object({ documents: z.array(dokumentSchema) })

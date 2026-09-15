@@ -126,6 +126,16 @@ export const bausteinTypEnum = pgEnum('baustein_typ', ['bibliothek', 'eigener_te
  */
 export const modusEnum = pgEnum('modus', ['standard', 'schnell', 'individuell', 'import'])
 
+/**
+ * Woher der zwischengespeicherte Kalkulationsauszug eines Falls stammt
+ * (`src/gutachtenkalkulation/`) — erst die DAT-Schadenskalkulation
+ * versucht, ersatzweise das Gutachten-PDF selbst.
+ */
+export const kalkulationsquelleEnum = pgEnum('kalkulationsquelle', [
+  'dat_damage_calculation',
+  'report',
+])
+
 /* ------------------------------------------------------------------ *
  * Benutzer und Sitzungen
  * ------------------------------------------------------------------ */
@@ -999,6 +1009,41 @@ export const position = pgTable(
 )
 
 /**
+ * Der zwischengespeicherte Kalkulationsauszug eines Falls — die Grundlage
+ * für den Kalkulationsvorschlag beim Bearbeiten einer Kürzungsposition
+ * (siehe `src/gutachtenkalkulation/`).
+ *
+ * **Eine Zeile je Fall, nicht je Lauf** — wie bei `fotoAnalyse`. Ein
+ * erneutes Laden (Knopf „Neu laden") ersetzt den bisherigen Stand
+ * vollständig; es gibt keine Historie, weil nur der aktuelle Auszug für den
+ * Vorschlag gebraucht wird.
+ *
+ * **Warum überhaupt zwischengespeichert wird.** Das Laden kostet einen
+ * echten autoiXpert-Dokumentabruf (Dokumentliste + Download) plus einen
+ * Modellaufruf, um die Kalkulationszeilen aus dem PDF zu lesen. Ohne
+ * Zwischenspeicher liefe das bei jedem Öffnen jeder Kürzungsposition erneut
+ * — für ein und denselben Fall.
+ */
+export const fallKalkulation = pgTable(
+  'fall_kalkulation',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    fallId: uuid()
+      .notNull()
+      .references(() => fall.id, { onDelete: 'cascade' }),
+    quelle: kalkulationsquelleEnum().notNull(),
+    /** Geprüft mit Zod beim Lesen (`kalkulationszeileSchema`), nicht nur hier getypt. */
+    zeilen: jsonb().$type<{ bezeichnung: string; betrag: number }[]>().notNull().default(sql`'[]'::jsonb`),
+    summeNetto: numeric({ precision: 12, scale: 2 }),
+    /** Was das Modell beim Lesen der Kalkulation nicht sicher erkennen konnte. */
+    unklarheiten: jsonb().$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    erstelltVon: uuid().references(() => benutzer.id, { onDelete: 'set null' }),
+    erstelltAm: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('fall_kalkulation_fall_idx').on(t.fallId)],
+)
+
+/**
  * Bausteine einer Position — der Stand vor dem Brief-Editor.
  *
  * Seit der Umstellung ist `stellungnahme.dokument` die Wahrheit über den
@@ -1164,3 +1209,4 @@ export type Ereignis = typeof ereignis.$inferSelect
 export type BenutzerRecht = typeof benutzerRecht.$inferSelect
 export type FotoTeilZeile = typeof fotoTeil.$inferSelect
 export type ApiToken = typeof apiToken.$inferSelect
+export type FallKalkulationZeile = typeof fallKalkulation.$inferSelect

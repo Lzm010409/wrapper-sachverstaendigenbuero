@@ -169,6 +169,13 @@
       "when": 1789453363272,
       "tag": "0023_broad_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789475817108,
+      "tag": "0024_clammy_beast",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { durchsucheBibliothek } from '@/stellungnahme/aktionen'
 import { durchsucheBildbibliothek } from '@/bilder/aktionen'
+import {
+  ladeKalkulationsvorschlag,
+  type KalkulationsvorschlagErgebnis,
+} from '@/stellungnahme/editor-aktionen'
 import type { Bibliotheksbild } from '@/bilder/bibliothek'
 import { setzeWerteEin } from '@/dokument/platzhalter'
 import { MIME_BAUSTEIN, MIME_BILD, type Bildziehgut, type Ziehgut } from '@/dokument/ziehen'
@@ -90,6 +94,12 @@ const GUETE_TEXT: Record<string, string> = {
   direkt: 'Direkter Treffer',
   teilweise: 'Teiltreffer',
   kein: 'Kein Treffer',
+}
+
+/** Woher der Kalkulationsvorschlag stammt — für den kurzen Beleg unter dem Betrag. */
+const KALKULATIONSQUELLE_TEXT: Record<string, string> = {
+  dat_damage_calculation: 'DAT-Schadenskalkulation',
+  report: 'Gutachten-PDF',
 }
 
 function euro(wert: string | null): string {
@@ -741,8 +751,15 @@ export function Blase({
  * Anders als die Vorschlagsfelder daneben ist das kein Baustein, der in den
  * Brief eingefügt wird — es berichtigt die drei Grundangaben der Position
  * selbst (Bezeichnung, Gutachten-Betrag, gekürzter Betrag). Deshalb ein
- * eigenes, einfaches Formular ohne Vorschlags-Matching, nur an der Optik von
+ * eigenes, einfaches Formular ohne Bibliotheks-Matching, nur an der Optik von
  * `.blase-entwurf` und `.blase-knoepfe` orientiert.
+ *
+ * Der Kalkulationsvorschlag darunter ist ein zweites, unabhängiges
+ * Matching — nicht gegen die Bibliothek, sondern gegen die tatsächliche
+ * Kalkulation des Gutachtens bei autoiXpert (`ladeKalkulationsvorschlag`).
+ * Er lädt beim Öffnen automatisch und blockiert die Felder darüber nicht:
+ * Bezeichnung und Beträge lassen sich sofort bearbeiten, während der
+ * Vorschlag noch lädt.
  */
 function PositionBearbeiten({
   position,
@@ -764,6 +781,18 @@ function PositionBearbeiten({
   const [betragGekuerzt, setzeBetragGekuerzt] = useState(position.betragGekuerzt ?? '')
   const [speichert, setzeSpeichert] = useState(false)
   const [fehler, setzeFehler] = useState<string | null>(null)
+
+  const [vorschlag, setzeVorschlag] = useState<KalkulationsvorschlagErgebnis | null>(null)
+  const [ladeVorschlag, starteVorschlagsladen] = useTransition()
+
+  useEffect(() => {
+    starteVorschlagsladen(async () => setzeVorschlag(await ladeKalkulationsvorschlag(position.id)))
+  }, [position.id])
+
+  const neuLaden = () =>
+    starteVorschlagsladen(async () =>
+      setzeVorschlag(await ladeKalkulationsvorschlag(position.id, { erzwingeNeuladen: true })),
+    )
 
   const speichern = async () => {
     setzeSpeichert(true)
@@ -809,6 +838,34 @@ function PositionBearbeiten({
         </div>
       </div>
 
+      <div className="blase-abschnitt">
+        <div className="blase-label">
+          Vorschlag aus der Kalkulation
+          <button
+            type="button"
+            className="blase-kopf-knopf"
+            title="Kalkulation erneut bei autoiXpert laden — falls sich das Gutachten geändert hat"
+            aria-label="Kalkulationsvorschlag neu laden"
+            disabled={ladeVorschlag}
+            onClick={neuLaden}
+          >
+            ↻
+          </button>
+        </div>
+
+        {ladeVorschlag ? (
+          <p className="unterzeile" style={{ margin: 0 }}>
+            <Kreisel text="Kalkulation wird geladen" />
+          </p>
+        ) : (
+          <KalkulationsvorschlagAnzeige
+            ergebnis={vorschlag}
+            aufUebernehmen={(betrag) => setzeBetragGutachten(String(betrag))}
+            deaktiviert={speichert || laeuft}
+          />
+        )}
+      </div>
+
       {fehler ? (
         <p className="hinweis fehler" role="alert" style={{ margin: '8px 0 0' }}>
           {fehler}
@@ -826,6 +883,91 @@ function PositionBearbeiten({
         </button>
         <button type="button" disabled={speichert} onClick={aufAbbrechen}>
           Abbrechen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Zeigt den Kalkulationsvorschlag an — oder erklärt, warum es keinen gibt.
+ *
+ * Jeder Ausgang von `ladeKalkulationsvorschlag` bekommt einen eigenen,
+ * verständlichen Text. Kein stiller Fehlschlag: „keine Kalkulation
+ * gefunden", „autoiXpert nicht erreichbar" und „kein DAT-Zugang" sind drei
+ * verschiedene Dinge und sollen sich auch so lesen.
+ */
+function KalkulationsvorschlagAnzeige({
+  ergebnis,
+  aufUebernehmen,
+  deaktiviert,
+}: {
+  ergebnis: KalkulationsvorschlagErgebnis | null
+  aufUebernehmen: (betrag: number) => void
+  deaktiviert: boolean
+}) {
+  if (!ergebnis) return null
+
+  if (ergebnis.stand === 'fehler') {
+    return (
+      <p className="hinweis fehler" style={{ margin: 0 }}>
+        {ergebnis.meldung}
+      </p>
+    )
+  }
+  if (ergebnis.stand === 'nicht_eingerichtet') {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        Kein autoiXpert-Zugang eingerichtet — der Vorschlag lässt sich hier nicht ermitteln.
+      </p>
+    )
+  }
+  if (ergebnis.stand === 'kein_gutachten') {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        Diese Stellungnahme hängt an keinem autoiXpert-Gutachten.
+      </p>
+    )
+  }
+  if (ergebnis.stand === 'keine_kalkulation') {
+    return (
+      <p className="unterzeile" style={{ margin: 0 }}>
+        Zu diesem Gutachten liess sich keine auswertbare Kalkulation lesen — weder eine
+        DAT-Schadenskalkulation noch Zeilen im Gutachten-PDF.
+      </p>
+    )
+  }
+  if (ergebnis.stand === 'kein_treffer') {
+    return (
+      <p className="hinweis warn" style={{ margin: 0 }}>
+        Keine Kalkulationszeile passt erkennbar zu dieser Position. Grundlage:{' '}
+        {KALKULATIONSQUELLE_TEXT[ergebnis.quelle] ?? ergebnis.quelle}.
+      </p>
+    )
+  }
+
+  return (
+    <div className="hinweis" style={{ margin: 0 }}>
+      <strong>{euro(String(ergebnis.betrag))}</strong> laut{' '}
+      {KALKULATIONSQUELLE_TEXT[ergebnis.quelle] ?? ergebnis.quelle}
+      <br />
+      {ergebnis.begruendung}
+      {ergebnis.verwendeteZeilen.length > 0 ? (
+        <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+          {ergebnis.verwendeteZeilen.map((z, i) => (
+            <li key={i}>
+              {z.bezeichnung} — {euro(String(z.betrag))}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="blase-knoepfe">
+        <button
+          type="button"
+          disabled={deaktiviert}
+          onClick={() => aufUebernehmen(ergebnis.betrag)}
+        >
+          Übernehmen
         </button>
       </div>
     </div>
