@@ -21,7 +21,7 @@ sie vollständig ersetzt.
 | Stellungnahme: Ausformulieren, vier Wächter, Word-Ausgabe | steht |
 | Brief-Editor mit Anmerkungen am Rand, Bildbibliothek | steht |
 | Fälle aus autoiXpert über Aktenzeichen, ID oder externe ID | steht |
-| Abrufregel gegen autoiXpert (nur offene Fälle ab Mai 2026, nichts Schreibendes) | steht |
+| Abrufregel gegen autoiXpert (nur offene Fälle ab Februar 2026, nichts Schreibendes) | steht |
 | Oberfläche im autoiXpert-Look | Rahmen, Listen, Karten, Felder stehen |
 | Fallakte im Stil der autoiXpert-Gutachtenmaske | offen |
 | WBW-Modul: Eingabemaske und `params.json` | Abbildung steht, Maske noch nicht eingehängt |
@@ -62,7 +62,7 @@ Solange der Ausbau läuft, gilt eine enge Sperre. Sie steht in
 | Regel | Voreinstellung | Lösen über |
 | --- | --- | --- |
 | nur offene Gutachten | an | `AUTOIXPERT_NUR_OFFENE=false` |
-| frühestens angelegt am | `2026-05-01` | `AUTOIXPERT_FRUEHESTENS` |
+| frühestens angelegt am | `2026-02-01` | `AUTOIXPERT_FRUEHESTENS` |
 | schreibende Zugriffe | gesperrt | `AUTOIXPERT_SCHREIBEN=erlaubt` |
 
 Grund ist nicht nur der Auftrag, sondern auch Geld: autoiXpert rechnet Lesezugriffe
