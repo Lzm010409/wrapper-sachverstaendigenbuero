@@ -4,6 +4,7 @@ import type { Dokument } from '@/autoixpert/typen'
 import type { EingelesenerBericht } from '@/pruefbericht/einlesen'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/protokoll', () => ({ protokolliereWarnung: vi.fn() }))
 
 const leseBericht = vi.fn()
 vi.mock('@/pruefbericht/einlesen', () => ({ leseBericht: (...args: unknown[]) => leseBericht(...args) }))
@@ -65,6 +66,34 @@ describe('ladeGutachtenKalkulation', () => {
     const ergebnis = await ladeGutachtenKalkulation(c as unknown as AutoixpertClient, 'r1')
 
     expect(ergebnis.quelle).toBe('report')
+    expect(c.holeDokumentDatei).toHaveBeenCalledWith('r1', 'report')
+  })
+
+  it('weicht auf das Gutachten-PDF aus, wenn die gelistete DAT-Schadenskalkulation nicht ladbar ist', async () => {
+    // Realer Fall: autoiXpert listet das Dokument, der Download selbst
+    // scheitert dann aber serverseitig bei ihnen (HTTP 500) — gelistet
+    // heisst nicht ladbar.
+    leseBericht.mockResolvedValue(BERICHT)
+    extrahiereKalkulation.mockResolvedValue({
+      kalkulation: { zeilen: [{ bezeichnung: 'Lohn', betrag: 100 }], summeNetto: 100, unklarheiten: [] },
+      quellen: { text: 1, bild: 0 },
+    })
+
+    const c = client([
+      { id: 'd1', type: 'report' },
+      { id: 'd2', type: 'dat_damage_calculation' },
+    ] as Dokument[])
+    c.holeDokumentDatei.mockImplementation((reportId: string, quelle: string) => {
+      if (quelle === 'dat_damage_calculation') {
+        return Promise.reject(new Error('Das Dokument liess sich nicht laden (HTTP 500).'))
+      }
+      return Promise.resolve(Buffer.from('PDF'))
+    })
+
+    const ergebnis = await ladeGutachtenKalkulation(c as unknown as AutoixpertClient, 'r1')
+
+    expect(ergebnis.quelle).toBe('report')
+    expect(c.holeDokumentDatei).toHaveBeenCalledWith('r1', 'dat_damage_calculation')
     expect(c.holeDokumentDatei).toHaveBeenCalledWith('r1', 'report')
   })
 })
