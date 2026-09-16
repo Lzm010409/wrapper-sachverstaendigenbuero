@@ -696,6 +696,40 @@ Direkt nach der Anlage trägt es oft nur die ID. `leseFalldaten` liest jedes
 Feld optional — ein sehr dünnes Gutachten erzeugt keine Ausnahme, nur viele
 offene Felder in der Ansicht.
 
+## Kalkulationsvorschlag: Kürzungsposition gegen die echte Kalkulation
+
+Dritte Ausbaustufe rund um Kürzungspositionen in Stellungnahmen (nach dem
+Import bestehender Schreiben und dem Bearbeiten/Löschen von Positionen): beim
+Bearbeiten einer Position erscheint ein Vorschlag für `betragGutachten`, der
+aus der **tatsächlichen Kalkulation** des zugehörigen Gutachtens stammt, nicht
+nur aus dem Text des Versicherer-Schreibens — die unter Punkt 1 oben getroffene
+Entscheidung, umgesetzt.
+
+**Woher die Kalkulation kommt.** `GET /reports/{id}/documents` listet die
+Dokumente eines Gutachtens mit ihrem Typ; erst versucht wird
+`dat_damage_calculation` (tabellarisch, ohne Fließtext drumherum), fehlt sie,
+ersatzweise das volle Gutachten-PDF (`type: report`). Beide Dokument-Typen
+lassen sich ohne vorherige ID-Auflösung direkt über ihren Typ herunterladen
+(`GET .../documents/{type}/download`). Das Lesen läuft über dieselbe
+Seiten-für-Seite-Pipeline wie der Prüfbericht-Import
+(`src/pruefbericht/einlesen.ts`): Text, wo welcher steht, gerastert, wo nicht.
+
+**Zwischenspeicher statt Live-Abruf.** Anders als der Reiter „Kalkulation"
+(`src/fall/kalkulation.ts`, der bei jedem Aufruf neu die VXS-Summen holt) wird
+der Kalkulationsauszug hier **pro Fall** in `fall_kalkulation` abgelegt
+(`src/gutachtenkalkulation/cache.ts`). Ein Dokumentabruf plus ein Modellaufruf
+sind zu teuer, um bei jedem Öffnen jeder Position erneut zu laufen — ein
+Knopf „Neu laden" ersetzt den Stand vollständig, wenn sich das Gutachten
+geändert hat.
+
+**Zuordnung per KI, nicht per Stichwortsuche.** Die Bezeichnung einer
+Kürzungsposition stammt oft aus dem Prüfbericht des Versicherers und ist
+nicht wortgleich mit der Kalkulation. `src/stellungnahme/kalkulationsabgleich.ts`
+lässt ein Sprachmodell die passenden Kalkulationszeilen benennen (als Index in
+eine feste Liste, mehrere Zeilen möglich); die Summe der Beträge bildet
+anschließend der Code aus den echten Zahlen, nicht das Modell — ein Index
+lässt sich nachrechnen, eine vom Modell selbst gebildete Summe nicht.
+
 ## Offene Punkte
 
 - Recherchelauf des WBW-Plugins anschließen (Job-Dienst mit Fortschritt,
@@ -703,7 +737,6 @@ offene Felder in der Ansicht.
 - Alte Kleinanzeigen-Anwendung abschalten, sobald ein vollständiger Lauf über
   den neuen Weg im Alltag durchgelaufen ist
 - Kürzungscockpit aus dem vorhandenen Projekt integrieren
-- Extraktion der Kalkulationszahlen aus dem gerenderten Gutachten-Dokument
 - Anmeldung, Datenbank, Änderungsprotokoll
 - Dokumenten- und Versandcockpit
 - Die rund vierzig verbliebenen rohen `<div class="hinweis">` auf die

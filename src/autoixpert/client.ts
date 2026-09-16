@@ -1,7 +1,9 @@
 import {
+  dokumentlisteAntwortSchema,
   einzelAntwortSchema,
   fotolisteSchema,
   listenAntwortSchema,
+  type Dokument,
   type Fotodaten,
   type Fotoformat,
   type Gutachten,
@@ -192,6 +194,71 @@ export class AutoixpertClient {
       )
     }
     return antwort.text()
+  }
+
+  /**
+   * Die Dokumente eines Gutachtens — Metadaten, nicht die Dateien selbst.
+   *
+   * Trägt für jedes Dokument seinen `type` (u.a. `report` für das Gutachten
+   * selbst, `dat_damage_calculation` für die DAT-Schadenskalkulation). Für
+   * `src/gutachtenkalkulation/` ist das der Weg, zu prüfen, ob eine
+   * DAT-Kalkulation überhaupt vorliegt, bevor sie heruntergeladen wird —
+   * ein Gutachten ohne DAT-Zugang hat keine.
+   */
+  async holeDokumente(reportId: string): Promise<Dokument[]> {
+    const roh = await this.anfrage(`/reports/${encodeURIComponent(reportId)}/documents`)
+    const geprueft = dokumentlisteAntwortSchema.safeParse(roh)
+    if (!geprueft.success) {
+      throw new AutoixpertFehler('Die Dokumentliste von autoiXpert hat eine unerwartete Form.')
+    }
+    return geprueft.data.documents
+  }
+
+  /**
+   * Lädt die Datei eines Dokuments herunter — als **Puffer**, nicht als
+   * Strom.
+   *
+   * Anders als bei `holeFotoDatei` ist das hier vertretbar: eine
+   * DAT-Kalkulation oder ein Gutachten-PDF hat wenige Megabyte, und die
+   * Datei wird im Anschluss ohnehin vollständig gebraucht — Seite für Seite
+   * eingelesen (`src/pruefbericht/einlesen.ts`).
+   *
+   * `dokumentTypOderId` nimmt für eindeutige Dokument-Typen (u.a. `report`,
+   * `dat_damage_calculation`) den Typ direkt entgegen, ohne vorher die
+   * Dokument-ID nachschlagen zu müssen.
+   */
+  async holeDokumentDatei(
+    reportId: string,
+    dokumentTypOderId: string,
+    format: 'pdf' | 'docx' = 'pdf',
+  ): Promise<Buffer> {
+    const url = new URL(
+      `${this.basisUrl}/reports/${encodeURIComponent(reportId)}/documents/${encodeURIComponent(dokumentTypOderId)}/download`,
+    )
+    url.searchParams.set('format', format)
+
+    let antwort: Response
+    try {
+      antwort = await this.hole(url.toString(), {
+        headers: { authorization: `Bearer ${this.token}` },
+        signal: AbortSignal.timeout(ZEITLIMIT_MS),
+      })
+    } catch (fehler) {
+      throw new AutoixpertFehler(nichtErreichbar(fehler))
+    }
+
+    if (antwort.status === 404) {
+      throw new AutoixpertFehler(`Dokument „${dokumentTypOderId}" wurde bei autoiXpert nicht gefunden.`, 404)
+    }
+    if (!antwort.ok) {
+      const text = await antwort.text().catch(() => '')
+      throw new AutoixpertFehler(
+        `Das Dokument liess sich nicht laden (HTTP ${antwort.status}). ${text.slice(0, 200)}`,
+        antwort.status,
+      )
+    }
+
+    return Buffer.from(await antwort.arrayBuffer())
   }
 
   /** Eine Seite der Gutachtenliste. */

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { eintrag, position, stellungnahme } from '@/db/schema'
+import { eintrag, fall, position, stellungnahme } from '@/db/schema'
 import { verlangeBenutzer } from '@/auth/sitzung'
 import { gutachtenSchema } from '@/autoixpert/typen'
 import { leseFalldaten, platzhalterWerte } from '@/autoixpert/felder'
@@ -17,6 +17,8 @@ import { formulierePosition } from './komposition'
 import { ladeStellungnahme } from './abfragen'
 import { istDublette, sperreBereichZurNummernvergabe } from '@/bibliothek/sperre'
 import { pruefePositionsfelder, type PositionsfelderEingabe } from './positions-validierung'
+import { aktualisiereFallKalkulation, holeOderLadeFallKalkulation } from '@/gutachtenkalkulation/cache'
+import { ermittleKalkulationsvorschlag as ordneKalkulationszeilenZu } from './kalkulationsabgleich'
 
 /* ------------------------------------------------------------------ *
  * Speichern
@@ -414,4 +416,92 @@ export async function positionsReihenfolge(stellungnahmeId: string): Promise<str
     .where(and(eq(position.stellungnahmeId, stellungnahmeId)))
     .orderBy(asc(position.reihenfolge))
   return zeilen.map((z) => z.id)
+}
+
+/* ------------------------------------------------------------------ *
+ * Kalkulationsvorschlag für betragGutachten
+ * ------------------------------------------------------------------ */
+
+/** Der Fall hinter einer Position — über Stellungnahme, nicht per fallId aus dem Formular. */
+async function fallZuPosition(
+  positionId: string,
+): Promise<{ id: string; autoixpertId: string | null } | null> {
+  const [zeile] = await db
+    .select({ id: fall.id, autoixpertId: fall.autoixpertId })
+    .from(position)
+    .innerJoin(stellungnahme, eq(position.stellungnahmeId, stellungnahme.id))
+    .innerJoin(fall, eq(stellungnahme.fallId, fall.id))
+    .where(eq(position.id, positionId))
+    .limit(1)
+  return zeile ?? null
+}
+
+export type KalkulationsvorschlagErgebnis =
+  | {
+      stand: 'vorschlag'
+      betrag: number
+      begruendung: string
+      verwendeteZeilen: { bezeichnung: string; betrag: number }[]
+      quelle: 'dat_damage_calculation' | 'report'
+    }
+  | { stand: 'kein_treffer'; quelle: 'dat_damage_calculation' | 'report' }
+  /** Zur Kalkulation kamen keine auswertbaren Zeilen zurück. */
+  | { stand: 'keine_kalkulation' }
+  /** Die Position hängt an keinem Fall oder der Fall an keinem autoiXpert-Gutachten. */
+  | { stand: 'kein_gutachten' }
+  | { stand: 'nicht_eingerichtet' }
+  | { stand: 'fehler'; meldung: string }
+
+/**
+ * Ermittelt den Kalkulationsvorschlag für `betragGutachten` einer Position —
+ * aus der tatsächlichen Kalkulation des zugehörigen Gutachtens bei
+ * autoiXpert, nicht nur aus dem Text des Versicherer-Schreibens.
+ *
+ * Der zwischengespeicherte Kalkulationsauszug des Falls (`fall_kalkulation`)
+ * wird beim ersten Bedarf automatisch geladen; `erzwingeNeuladen` ist der
+ * manuelle „Neu laden"-Knopf für den Fall, dass sich das Gutachten seitdem
+ * geändert hat.
+ */
+export async function ladeKalkulationsvorschlag(
+  positionId: string,
+  optionen: { erzwingeNeuladen?: boolean } = {},
+): Promise<KalkulationsvorschlagErgebnis> {
+  const benutzer = await verlangeBenutzer()
+
+  const bezug = await fallZuPosition(positionId)
+  if (!bezug) return { stand: 'fehler', meldung: 'Diese Position gibt es nicht mehr.' }
+
+  const [posZeile] = await db
+    .select({ bezeichnung: position.bezeichnung, begruendungVersicherer: position.begruendungVersicherer })
+    .from(position)
+    .where(eq(position.id, positionId))
+    .limit(1)
+  if (!posZeile) return { stand: 'fehler', meldung: 'Diese Position gibt es nicht mehr.' }
+
+  const kalkulationsstand =
+    optionen.erzwingeNeuladen && bezug.autoixpertId
+      ? await aktualisiereFallKalkulation(bezug.id, bezug.autoixpertId, benutzer.id)
+      : await holeOderLadeFallKalkulation(bezug.id, bezug.autoixpertId, benutzer.id)
+
+  if (kalkulationsstand.stand !== 'gefunden') return kalkulationsstand
+
+  const { quelle, zeilen } = kalkulationsstand.cache
+  if (zeilen.length === 0) return { stand: 'keine_kalkulation' }
+
+  try {
+    const vorschlag = await ordneKalkulationszeilenZu(
+      { bezeichnung: posZeile.bezeichnung, begruendungVersicherer: posZeile.begruendungVersicherer },
+      zeilen,
+    )
+    if (!vorschlag) return { stand: 'kein_treffer', quelle }
+    return {
+      stand: 'vorschlag',
+      betrag: vorschlag.betrag,
+      begruendung: vorschlag.begruendung,
+      verwendeteZeilen: vorschlag.verwendeteZeilen,
+      quelle,
+    }
+  } catch (fehler) {
+    return { stand: 'fehler', meldung: fehler instanceof Error ? fehler.message : String(fehler) }
+  }
 }
